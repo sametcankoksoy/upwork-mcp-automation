@@ -113,21 +113,19 @@ function setSetting(key, val) {
 }
 
 // Seed default tracked keywords if empty
-const kwCount = db.prepare('SELECT COUNT(*) as c FROM tracked_keywords').get().c;
-if (kwCount === 0) {
-  const defaultKeywords = [
-    ['n8n', 'Workflow Automation'],
-    ['AI Automation', 'AI & Agents'],
-    ['Voice AI', 'Voice & Telephony'],
-    ['Make.com', 'Workflow Automation'],
-    ['MCP Server', 'AI & Agents'],
-    ['Web Scraping', 'Data Extraction']
-  ];
-  const insertKw = db.prepare('INSERT OR IGNORE INTO tracked_keywords (keyword, category) VALUES (?, ?)');
-  for (const [kw, cat] of defaultKeywords) {
-    insertKw.run(kw, cat);
-  }
+const defaultKeywords = [
+  ['Automation', 'Core Niche'],
+  ['Data Scraping', 'Core Niche'],
+  ['AI Automation', 'Core Niche'],
+  ['Full-Stack Development', 'Core Niche'],
+  ['Back-End Development', 'Core Niche']
+];
+const insertKw = db.prepare('INSERT OR IGNORE INTO tracked_keywords (keyword, category, active) VALUES (?, ?, 1)');
+for (const [kw, cat] of defaultKeywords) {
+  insertKw.run(kw, cat);
 }
+// Deactivate old sub-niches unless explicitly added so we focus on the 5 core categories
+db.exec(`UPDATE tracked_keywords SET active = 0 WHERE keyword IN ('n8n', 'Voice AI', 'Make.com', 'MCP Server', 'Web Scraping');`);
 
 // Bootstrap tokens from UPWORK_TOKENS_JSON env var if running on Render/Cloud
 if (process.env.UPWORK_TOKENS_JSON && !getSetting('upwork_tokens')) {

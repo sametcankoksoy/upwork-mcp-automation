@@ -136,11 +136,13 @@ function getFullMarketAnalytics(keywordFilter = null) {
   }
   timeBlockWindows.sort((a, b) => a.avg_proposals_per_job - b.avg_proposals_per_job);
 
-  // 4. Keyword / Niche Breakdown (Velocity, Ghost Rate, Hire Rate)
+  // 4. Keyword / Niche Breakdown (Job Volume, Velocity, Avg Applies, Ghost Rate, Hire Rate)
   const keywordBreakdown = db.prepare(`
     SELECT
       keyword_matched as keyword,
       COUNT(*) as total_jobs,
+      SUM(CASE WHEN datetime(posted_at) >= datetime('now', '-24 hours') THEN 1 ELSE 0 END) as jobs_last_24h,
+      ROUND(AVG(current_proposals_numeric), 1) as avg_proposals,
       ROUND(AVG(mins_to_5_10_proposals), 1) as avg_mins_to_5_10,
       ROUND(AVG(mins_to_10_15_proposals), 1) as avg_mins_to_10_15,
       ROUND(SUM(CASE WHEN job_status = 'hired' OR hires_count > 0 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as hire_conversion_pct,
@@ -149,7 +151,7 @@ function getFullMarketAnalytics(keywordFilter = null) {
       ROUND(AVG(CASE WHEN budget > 0 THEN budget ELSE NULL END), 0) as avg_budget
     FROM jobs
     GROUP BY keyword_matched
-    ORDER BY total_jobs DESC
+    ORDER BY jobs_last_24h DESC, total_jobs DESC
   `).all();
 
   // 5. Proposal Velocity Distribution (How fast jobs hit 5-10 proposals)

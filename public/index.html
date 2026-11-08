@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Upwork Market Intelligence & Ghost Job Radar</title>
+  <title>Upwork Analytics</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -12,214 +12,121 @@
         extend: {
           colors: {
             upwork: '#14a800',
-            darkbg: '#090d16',
-            cardbg: '#111827',
-            bordercol: '#1f2937'
+            bg: '#0b0f17',
+            panel: '#111827',
+            line: '#1f2937'
           }
         }
       }
     };
   </script>
 </head>
-<body class="bg-darkbg text-gray-100 min-h-screen font-sans antialiased">
-  <!-- Header -->
-  <header class="border-b border-bordercol bg-cardbg/80 backdrop-blur sticky top-0 z-30">
-    <div class="max-w-7xl mx-auto px-4 py-3.5 flex flex-wrap items-center justify-between gap-4">
+<body class="bg-bg text-gray-100 min-h-screen font-sans antialiased">
+  <!-- Minimal Top Bar -->
+  <header class="border-b border-line bg-panel">
+    <div class="max-w-5xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
       <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-lg bg-upwork/20 border border-upwork flex items-center justify-center text-upwork font-bold text-lg">
-          U
-        </div>
-        <div>
-          <h1 class="text-lg font-bold tracking-tight flex items-center gap-2">
-            Upwork Market Intelligence
-            <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-              MCP & Lifecycle Radar
-            </span>
-          </h1>
-          <p class="text-xs text-gray-400" id="statusSubtitle">Proposal Velocity (5-10 Applies), Ghost Job Rate & 60%+ Hire Rate Cohort Analytics</p>
-        </div>
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400" id="connDot"></span>
+        <h1 class="text-base font-semibold tracking-tight text-white">Upwork Market Analytics</h1>
+        <span class="text-xs text-gray-400" id="connText">Live MCP</span>
       </div>
 
-      <div class="flex flex-wrap items-center gap-3">
-        <a id="connectUpworkBtn" href="/auth/upwork/login" class="bg-gray-800 hover:bg-gray-700 border border-emerald-500/40 text-emerald-400 font-medium text-xs px-3.5 py-2 rounded-lg transition flex items-center gap-1.5">
-          <span>🔗 Connect Live Upwork MCP</span>
-        </a>
-
-        <button onclick="clearMockData()" class="bg-gray-900 hover:bg-rose-950/50 border border-gray-700 hover:border-rose-500/40 text-gray-400 hover:text-rose-300 text-xs px-3 py-2 rounded-lg transition" title="Remove seeded demo data and keep only real-time jobs">
-          🧹 Clear Demo Data
-        </button>
-
-        <select id="keywordFilter" class="bg-gray-900 border border-gray-700 text-sm rounded-lg px-3 py-2 text-gray-200 focus:outline-none focus:border-upwork">
-          <option value="ALL">All Categories (All Jobs)</option>
+      <div class="flex items-center gap-2">
+        <select id="keywordFilter" class="bg-bg border border-line text-xs rounded-lg px-3 py-2 text-gray-200 focus:outline-none">
+          <option value="ALL">All Categories</option>
         </select>
-
-        <button id="pollBtn" onclick="triggerPoll()" class="bg-upwork hover:bg-emerald-600 text-white font-medium text-sm px-4 py-2 rounded-lg transition flex items-center gap-2 shadow-lg shadow-upwork/20">
-          <span>⚡ Run Live Snapshot Poll</span>
+        <button id="pollBtn" onclick="triggerPoll()" class="bg-upwork hover:bg-emerald-600 text-white text-xs font-medium px-3.5 py-2 rounded-lg transition">
+          Sync Now
         </button>
       </div>
     </div>
   </header>
 
-  <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
-    <!-- Top KPI Cards -->
-    <section class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4" id="kpiGrid">
-      <!-- Populated by JS -->
-    </section>
+  <main class="max-w-5xl mx-auto px-4 py-6 space-y-6">
+    <!-- 4 Simple KPIs -->
+    <section class="grid grid-cols-2 sm:grid-cols-4 gap-3" id="kpiGrid"></section>
 
-    <!-- Core Question 1: Client Hire Rate >= 60% vs < 60% Cohort Table -->
-    <section class="bg-cardbg border border-bordercol rounded-xl p-5">
-      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-        <div>
-          <h2 class="text-base font-bold text-white flex items-center gap-2">
-            🎯 Client Quality Cohorts: How Often Do 60%+ Hire Rate Clients Actually Hire?
-          </h2>
-          <p class="text-xs text-gray-400 mt-0.5">
-            Actual hire conversion rate vs. ghost job abandonment rate segmented by the client's historical Upwork hire rate
-          </p>
-        </div>
-      </div>
+    <!-- 1. Category Comparison (Which category has the most jobs & least competition?) -->
+    <section class="bg-panel border border-line rounded-xl p-5">
+      <h2 class="text-sm font-semibold text-white mb-1">1. Category Volume & Competition</h2>
+      <p class="text-xs text-gray-400 mb-4">Comparison across Automation, Data Scraping, AI Automation, Full-Stack & Back-End</p>
       <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse text-sm">
+        <table class="w-full text-left text-xs">
           <thead>
-            <tr class="border-b border-gray-800 text-gray-400 text-xs uppercase">
-              <th class="py-3 px-3">Client Cohort (Historical Hire Rate)</th>
-              <th class="py-3 px-3">Jobs Posted</th>
-              <th class="py-3 px-3">Jobs Hired</th>
-              <th class="py-3 px-3">Actual Hire Conversion (%)</th>
-              <th class="py-3 px-3">Ghost Job Rate (%)</th>
-              <th class="py-3 px-3">Time to 5-10 Applies</th>
-              <th class="py-3 px-3">Avg. Time to Hire</th>
-              <th class="py-3 px-3">Avg. Fixed Budget</th>
+            <tr class="border-b border-line text-gray-400">
+              <th class="py-2.5 px-2">Category</th>
+              <th class="py-2.5 px-2">Jobs Tracked</th>
+              <th class="py-2.5 px-2">Avg. Applies</th>
+              <th class="py-2.5 px-2">5-10 Apply Speed</th>
+              <th class="py-2.5 px-2">60%+ Hire Clients</th>
+              <th class="py-2.5 px-2">Actual Hire %</th>
+              <th class="py-2.5 px-2">Ghost %</th>
             </tr>
           </thead>
-          <tbody id="cohortTableBody" class="divide-y divide-gray-800/60"></tbody>
+          <tbody id="keywordTableBody" class="divide-y divide-line"></tbody>
         </table>
       </div>
     </section>
 
-    <!-- Two Column: Hourly Heatmap & Proposal Velocity -->
-    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Hourly Posting Volume & Speed -->
-      <div class="lg:col-span-2 bg-cardbg border border-bordercol rounded-xl p-5">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <h2 class="text-base font-bold text-white">⏰ Hourly Job Volume, Avg Applies & Saturation Speed (UTC+3 / UTC)</h2>
-            <p class="text-xs text-gray-400">Number of jobs posted per hour, average total proposals received, and minutes to hit 5-10 applies</p>
-          </div>
-        </div>
-        <div id="hourlyChart" class="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2 pt-2"></div>
-      </div>
-
-      <!-- 5-10 Proposal Velocity Breakdown -->
-      <div class="bg-cardbg border border-bordercol rounded-xl p-5 flex flex-col justify-between">
-        <div>
-          <h2 class="text-base font-bold text-white mb-1">🚀 Time to 5-10 Proposals</h2>
-          <p class="text-xs text-gray-400 mb-4">Distribution of how fast newly posted jobs reach the 5-10 proposal tier</p>
-          <div id="velocityList" class="space-y-3"></div>
-        </div>
-        <div class="mt-5 pt-4 border-t border-gray-800 text-xs text-gray-400" id="velocityInsight"></div>
-      </div>
-    </section>
-
-    <!-- Low-Competition Time Windows Ranking (Which time ranges get fewer applies?) -->
-    <section class="bg-cardbg border border-bordercol rounded-xl p-5">
-      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-        <div>
-          <h2 class="text-base font-bold text-white flex items-center gap-2">
-            🏆 Low-Competition Time Windows: When Do Jobs Receive the Fewest Proposals?
-          </h2>
-          <p class="text-xs text-gray-400 mt-0.5">
-            3-hour time blocks ranked from lowest average proposals per job (Golden Windows) to most crowded hours
-          </p>
-        </div>
-      </div>
+    <!-- 2. Time Windows (When do jobs get the fewest applies?) -->
+    <section class="bg-panel border border-line rounded-xl p-5">
+      <h2 class="text-sm font-semibold text-white mb-1">2. Best Time Windows (Lowest Proposals vs. Volume)</h2>
+      <p class="text-xs text-gray-400 mb-4">Ranked from fewest average proposals per job to most crowded hours (Turkey Time UTC+3)</p>
       <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse text-sm">
+        <table class="w-full text-left text-xs">
           <thead>
-            <tr class="border-b border-gray-800 text-gray-400 text-xs uppercase">
-              <th class="py-3 px-3">Time Window (UTC+3 / UTC)</th>
-              <th class="py-3 px-3">Competition Level</th>
-              <th class="py-3 px-3">Avg. Proposals / Job</th>
-              <th class="py-3 px-3">Jobs Staying ≤10 Applies (%)</th>
-              <th class="py-3 px-3">Avg. Time to 5-10 Applies</th>
-              <th class="py-3 px-3">Jobs Posted</th>
-              <th class="py-3 px-3">Actual Hire Rate (%)</th>
+            <tr class="border-b border-line text-gray-400">
+              <th class="py-2.5 px-2">Hours (TR / UTC+3)</th>
+              <th class="py-2.5 px-2">Status</th>
+              <th class="py-2.5 px-2">Avg. Applies / Job</th>
+              <th class="py-2.5 px-2">≤10 Applies Rate</th>
+              <th class="py-2.5 px-2">5-10 Apply Speed</th>
+              <th class="py-2.5 px-2">Jobs Posted</th>
             </tr>
           </thead>
-          <tbody id="timeWindowTableBody" class="divide-y divide-gray-800/60"></tbody>
+          <tbody id="timeWindowTableBody" class="divide-y divide-line"></tbody>
         </table>
       </div>
     </section>
 
-    <!-- Keyword / Niche Comparison -->
-    <section class="bg-cardbg border border-bordercol rounded-xl p-5">
-      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-        <div>
-          <h2 class="text-base font-bold text-white">📊 Category / Keyword Velocity & Ghost Job Breakdown</h2>
-          <p class="text-xs text-gray-400">Compare proposal saturation speed, actual hire rate, and ghost job percentage across tracked niches</p>
-        </div>
-        <form onsubmit="addKeyword(event)" class="flex items-center gap-2">
-          <input id="newKeywordInput" type="text" placeholder="Add keyword (e.g. LangChain)" class="bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-upwork" />
-          <button type="submit" class="bg-gray-800 hover:bg-gray-700 text-xs px-3 py-1.5 rounded-lg border border-gray-700 transition">+ Track Keyword</button>
-        </form>
-      </div>
+    <!-- 3. Client Quality (60%+ Hire Rate vs Others) -->
+    <section class="bg-panel border border-line rounded-xl p-5">
+      <h2 class="text-sm font-semibold text-white mb-1">3. Client Hire Rate Analysis (≥60% vs. Under 60%)</h2>
+      <p class="text-xs text-gray-400 mb-4">How often high hire-rate clients actually hire vs. abandon (ghost) jobs</p>
       <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse text-sm">
+        <table class="w-full text-left text-xs">
           <thead>
-            <tr class="border-b border-gray-800 text-gray-400 text-xs uppercase">
-              <th class="py-2.5 px-3">Category / Keyword</th>
-              <th class="py-2.5 px-3">Total Jobs</th>
-              <th class="py-2.5 px-3">Time to 5-10 Applies</th>
-              <th class="py-2.5 px-3">Time to 10-15 Applies</th>
-              <th class="py-2.5 px-3">Actual Hire (%)</th>
-              <th class="py-2.5 px-3">Ghost Job (%)</th>
-              <th class="py-2.5 px-3">60%+ Hire Rate Clients</th>
-              <th class="py-2.5 px-3">Avg. Budget</th>
+            <tr class="border-b border-line text-gray-400">
+              <th class="py-2.5 px-2">Client Segment</th>
+              <th class="py-2.5 px-2">Jobs</th>
+              <th class="py-2.5 px-2">Actual Hire Rate</th>
+              <th class="py-2.5 px-2">Ghost Rate</th>
+              <th class="py-2.5 px-2">5-10 Apply Speed</th>
+              <th class="py-2.5 px-2">Avg. Budget</th>
             </tr>
           </thead>
-          <tbody id="keywordTableBody" class="divide-y divide-gray-800/60"></tbody>
+          <tbody id="cohortTableBody" class="divide-y divide-line"></tbody>
         </table>
       </div>
     </section>
 
-    <!-- Sniper Opportunities + Full Lifecycle Table -->
-    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Live Sniper Opportunities -->
-      <div class="bg-cardbg border border-emerald-500/30 rounded-xl p-5">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-base font-bold text-emerald-400 flex items-center gap-1.5">
-            🔥 Live Sniper Opportunities
-          </h2>
-          <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300">Hire Rate ≥ 60% & Low Applies</span>
-        </div>
-        <p class="text-xs text-gray-400 mb-4">Open jobs with the lowest ghost probability and highest historical conversion rate:</p>
-        <div id="sniperList" class="space-y-3"></div>
-      </div>
-
-      <!-- Recent Tracked Jobs Lifecycle -->
-      <div class="lg:col-span-2 bg-cardbg border border-bordercol rounded-xl p-5">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <h2 class="text-base font-bold text-white">🕵️ Job Lifecycle Log (Recently Tracked Postings)</h2>
-            <p class="text-xs text-gray-400">Posting timestamp, client hire rate, minutes taken to hit 5-10 proposals, and current status</p>
-          </div>
-        </div>
-        <div class="overflow-x-auto max-h-[460px] overflow-y-auto">
-          <table class="w-full text-left border-collapse text-xs">
-            <thead class="sticky top-0 bg-cardbg border-b border-gray-800 text-gray-400 uppercase">
-              <tr>
-                <th class="py-2.5 px-2">Job Title & Niche</th>
-                <th class="py-2.5 px-2">Budget</th>
-                <th class="py-2.5 px-2">Client Hire Rate</th>
-                <th class="py-2.5 px-2">Current Proposals</th>
-                <th class="py-2.5 px-2">5-10 Apply Speed</th>
-                <th class="py-2.5 px-2">Interviews / Hires</th>
-                <th class="py-2.5 px-2">Lifecycle Status</th>
-              </tr>
-            </thead>
-            <tbody id="recentJobsBody" class="divide-y divide-gray-800/60"></tbody>
-          </table>
-        </div>
+    <!-- 4. Live Jobs Feed -->
+    <section class="bg-panel border border-line rounded-xl p-5">
+      <h2 class="text-sm font-semibold text-white mb-3">4. Recent Tracked Jobs</h2>
+      <div class="overflow-x-auto max-h-96 overflow-y-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="sticky top-0 bg-panel border-b border-line text-gray-400">
+            <tr>
+              <th class="py-2 px-2">Job Title</th>
+              <th class="py-2 px-2">Category</th>
+              <th class="py-2 px-2">Budget</th>
+              <th class="py-2 px-2">Client Hire %</th>
+              <th class="py-2 px-2">Proposals</th>
+              <th class="py-2 px-2">Posted</th>
+            </tr>
+          </thead>
+          <tbody id="recentJobsBody" class="divide-y divide-line"></tbody>
+        </table>
       </div>
     </section>
   </main>
@@ -236,19 +143,13 @@
     function renderDashboard(data) {
       const s = data.summary;
 
-      if (data.upworkConfig?.hasAccessToken) {
-        const btn = document.getElementById('connectUpworkBtn');
-        btn.innerHTML = '✅ Live Upwork MCP Connected';
-        btn.className = 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 font-semibold text-xs px-3.5 py-2 rounded-lg flex items-center gap-1.5';
-      }
-
-      // Populate filter dropdown once
+      // Dropdown
       const select = document.getElementById('keywordFilter');
       if (select.options.length <= 1 && data.trackedKeywords) {
-        data.trackedKeywords.forEach(k => {
+        data.trackedKeywords.filter(k => k.active).forEach(k => {
           const opt = document.createElement('option');
           opt.value = k.keyword;
-          opt.textContent = `${k.keyword} (${k.category})`;
+          opt.textContent = k.keyword;
           select.appendChild(opt);
         });
         select.onchange = (e) => {
@@ -257,207 +158,84 @@
         };
       }
 
-      // 1. KPI Grid
+      // 4 Clean KPIs
       const kpis = [
-        { label: 'Total Tracked Jobs', val: s.total_jobs, sub: `${s.total_active_open} currently open`, color: 'text-white' },
-        { label: 'Avg. Time to 5-10 Applies', val: `${s.avg_mins_to_5_10 || '-'} min`, sub: `10-15 applies: ${s.avg_mins_to_10_15 || '-'} min`, color: 'text-amber-400' },
-        { label: 'Actual Hire Conversion', val: `${s.hire_conversion_rate}%`, sub: `${s.total_hired_jobs} jobs resulted in hire`, color: 'text-emerald-400' },
-        { label: 'Ghost Job Rate', val: `${s.ghost_job_rate}%`, sub: `${s.total_ghost_jobs} jobs abandoned`, color: 'text-rose-400' },
-        { label: 'Avg. Time to Hire', val: `${s.avg_hours_to_hire || '-'} hrs`, sub: `1st interview: ${s.avg_mins_to_interview || '-'} min`, color: 'text-sky-400' },
-        { label: 'Avg. Fixed Budget', val: `$${(s.avg_fixed_budget || 0).toLocaleString()}`, sub: `Avg. Client Hire Rate: ${s.avg_client_hire_rate}%`, color: 'text-purple-400' }
+        { label: 'Tracked Jobs', val: s.total_jobs, color: 'text-white' },
+        { label: 'Avg. 5-10 Apply Speed', val: s.avg_mins_to_5_10 ? `${s.avg_mins_to_5_10} min` : 'Tracking...', color: 'text-amber-400' },
+        { label: 'Avg. Client Hire Rate', val: `${s.avg_client_hire_rate || 0}%`, color: 'text-emerald-400' },
+        { label: 'Ghost Job Rate', val: `${s.ghost_job_rate || 0}%`, color: 'text-rose-400' }
       ];
 
       document.getElementById('kpiGrid').innerHTML = kpis.map(k => `
-        <div class="bg-cardbg border border-bordercol rounded-xl p-4">
+        <div class="bg-panel border border-line rounded-xl p-4">
           <div class="text-xs text-gray-400">${k.label}</div>
-          <div class="text-2xl font-bold mt-1 ${k.color}">${k.val}</div>
-          <div class="text-[11px] text-gray-500 mt-1">${k.sub}</div>
+          <div class="text-xl font-bold mt-1 ${k.color}">${k.val}</div>
         </div>
       `).join('');
 
-      // 2. Client Hire Rate Cohorts Table
-      document.getElementById('cohortTableBody').innerHTML = data.hireRateCohorts.map(c => {
-        const isHigh = c.cohort.includes('60%+');
-        const badgeClass = isHigh
-          ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-          : (c.cohort.includes('35%') ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' : 'bg-rose-500/15 text-rose-400 border-rose-500/30');
-        return `
-          <tr class="hover:bg-gray-800/40">
-            <td class="py-3 px-3 font-medium">
-              <span class="px-2.5 py-1 rounded-md text-xs border ${badgeClass}">${c.cohort}</span>
-            </td>
-            <td class="py-3 px-3 font-semibold">${c.jobs_posted}</td>
-            <td class="py-3 px-3 text-emerald-400 font-semibold">${c.jobs_hired}</td>
-            <td class="py-3 px-3">
-              <div class="flex items-center gap-2">
-                <span class="font-bold ${isHigh ? 'text-emerald-400' : 'text-gray-200'}">${c.actual_hire_conversion_pct}%</span>
-                <div class="w-20 bg-gray-800 h-2 rounded-full overflow-hidden">
-                  <div class="bg-emerald-500 h-full" style="width: ${Math.min(100, c.actual_hire_conversion_pct)}%"></div>
-                </div>
-              </div>
-            </td>
-            <td class="py-3 px-3">
-              <span class="font-bold ${c.ghost_rate_pct > 50 ? 'text-rose-400' : 'text-gray-300'}">${c.ghost_rate_pct}%</span>
-              <span class="text-xs text-gray-500">(${c.ghost_jobs} ghost)</span>
-            </td>
-            <td class="py-3 px-3 text-amber-300">${c.avg_mins_to_5_10_apply || '-'} min</td>
-            <td class="py-3 px-3 text-sky-300">${c.avg_hours_to_hire || '-'} hrs</td>
-            <td class="py-3 px-3 font-medium">$${(c.avg_budget || 0).toLocaleString()}</td>
-          </tr>
-        `;
-      }).join('');
+      // 1. Category Table
+      document.getElementById('keywordTableBody').innerHTML = data.keywordBreakdown.map(k => `
+        <tr class="hover:bg-gray-800/30">
+          <td class="py-2.5 px-2 font-semibold text-white">${k.keyword}</td>
+          <td class="py-2.5 px-2 font-bold text-white">${k.total_jobs} <span class="text-gray-500 font-normal">(${k.jobs_last_24h || k.total_jobs} today)</span></td>
+          <td class="py-2.5 px-2 text-gray-300">~${k.avg_proposals || 0}</td>
+          <td class="py-2.5 px-2 text-amber-400">${k.avg_mins_to_5_10 ? k.avg_mins_to_5_10 + ' min' : '-'}</td>
+          <td class="py-2.5 px-2 text-emerald-400 font-medium">${k.high_hire_client_pct}%</td>
+          <td class="py-2.5 px-2 text-emerald-400">${k.hire_conversion_pct}%</td>
+          <td class="py-2.5 px-2 text-rose-400">${k.ghost_rate_pct}%</td>
+        </tr>
+      `).join('');
 
-      // 3. Hourly Distribution Chart
-      const maxHourly = Math.max(1, ...data.hourlyDistribution.map(h => h.jobs_count));
-      document.getElementById('hourlyChart').innerHTML = data.hourlyDistribution.map(h => {
-        const heightPct = Math.max(8, Math.round((h.jobs_count / maxHourly) * 100));
-        const isLowComp = h.avg_total_proposals > 0 && h.avg_total_proposals <= 12;
-        return `
-          <div class="flex flex-col items-center bg-gray-900/70 border ${isLowComp ? 'border-emerald-500/40' : 'border-gray-800/80'} rounded-lg p-2 hover:border-upwork/50 transition" title="${h.window_label_trt} (${h.window_label_utc}) | ${h.jobs_count} Jobs | Avg Proposals: ${h.avg_total_proposals} | Avg 5-10 Apply: ${h.avg_mins_to_5_10 || '-'} min | Hire Rate: ${h.hire_rate_pct}%">
-            <div class="text-[10px] text-gray-400 font-medium">${h.hour_label_trt.replace(':00 UTC+3', '')}:00</div>
-            <div class="h-20 w-full flex items-end justify-center my-1.5 bg-gray-950/60 rounded p-1">
-              <div class="w-full rounded ${isLowComp ? 'bg-emerald-400' : 'bg-emerald-700/70'}" style="height: ${heightPct}%"></div>
-            </div>
-            <div class="text-xs font-bold text-white">${h.jobs_count} jobs</div>
-            <div class="text-[10px] ${isLowComp ? 'text-emerald-400 font-semibold' : 'text-gray-400'}">~${h.avg_total_proposals || 0} app</div>
-            <div class="text-[10px] text-amber-400">${h.avg_mins_to_5_10 ? h.avg_mins_to_5_10 + 'm' : '-'}</div>
-          </div>
-        `;
-      }).join('');
-
-      // 3b. Low-Competition Time Windows Table
+      // 2. Time Windows Table
       if (data.timeBlockWindows) {
         document.getElementById('timeWindowTableBody').innerHTML = data.timeBlockWindows.map(w => {
-          const isLow = w.competition_level.includes('Low Competition');
-          const isMod = w.competition_level.includes('Moderate');
-          const badge = isLow
-            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-            : (isMod ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' : 'bg-rose-500/15 text-rose-400 border-rose-500/30');
+          const isLow = w.competition_level.includes('Low');
           return `
-            <tr class="hover:bg-gray-800/40">
-              <td class="py-2.5 px-3 font-semibold text-white">
-                ${w.block_trt}
-                <span class="block text-[11px] text-gray-500 font-normal">${w.block_utc}</span>
-              </td>
-              <td class="py-2.5 px-3">
-                <span class="px-2.5 py-1 rounded-md text-xs border ${badge}">${w.competition_level}</span>
-              </td>
-              <td class="py-2.5 px-3 font-bold ${isLow ? 'text-emerald-400' : 'text-gray-200'}">${w.avg_proposals_per_job} applies</td>
-              <td class="py-2.5 px-3 text-sky-400 font-medium">${w.low_competition_pct}%</td>
-              <td class="py-2.5 px-3 text-amber-300 font-medium">${w.avg_mins_to_5_10} min</td>
-              <td class="py-2.5 px-3 text-gray-300">${w.total_jobs} jobs</td>
-              <td class="py-2.5 px-3 text-emerald-400 font-semibold">${w.hire_rate_pct}%</td>
+            <tr class="hover:bg-gray-800/30">
+              <td class="py-2.5 px-2 font-medium text-white">${w.block_trt}</td>
+              <td class="py-2.5 px-2 ${isLow ? 'text-emerald-400 font-semibold' : 'text-gray-400'}">${isLow ? '🟢 Low Competition' : '🟡 Normal / Busy'}</td>
+              <td class="py-2.5 px-2 font-bold ${isLow ? 'text-emerald-400' : 'text-gray-200'}">${w.avg_proposals_per_job} applies</td>
+              <td class="py-2.5 px-2 text-sky-400">${w.low_competition_pct}%</td>
+              <td class="py-2.5 px-2 text-amber-300">${w.avg_mins_to_5_10 || '-'} min</td>
+              <td class="py-2.5 px-2 text-gray-300">${w.total_jobs}</td>
             </tr>
           `;
         }).join('');
       }
 
-      // 4. Proposal Velocity List
-      const totalVel = data.velocityBuckets.reduce((acc, v) => acc + v.job_count, 0) || 1;
-      document.getElementById('velocityList').innerHTML = data.velocityBuckets.map(v => {
-        const pct = Math.round((v.job_count / totalVel) * 100);
-        return `
-          <div>
-            <div class="flex justify-between text-xs mb-1">
-              <span class="text-gray-200 font-medium">${v.speed_bucket}</span>
-              <span class="text-gray-400">${v.job_count} jobs (${pct}%) · <b class="text-emerald-400">Hired: ${v.hire_rate_pct}%</b></span>
-            </div>
-            <div class="w-full bg-gray-800 h-2 rounded-full overflow-hidden">
-              <div class="bg-amber-400 h-full" style="width: ${pct}%"></div>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      document.getElementById('velocityInsight').innerHTML =
-        `💡 <b>Key Insight:</b> Jobs reach 5-10 proposals in an average of <b>${s.avg_mins_to_5_10} minutes</b>. Applying within the first 15 minutes to clients with a ≥60% historical hire rate yields a <b>3.8x higher</b> hire conversion.`;
-
-      // 5. Keyword Breakdown
-      document.getElementById('keywordTableBody').innerHTML = data.keywordBreakdown.map(k => `
-        <tr class="hover:bg-gray-800/40">
-          <td class="py-2.5 px-3 font-semibold text-white">${k.keyword}</td>
-          <td class="py-2.5 px-3">${k.total_jobs}</td>
-          <td class="py-2.5 px-3 text-amber-400 font-medium">${k.avg_mins_to_5_10 || '-'} min</td>
-          <td class="py-2.5 px-3 text-gray-300">${k.avg_mins_to_10_15 || '-'} min</td>
-          <td class="py-2.5 px-3 text-emerald-400 font-bold">${k.hire_conversion_pct}%</td>
-          <td class="py-2.5 px-3 text-rose-400">${k.ghost_rate_pct}%</td>
-          <td class="py-2.5 px-3 text-sky-400">${k.high_hire_client_pct}%</td>
-          <td class="py-2.5 px-3 font-medium">$${(k.avg_budget || 0).toLocaleString()}</td>
+      // 3. Client Hire Rate Cohorts
+      document.getElementById('cohortTableBody').innerHTML = data.hireRateCohorts.map(c => `
+        <tr class="hover:bg-gray-800/30">
+          <td class="py-2.5 px-2 font-medium text-white">${c.cohort}</td>
+          <td class="py-2.5 px-2">${c.jobs_posted}</td>
+          <td class="py-2.5 px-2 text-emerald-400 font-bold">${c.actual_hire_conversion_pct}% (${c.jobs_hired})</td>
+          <td class="py-2.5 px-2 text-rose-400">${c.ghost_rate_pct}% (${c.ghost_jobs})</td>
+          <td class="py-2.5 px-2 text-amber-300">${c.avg_mins_to_5_10_apply || '-'} min</td>
+          <td class="py-2.5 px-2">$${(c.avg_budget || 0).toLocaleString()}</td>
         </tr>
       `).join('');
 
-      // 6. Sniper Opportunities
-      document.getElementById('sniperList').innerHTML = data.sniperOpportunities.map(j => `
-        <div class="p-3 rounded-lg bg-gray-900/90 border border-gray-800 hover:border-emerald-500/40 transition">
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-[11px] px-2 py-0.5 rounded bg-upwork/20 text-emerald-300 font-semibold">${j.keyword_matched}</span>
-            <span class="text-xs font-bold text-emerald-400">Sniper Score: ${j.sniper_score}/100</span>
-          </div>
-          <div class="text-sm font-semibold text-white mt-1.5">${j.title}</div>
-          <div class="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-400">
-            <span>💰 ${j.budget > 0 ? '$' + j.budget.toLocaleString() : '$' + j.hourly_min + '-' + j.hourly_max + '/hr'}</span>
-            <span class="text-emerald-400 font-medium">🎯 Client Hire Rate: ${j.client_hire_rate}%</span>
-            <span class="text-amber-300">📨 ${j.current_proposals_tier}</span>
-          </div>
-        </div>
+      // 4. Recent Jobs
+      document.getElementById('recentJobsBody').innerHTML = data.recentJobs.map(j => `
+        <tr class="hover:bg-gray-800/30">
+          <td class="py-2 px-2 font-medium text-white truncate max-w-xs" title="${j.title}">${j.title}</td>
+          <td class="py-2 px-2 text-gray-400">${j.keyword_matched}</td>
+          <td class="py-2 px-2">${j.budget > 0 ? '$' + j.budget.toLocaleString() : '$' + j.hourly_max + '/hr'}</td>
+          <td class="py-2 px-2 ${j.client_hire_rate >= 60 ? 'text-emerald-400 font-bold' : 'text-gray-400'}">${j.client_hire_rate}%</td>
+          <td class="py-2 px-2 text-amber-300">${j.current_proposals_tier}</td>
+          <td class="py-2 px-2 text-gray-400">${new Date(j.posted_at).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'})}</td>
+        </tr>
       `).join('');
-
-      // 7. Recent Jobs Table
-      document.getElementById('recentJobsBody').innerHTML = data.recentJobs.map(j => {
-        let statusBadge = `<span class="px-2 py-0.5 rounded bg-sky-500/15 text-sky-400">Open</span>`;
-        if (j.job_status === 'hired' || j.hires_count > 0) {
-          statusBadge = `<span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-semibold">✅ Hired (${j.mins_to_hire ? Math.round(j.mins_to_hire / 60) + 'h' : ''})</span>`;
-        } else if (j.is_ghost_job || j.job_status === 'ghost') {
-          statusBadge = `<span class="px-2 py-0.5 rounded bg-rose-500/15 text-rose-400">👻 Ghost Job</span>`;
-        }
-
-        const hrColor = j.client_hire_rate >= 60 ? 'text-emerald-400 font-bold' : (j.client_hire_rate >= 35 ? 'text-amber-300' : 'text-rose-400');
-
-        return `
-          <tr class="hover:bg-gray-800/40">
-            <td class="py-2.5 px-2">
-              <div class="font-medium text-gray-100 truncate max-w-xs" title="${j.title}">${j.title}</div>
-              <div class="text-[10px] text-gray-500">${j.keyword_matched} · ${j.client_country} · ${new Date(j.posted_at).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'})}</div>
-            </td>
-            <td class="py-2.5 px-2 font-medium">${j.budget > 0 ? '$' + j.budget.toLocaleString() : '$' + j.hourly_max + '/hr'}</td>
-            <td class="py-2.5 px-2 ${hrColor}">${j.client_hire_rate}% <span class="text-gray-500 font-normal">($${Math.round((j.client_total_spent || 0)/1000)}k)</span></td>
-            <td class="py-2.5 px-2 text-gray-300">${j.current_proposals_tier}</td>
-            <td class="py-2.5 px-2 text-amber-400">${j.mins_to_5_10_proposals ? j.mins_to_5_10_proposals + ' min' : 'Still <5'}</td>
-            <td class="py-2.5 px-2 text-gray-300">${j.interviewing_count} intv / ${j.hires_count} hired</td>
-            <td class="py-2.5 px-2">${statusBadge}</td>
-          </tr>
-        `;
-      }).join('');
     }
 
     async function triggerPoll() {
       const btn = document.getElementById('pollBtn');
       btn.disabled = true;
-      btn.innerHTML = '⏳ Polling Snapshots...';
+      btn.textContent = 'Syncing...';
       await fetch('/api/poll', { method: 'POST' });
       await loadAnalytics();
       btn.disabled = false;
-      btn.innerHTML = '⚡ Run Live Snapshot Poll';
-    }
-
-    async function addKeyword(e) {
-      e.preventDefault();
-      const input = document.getElementById('newKeywordInput');
-      const kw = input.value.trim();
-      if (!kw) return;
-      await fetch('/api/keywords', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword: kw, category: 'Custom' })
-      });
-      input.value = '';
-      location.reload();
-    }
-
-    async function clearMockData() {
-      if (!confirm('Clear demo/seed jobs and keep only real-time Upwork jobs?')) return;
-      await fetch('/api/clear-mock', { method: 'POST' });
-      await loadAnalytics();
+      btn.textContent = 'Sync Now';
     }
 
     loadAnalytics();
