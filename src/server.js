@@ -150,12 +150,11 @@ if (require.main === module) {
     runTrackerCycle({ simulateStep: false }).catch(console.error);
   }, 5 * 60 * 1000);
 
-  // Self keep-alive ping if RENDER_EXTERNAL_URL is set
-  if (process.env.RENDER_EXTERNAL_URL) {
-    setInterval(() => {
-      fetch(`${process.env.RENDER_EXTERNAL_URL}/health`).catch(() => {});
-    }, 10 * 60 * 1000);
-  }
+  // Self keep-alive ping every 4 minutes
+  const externalUrl = process.env.RENDER_EXTERNAL_URL || 'https://upwork-mcp-automation.onrender.com';
+  setInterval(() => {
+    fetch(`${externalUrl}/health`).catch(() => {});
+  }, 4 * 60 * 1000);
 }
 
 module.exports = { app };
