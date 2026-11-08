@@ -1,9 +1,16 @@
 const { db } = require('./db');
 
 function getFullMarketAnalytics(keywordFilter = null) {
-  const whereClause = keywordFilter && keywordFilter !== 'ALL'
-    ? `WHERE keyword_matched = ${db.prepare('SELECT ?').get(keywordFilter) ? `'${keywordFilter.replace(/'/g, "''")}'` : 'keyword_matched'}`
-    : '';
+  let whereClause = '';
+  if (keywordFilter && keywordFilter !== 'ALL') {
+    if (keywordFilter.startsWith('GROUP:')) {
+      const grp = keywordFilter.slice(6).replace(/'/g, "''");
+      whereClause = `WHERE keyword_matched IN (SELECT keyword FROM tracked_keywords WHERE category = '${grp}')`;
+    } else {
+      const kw = keywordFilter.replace(/'/g, "''");
+      whereClause = `WHERE keyword_matched = '${kw}'`;
+    }
+  }
 
   // 1. High-level KPI Summary
   const summary = db.prepare(`
@@ -155,22 +162,44 @@ function getFullMarketAnalytics(keywordFilter = null) {
   // 4. Keyword / Niche Breakdown (Job Volume, Velocity, Avg Applies, Ghost Rate, Hire Rate)
   const keywordBreakdown = db.prepare(`
     SELECT
-      keyword_matched as keyword,
+      j.keyword_matched as keyword,
+      COALESCE(tk.category, 'Other') as category_group,
       COUNT(*) as total_jobs,
-      SUM(CASE WHEN datetime(posted_at) >= datetime('now', '-24 hours') THEN 1 ELSE 0 END) as jobs_last_24h,
-      ROUND(AVG(current_proposals_numeric), 1) as avg_proposals,
-      SUM(CASE WHEN current_proposals_numeric <= 10 THEN 1 ELSE 0 END) as low_apply_jobs,
-      ROUND(SUM(CASE WHEN current_proposals_numeric <= 10 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as low_apply_pct,
-      ROUND(AVG(mins_to_5_10_proposals), 1) as avg_mins_to_5_10,
-      ROUND(AVG(mins_to_10_15_proposals), 1) as avg_mins_to_10_15,
-      ROUND(SUM(CASE WHEN job_status = 'hired' OR hires_count > 0 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as hire_conversion_pct,
-      ROUND(SUM(CASE WHEN is_ghost_job = 1 OR job_status = 'ghost' THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as ghost_rate_pct,
-      ROUND(SUM(CASE WHEN client_hire_rate >= 60 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as high_hire_client_pct,
-      ROUND(AVG(CASE WHEN budget > 0 THEN budget ELSE NULL END), 0) as avg_budget,
-      ROUND(AVG(CASE WHEN hourly_max > 0 THEN hourly_max ELSE NULL END), 0) as avg_hourly_rate
-    FROM jobs
-    GROUP BY keyword_matched
-    ORDER BY jobs_last_24h DESC, total_jobs DESC
+      SUM(CASE WHEN datetime(j.posted_at) >= datetime('now', '-24 hours') THEN 1 ELSE 0 END) as jobs_last_24h,
+      ROUND(AVG(j.current_proposals_numeric), 1) as avg_proposals,
+      SUM(CASE WHEN j.current_proposals_numeric <= 10 THEN 1 ELSE 0 END) as low_apply_jobs,
+      ROUND(SUM(CASE WHEN j.current_proposals_numeric <= 10 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as low_apply_pct,
+      ROUND(AVG(j.mins_to_5_10_proposals), 1) as avg_mins_to_5_10,
+      ROUND(AVG(j.mins_to_10_15_proposals), 1) as avg_mins_to_10_15,
+      ROUND(SUM(CASE WHEN j.job_status = 'hired' OR j.hires_count > 0 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as hire_conversion_pct,
+      ROUND(SUM(CASE WHEN j.is_ghost_job = 1 OR j.job_status = 'ghost' THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as ghost_rate_pct,
+      ROUND(SUM(CASE WHEN j.client_hire_rate >= 60 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as high_hire_client_pct,
+      ROUND(AVG(CASE WHEN j.budget > 0 THEN j.budget ELSE NULL END), 0) as avg_budget,
+      ROUND(AVG(CASE WHEN j.hourly_max > 0 THEN j.hourly_max ELSE NULL END), 0) as avg_hourly_rate
+    FROM jobs j
+    LEFT JOIN tracked_keywords tk ON tk.keyword = j.keyword_matched
+    GROUP BY j.keyword_matched
+    ORDER BY avg_proposals ASC, total_jobs DESC
+  `).all();
+
+  // 4b. Macro Group Breakdown (Development, AI & Data, Automation, Marketing, Design)
+  const groupBreakdown = db.prepare(`
+    SELECT
+      COALESCE(tk.category, 'Other') as group_name,
+      COUNT(*) as total_jobs,
+      SUM(CASE WHEN datetime(j.posted_at) >= datetime('now', '-24 hours') THEN 1 ELSE 0 END) as jobs_last_24h,
+      ROUND(AVG(j.current_proposals_numeric), 1) as avg_proposals,
+      ROUND(SUM(j.current_proposals_numeric) * 1.0 / COUNT(*), 1) as apply_to_job_ratio,
+      ROUND(SUM(CASE WHEN j.current_proposals_numeric <= 10 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as low_apply_pct,
+      ROUND(AVG(j.mins_to_5_10_proposals), 1) as avg_mins_to_5_10,
+      ROUND(SUM(CASE WHEN j.client_hire_rate >= 60 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as high_hire_client_pct,
+      ROUND(SUM(CASE WHEN j.job_status = 'hired' OR j.hires_count > 0 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as hire_conversion_pct,
+      ROUND(AVG(CASE WHEN j.budget > 0 THEN j.budget ELSE NULL END), 0) as avg_budget,
+      ROUND(AVG(CASE WHEN j.hourly_max > 0 THEN j.hourly_max ELSE NULL END), 0) as avg_hourly_rate
+    FROM jobs j
+    LEFT JOIN tracked_keywords tk ON tk.keyword = j.keyword_matched
+    GROUP BY group_name
+    ORDER BY avg_proposals ASC
   `).all();
 
   // 5. Proposal Velocity Distribution (How fast jobs hit 5-10 proposals)
@@ -237,6 +266,7 @@ function getFullMarketAnalytics(keywordFilter = null) {
     hireRateCohorts,
     hourlyDistribution,
     timeBlockWindows,
+    groupBreakdown,
     keywordBreakdown,
     countryBreakdown,
     velocityBuckets,
