@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="tr" class="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Upwork Market Intelligence & Opportunity Engine</title>
+  <title>Upwork Pazar İstihbaratı ve Fırsat Radarı</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -28,7 +28,7 @@
   </script>
 </head>
 <body class="bg-bg text-zinc-100 min-h-screen font-sans antialiased selection:bg-emerald-500/20 selection:text-emerald-300">
-  <!-- Top Navigation Bar -->
+  <!-- Üst Menü / Navigasyon -->
   <header class="border-b border-border bg-surface/80 backdrop-blur sticky top-0 z-30">
     <div class="max-w-7xl mx-auto px-5 py-4 flex flex-wrap items-center justify-between gap-4">
       <div class="flex items-center gap-3">
@@ -37,88 +37,88 @@
         </div>
         <div>
           <div class="flex items-center gap-2.5">
-            <h1 class="text-sm font-bold text-white tracking-tight">Upwork Intelligence Radar</h1>
+            <h1 class="text-sm font-bold text-white tracking-tight">Upwork Fırsat ve Piyasa Radarı</h1>
             <span class="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              24/7 Live Data
+              7/24 Canlı Veri
             </span>
           </div>
-          <p class="text-[11px] text-zinc-400 mt-0.5" id="lastSyncText">Statistical decision-support platform for Freelancers & Agencies</p>
+          <p class="text-[11px] text-zinc-400 mt-0.5" id="lastSyncText">Yazılım, Yapay Zeka ve Otomasyon için İstatistiksel Karar Destek Platformu</p>
         </div>
       </div>
 
       <div class="flex items-center gap-3">
         <select id="keywordFilter" class="bg-bg border border-border text-xs font-semibold rounded-lg px-3.5 py-2 text-zinc-200 focus:outline-none focus:border-emerald-500/50 transition">
-          <option value="ALL">All Categories & Niches</option>
+          <option value="ALL">Tüm Kategoriler ve Alanlar</option>
         </select>
         <button id="pollBtn" onclick="triggerPoll()" class="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold px-4 py-2 rounded-lg transition shadow-md shadow-emerald-500/10">
-          Sync Now
+          Şimdi Güncelle
         </button>
       </div>
     </div>
   </header>
 
   <main class="max-w-7xl mx-auto px-5 py-7 space-y-8">
-    <!-- Top Executive KPIs -->
+    <!-- Üst Yönetici KPI Kartları -->
     <section class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="kpiGrid"></section>
 
-    <!-- CHART 1 (HERO): 24-Hour Golden Hours Chart (Volume Bars + Proposal Scarcity Line) -->
+    <!-- 1. GRAFİK (HERO): 24 Saatlik İlan Hacmi vs. Teklif Yoğunluğu (Altın Saatler) -->
     <section class="bg-surface border border-border rounded-2xl p-6 space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div class="flex items-center gap-2">
             <span class="text-base">🔥</span>
-            <h2 class="text-sm font-bold text-white">24-Hour Posting Volume vs. Proposal Pressure (Golden Hours)</h2>
+            <h2 class="text-sm font-bold text-white">24 Saatlik İlan Paylaşımı vs. Teklif Baskısı (Altın Saatler)</h2>
           </div>
           <p class="text-xs text-zinc-400 mt-0.5">
-            <b>Best for:</b> Visualizing when job volume spikes while proposal pressure stays low. The crossover gap = highest odds of winning.
+            İlan sayısının yükseldiği ancak teklif baskısının düşük kaldığı aralıklar. Makasın açıldığı saatler = En yüksek iş alma olasılığı.
           </p>
         </div>
         <div class="flex flex-wrap items-center gap-4 text-xs font-medium">
           <span class="flex items-center gap-1.5 text-emerald-400">
             <span class="w-3 h-3 rounded bg-emerald-500/80"></span>
-            Jobs Shared (Bars)
+            Açılan İlan Sayısı (Sütunlar)
           </span>
           <span class="flex items-center gap-1.5 text-amber-400">
             <span class="w-3 h-1 rounded bg-amber-400"></span>
-            Avg Proposals / Job (Line)
+            Ortalama Teklif / İlan (Çizgi)
           </span>
         </div>
       </div>
 
-      <!-- Chart Canvas -->
+      <!-- Grafik Alanı -->
       <div class="h-72 w-full pt-2">
         <canvas id="hourlyComboChart"></canvas>
       </div>
 
-      <!-- Detected Golden Windows Callout -->
+      <!-- Tespit Edilen Altın Saatler Kutusu -->
       <div class="pt-4 border-t border-border flex flex-wrap items-center justify-between gap-3">
         <div class="text-xs text-zinc-300">
-          <span class="font-bold text-emerald-400">💡 Golden Opportunity Hours:</span>
-          <span id="goldenHoursSummary" class="text-zinc-400 ml-1">Analyzing optimal windows...</span>
+          <span class="font-bold text-emerald-400">💡 Tespit Edilen Altın Fırsat Saatleri:</span>
+          <span id="goldenHoursSummary" class="text-zinc-400 ml-1">Optimum pencereler hesaplanıyor...</span>
         </div>
-        <span class="text-[11px] text-zinc-500">Timezone: Turkey Time (UTC+3)</span>
+        <span class="text-[11px] text-zinc-500">Saat Dilimi: Türkiye Saati (UTC+3)</span>
       </div>
     </section>
 
-    <!-- SECTION 2: Budget Tiers & Market Saturation (Side by Side) -->
+    <!-- 2. BÖLÜM: Bütçe Dilimleri & Pazar Doygunluğu (Yan Yana) -->
     <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- CHART 2: Budget Tier Breakdown (Horizontal Stacked Bar Chart) -->
+      <!-- 2. GRAFİK: Bütçe Dilimleri Dağılımı (Yatay Çift Bar Grafiği) -->
       <div class="lg:col-span-2 bg-surface border border-border rounded-2xl p-6 space-y-4">
         <div>
-          <h2 class="text-sm font-bold text-white">💰 Budget Tier Distribution & Competition</h2>
-          <p class="text-xs text-zinc-400 mt-0.5">Which budget brackets have the lowest competition and highest hire rates?</p>
+          <h2 class="text-sm font-bold text-white">💰 Bütçe Aralıkları ve Rekabet Dağılımı</h2>
+          <p class="text-xs text-zinc-400 mt-0.5">Hangi bütçe aralıklarında rekabet daha az ve işe alım oranı daha yüksek?</p>
         </div>
         <div class="h-64 w-full">
           <canvas id="budgetBarChart"></canvas>
         </div>
       </div>
 
-      <!-- CHART 3: Market Proposal Saturation (Doughnut Chart) -->
+      <!-- 3. GRAFİK: Teklif Doygunluğu (Halka / Donut Grafik) -->
       <div class="bg-surface border border-border rounded-2xl p-6 space-y-4 flex flex-col justify-between">
         <div>
-          <h2 class="text-sm font-bold text-white">🥊 Proposal Saturation Breakdown</h2>
-          <p class="text-xs text-zinc-400 mt-0.5">What percentage of jobs are uncontested vs. saturated?</p>
+          <h2 class="text-sm font-bold text-white">🥊 Teklif Doygunluğu Oranları</h2>
+          <p class="text-xs text-zinc-400 mt-0.5">İlanların ne kadarı bakir durumda, ne kadarı aşırı kalabalık?</p>
         </div>
         <div class="h-56 relative flex items-center justify-center">
           <canvas id="saturationDonutChart"></canvas>
@@ -127,14 +127,14 @@
       </div>
     </section>
 
-    <!-- SECTION 3: Technology Trends & Client Quality Forensics -->
+    <!-- 3. BÖLÜM: Teknoloji Trendleri & Müşteri Sicil Analizi -->
     <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- CHART 4: Technology & Skill Demand Matrix (Horizontal Multi-metric Bars) -->
+      <!-- 4. GRAFİK: Teknoloji ve Beceri Talep Matrisi -->
       <div class="lg:col-span-2 bg-surface border border-border rounded-2xl p-6 space-y-4">
         <div class="flex items-center justify-between">
           <div>
-            <h2 class="text-sm font-bold text-white">⚡ Technology & Skill Opportunity Matrix</h2>
-            <p class="text-xs text-zinc-400 mt-0.5">Job count, average proposals, and average budget per technology</p>
+            <h2 class="text-sm font-bold text-white">⚡ Teknoloji ve Beceri Fırsat Matrisi</h2>
+            <p class="text-xs text-zinc-400 mt-0.5">İlan açıklamalarından çıkarılan iş sayısı, ortalama teklif baskısı ve bütçe</p>
           </div>
         </div>
         <div class="h-72 w-full">
@@ -142,43 +142,43 @@
         </div>
       </div>
 
-      <!-- CHART 5: Client Quality Cohorts (Hire vs Ghost Probability) -->
+      <!-- 5. GRAFİK: Müşteri Kalite Segmentasyonu -->
       <div class="bg-surface border border-border rounded-2xl p-6 space-y-4 flex flex-col justify-between">
         <div>
-          <h2 class="text-sm font-bold text-white">🎯 Client Quality Reality Check</h2>
-          <p class="text-xs text-zinc-400 mt-0.5">Actual hire rate vs. ghost rate segmented by client track record</p>
+          <h2 class="text-sm font-bold text-white">🎯 Müşteri Kalite Karnesi (Gerçek vs. Ghost)</h2>
+          <p class="text-xs text-zinc-400 mt-0.5">Müşterinin geçmiş Hire Rate oranına göre gerçek işe alım vs. hayalet ilan oranı</p>
         </div>
         <div class="h-56 w-full">
           <canvas id="clientCohortChart"></canvas>
         </div>
         <p class="text-[11px] text-zinc-400 pt-3 border-t border-border">
-          Clients with <b>≥60% historical hire rate</b> hire <b>4x more often</b> and abandon almost zero jobs.
+          Geçmiş hire rate oranı <b>≥%60 olan müşteriler</b> <b>4 kat daha fazla</b> işe alım yapar ve neredeyse hiç hayalet ilan bırakmaz.
         </p>
       </div>
     </section>
 
-    <!-- SECTION 4: Top Client Countries & AI Opportunity Matches -->
+    <!-- 4. BÖLÜM: Ülke Dağılımı & AI Fırsat Puanı (Sniper İlanlar) -->
     <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Country Breakdown -->
+      <!-- 6. GRAFİK: Ülke Dağılımı -->
       <div class="bg-surface border border-border rounded-2xl p-6 space-y-4">
         <div>
-          <h2 class="text-sm font-bold text-white">🌍 Top Client Countries</h2>
-          <p class="text-xs text-zinc-400 mt-0.5">Volume and client hire conversion by geography</p>
+          <h2 class="text-sm font-bold text-white">🌍 En Çok İlan Açan Ülkeler</h2>
+          <p class="text-xs text-zinc-400 mt-0.5">Coğrafi iş hacmi ve işveren hire rate başarı oranları</p>
         </div>
         <div class="h-64 w-full">
           <canvas id="countryBarChart"></canvas>
         </div>
       </div>
 
-      <!-- AI Job Opportunity Scoring (Sniper Matches) -->
+      <!-- AI Fırsat Puanlama (Sniper Eşleşmeler) -->
       <div class="lg:col-span-2 bg-surface border border-border rounded-2xl p-6 space-y-4">
         <div class="flex items-center justify-between">
           <div>
             <div class="flex items-center gap-2">
               <span class="text-base">🎯</span>
-              <h2 class="text-sm font-bold text-white">AI Opportunity Scoring (Top Ranked Matches)</h2>
+              <h2 class="text-sm font-bold text-white">Yapay Zeka Fırsat Puanlaması (En Yüksek Puanlı İlanlar)</h2>
             </div>
-            <p class="text-xs text-zinc-400 mt-0.5">Scored by: High budget attractiveness + Proven client quality + Low applicant saturation</p>
+            <p class="text-xs text-zinc-400 mt-0.5">Algoritma kriteri: Yüksek bütçe çekiciliği + Güvenilir müşteri sicili + Düşük teklif doygunluğu</p>
           </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5" id="sniperGrid"></div>
@@ -228,17 +228,17 @@
     function timeAgo(isoStr) {
       if (!isoStr) return '-';
       const diffMins = Math.max(1, Math.round((Date.now() - new Date(isoStr).getTime()) / 60000));
-      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffMins < 60) return `${diffMins} dk önce`;
       const hrs = Math.floor(diffMins / 60);
       const mins = diffMins % 60;
-      if (hrs < 24) return `${hrs}h ${mins}m ago`;
-      return `${Math.floor(hrs / 24)}d ago`;
+      if (hrs < 24) return `${hrs} sa ${mins} dk önce`;
+      return `${Math.floor(hrs / 24)} gün önce`;
     }
 
     function formatMins(m) {
-      if (m === null || m === undefined) return 'Tracking...';
-      if (m < 60) return `${Math.round(m)} min`;
-      return `${(m / 60).toFixed(1)} hrs`;
+      if (m === null || m === undefined) return 'Hesaplanıyor...';
+      if (m < 60) return `${Math.round(m)} dk`;
+      return `${(m / 60).toFixed(1)} saat`;
     }
 
     async function loadAnalytics() {
@@ -257,16 +257,16 @@
     function renderDashboard(data) {
       const s = data.summary;
 
-      // Dropdown with groups and keywords
+      // Dropdown filtreleme
       const select = document.getElementById('keywordFilter');
       if (select.options.length <= 1) {
         if (data.groupBreakdown?.length > 0) {
           const optGroupHeader = document.createElement('optgroup');
-          optGroupHeader.label = '— Macro Groups —';
+          optGroupHeader.label = '— Makro Sektör Grupları —';
           data.groupBreakdown.forEach(g => {
             const opt = document.createElement('option');
             opt.value = `GROUP:${g.group_name}`;
-            opt.textContent = `Group: ${g.group_name}`;
+            opt.textContent = `Grup: ${g.group_name}`;
             optGroupHeader.appendChild(opt);
           });
           select.appendChild(optGroupHeader);
@@ -274,7 +274,7 @@
 
         if (data.trackedKeywords?.length > 0) {
           const optKwHeader = document.createElement('optgroup');
-          optKwHeader.label = '— Specific Categories —';
+          optKwHeader.label = '— Spesifik Kategoriler —';
           data.trackedKeywords.filter(k => k.active).forEach(k => {
             const opt = document.createElement('option');
             opt.value = k.keyword;
@@ -293,37 +293,37 @@
       if (data.recentRuns?.length > 0) {
         const lastRun = data.recentRuns[0];
         document.getElementById('lastSyncText').textContent =
-          `Last synced ${timeAgo(lastRun.finished_at || lastRun.started_at)} · Live tracking ${s.total_jobs} jobs in real-time`;
+          `Son güncelleme: ${timeAgo(lastRun.finished_at || lastRun.started_at)} · Radarda canlı izlenen ${s.total_jobs} iş ilanı`;
       }
 
       const highHireCohort = data.hireRateCohorts.find(c => c.cohort.includes('60%+'));
       const highHireCount = highHireCohort ? highHireCohort.jobs_posted : 0;
       const highHirePct = s.total_jobs > 0 ? Math.round((highHireCount / s.total_jobs) * 100) : 0;
 
-      // Top 4 KPIs
+      // Üst 4 KPI Kartı
       const kpis = [
         {
-          label: 'Jobs Shared (Last 24h)',
+          label: 'Açılan İlanlar (Son 24 Saat)',
           val: s.jobs_last_24h || s.total_jobs,
-          sub: `${s.total_jobs} total active in radar`,
+          sub: `Toplam radarda ${s.total_jobs} ilan var`,
           color: 'text-white'
         },
         {
-          label: '60%+ Hire Rate Clients',
-          val: `${highHirePct}%`,
-          sub: `${highHireCount} verified high-intent clients`,
+          label: 'İşe Alım Oranı ≥%60 Müşteriler',
+          val: `%${highHirePct}`,
+          sub: `${highHireCount} ilan onaylı kaliteli müşterilerden`,
           color: 'text-emerald-400'
         },
         {
-          label: 'Avg. 5–10 Apply Speed',
+          label: '5–10 Teklife Ulaşma Hızı',
           val: formatMins(s.avg_mins_to_5_10),
-          sub: 'Speed to reach 5-10 proposals',
+          sub: '5-10 teklife doyma ortalama süresi',
           color: 'text-amber-400'
         },
         {
-          label: 'Top Opportunity Sector',
+          label: 'En Yüksek Fırsatlı Sektör',
           val: data.groupBreakdown?.[0]?.group_name || 'Automation',
-          sub: `Lowest avg competition: ~${data.groupBreakdown?.[0]?.avg_proposals || 0} applies`,
+          sub: `En az ortalama teklif: ~${data.groupBreakdown?.[0]?.avg_proposals || 0} başvuru`,
           color: 'text-sky-400'
         }
       ];
@@ -337,7 +337,7 @@
       `).join('');
 
       // ==========================================
-      // CHART 1: 24-HOUR COMBO CHART (BARS + LINE)
+      // 1. GRAFİK: 24 SAATLİK COMBO CHART (BAR + ÇİZGİ)
       // ==========================================
       destroyChart('hourlyComboChart');
       const hourlyLabels = data.hourlyDistribution.map(h => `${h.hour_label_trt.replace(':00 UTC+3', '')}:00`);
@@ -348,10 +348,10 @@
       const goldenHours = data.hourlyDistribution.filter(h => h.is_golden_hour);
       if (goldenHours.length > 0) {
         document.getElementById('goldenHoursSummary').innerHTML = goldenHours.map(g =>
-          `<span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 font-bold text-xs">${g.hour_label_trt.replace(' UTC+3', '')} (${g.jobs_count} jobs, ~${g.avg_total_proposals} app)</span>`
+          `<span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 font-bold text-xs">${g.hour_label_trt.replace(' UTC+3', '')} (${g.jobs_count} ilan, ~${g.avg_total_proposals} teklif)</span>`
         ).join(' ');
       } else {
-        document.getElementById('goldenHoursSummary').textContent = 'Collecting hourly baseline...';
+        document.getElementById('goldenHoursSummary').textContent = 'Saatlik taban verisi toplanıyor...';
       }
 
       const ctxCombo = document.getElementById('hourlyComboChart').getContext('2d');
@@ -361,7 +361,7 @@
           datasets: [
             {
               type: 'line',
-              label: 'Avg Proposals / Job',
+              label: 'Ortalama Teklif / İlan',
               data: hourlyAvgProps,
               borderColor: '#f59e0b',
               backgroundColor: '#f59e0b',
@@ -373,7 +373,7 @@
             },
             {
               type: 'bar',
-              label: 'Jobs Shared',
+              label: 'Paylaşılan İlan Sayısı',
               data: hourlyJobCounts,
               backgroundColor: hourlyBarColors,
               borderRadius: 6,
@@ -398,7 +398,7 @@
                 afterBody: (context) => {
                   const idx = context[0].dataIndex;
                   const item = data.hourlyDistribution[idx];
-                  return `\nStatus: ${item.opportunity_verdict}\n≤10 Applies: ${item.low_competition_pct}%`;
+                  return `\nDurum: ${item.opportunity_verdict}\n≤10 Teklif Oranı: %${item.low_competition_pct}`;
                 }
               }
             }
@@ -413,25 +413,34 @@
               position: 'left',
               grid: { color: '#1f293d' },
               ticks: { color: '#71717a', stepSize: 1, font: { size: 10, family: 'Plus Jakarta Sans' } },
-              title: { display: true, text: 'Jobs Posted', color: '#10b981', font: { size: 10 } }
+              title: { display: true, text: 'Açılan İlan', color: '#10b981', font: { size: 10 } }
             },
             y1: {
               type: 'linear',
               position: 'right',
               grid: { display: false },
               ticks: { color: '#f59e0b', font: { size: 10, family: 'Plus Jakarta Sans' } },
-              title: { display: true, text: 'Avg Proposals', color: '#f59e0b', font: { size: 10 } }
+              title: { display: true, text: 'Ort. Teklif', color: '#f59e0b', font: { size: 10 } }
             }
           }
         }
       });
 
       // ==========================================
-      // CHART 2: BUDGET TIERS BAR CHART
+      // 2. GRAFİK: BÜTÇE DİLİMLERİ (YATAY BAR)
       // ==========================================
       destroyChart('budgetBarChart');
       if (data.budgetTiers) {
-        const budgetLabels = data.budgetTiers.map(b => b.tier_label.replace(' (Enterprise / Whale)', '').replace(' (High Value)', ''));
+        const budgetLabels = data.budgetTiers.map(b => b.tier_label
+          .replace(' (Enterprise / Whale)', ' (Büyük Proje)')
+          .replace(' (High Value)', ' (Yüksek Bütçe)')
+          .replace(' (Medium)', ' (Orta)')
+          .replace(' (Small)', ' (Küçük)')
+          .replace(' (Micro)', ' (Mikro)')
+          .replace('Hourly: Under', 'Saatlik: <')
+          .replace('Hourly:', 'Saatlik:')
+          .replace('(Premium)', '(Uzman)')
+        );
         const budgetCounts = data.budgetTiers.map(b => b.job_count);
         const budgetCompRates = data.budgetTiers.map(b => b.low_comp_pct);
 
@@ -442,14 +451,14 @@
             labels: budgetLabels,
             datasets: [
               {
-                label: 'Jobs Available',
+                label: 'Mevcut İlan Sayısı',
                 data: budgetCounts,
                 backgroundColor: 'rgba(56, 189, 248, 0.85)',
                 borderRadius: 5,
                 barThickness: 14
               },
               {
-                label: '% Staying ≤10 Proposals (Low Competition)',
+                label: '≤10 Teklifte Kalma Oranı (% Düşük Rekabet)',
                 data: budgetCompRates,
                 backgroundColor: 'rgba(16, 185, 129, 0.75)',
                 borderRadius: 5,
@@ -487,11 +496,11 @@
       }
 
       // ==========================================
-      // CHART 3: MARKET SATURATION DONUT
+      // 3. GRAFİK: DOYGUNLUK HALKASI (DONUT)
       // ==========================================
       destroyChart('saturationDonutChart');
       if (data.proposalBuckets) {
-        const donutLabels = ['< 5 (High Opportunity)', '5–10 (Active Window)', '10–20 (Competitive)', '20+ (Crowded)'];
+        const donutLabels = ['< 5 Teklif (Yüksek Fırsat)', '5–10 Teklif (Aktif Pencere)', '10–20 Teklif (Rekabetçi)', '20+ Teklif (Doymuş)'];
         const donutData = data.proposalBuckets.map(b => b.job_count);
         const donutColors = ['#10b981', '#38bdf8', '#f59e0b', '#f43f5e'];
 
@@ -531,18 +540,18 @@
 
         document.getElementById('donutSummary').innerHTML = `
           <div class="bg-bg/50 p-2 rounded-lg border border-border">
-            <div class="text-[10px] text-zinc-400">Low Competition (&le;10)</div>
-            <div class="text-sm font-bold text-emerald-400 mt-0.5">${lowCompPct}% (${lowCompTotal} jobs)</div>
+            <div class="text-[10px] text-zinc-400">Düşük Rekabet (&le;10 Teklif)</div>
+            <div class="text-sm font-bold text-emerald-400 mt-0.5">%${lowCompPct} (${lowCompTotal} ilan)</div>
           </div>
           <div class="bg-bg/50 p-2 rounded-lg border border-border">
-            <div class="text-[10px] text-zinc-400">Crowded (>10)</div>
-            <div class="text-sm font-bold text-rose-400 mt-0.5">${100 - lowCompPct}% (${totalBuckets - lowCompTotal} jobs)</div>
+            <div class="text-[10px] text-zinc-400">Doymuş (>10 Teklif)</div>
+            <div class="text-sm font-bold text-rose-400 mt-0.5">%${100 - lowCompPct} (${totalBuckets - lowCompTotal} ilan)</div>
           </div>
         `;
       }
 
       // ==========================================
-      // CHART 4: TECHNOLOGY DEMAND HORIZONTAL CHART
+      // 4. GRAFİK: TEKNOLOJİ VE BECERİ MATRİSİ
       // ==========================================
       destroyChart('techHorizontalChart');
       if (data.techTrends) {
@@ -557,14 +566,14 @@
             labels: techLabels,
             datasets: [
               {
-                label: 'Total Jobs Tracked',
+                label: 'İlan Hacmi',
                 data: techJobs,
                 backgroundColor: 'rgba(16, 185, 129, 0.85)',
                 borderRadius: 5,
                 barThickness: 12
               },
               {
-                label: 'Avg Proposals / Job',
+                label: 'Ortalama Teklif Sayısı',
                 data: techProps,
                 backgroundColor: 'rgba(245, 158, 11, 0.85)',
                 borderRadius: 5,
@@ -588,7 +597,7 @@
                   afterBody: (context) => {
                     const idx = context[0].dataIndex;
                     const item = data.techTrends[idx];
-                    return `Avg Budget: $${item.avg_budget} fixed | Top Clients: ${item.high_hire_client_pct}%`;
+                    return `Ort. Sabit Bütçe: $${item.avg_budget} | Kaliteli Müşteri: %${item.high_hire_client_pct}`;
                   }
                 }
               }
@@ -608,11 +617,11 @@
       }
 
       // ==========================================
-      // CHART 5: CLIENT QUALITY COHORT CONVERSION
+      // 5. GRAFİK: MÜŞTERİ KALİTE SEGMENTASYONU
       // ==========================================
       destroyChart('clientCohortChart');
       if (data.hireRateCohorts) {
-        const cohortLabels = ['60%+ (Whales)', '35%–59%', '< 35% (Low)'];
+        const cohortLabels = ['%60+ (Kaliteli Müşteriler)', '%35–%59 (Orta)', '< %35 (Düşük)'];
         const actualHireData = data.hireRateCohorts.map(c => c.actual_hire_conversion_pct);
         const ghostData = data.hireRateCohorts.map(c => c.ghost_rate_pct);
 
@@ -623,14 +632,14 @@
             labels: cohortLabels,
             datasets: [
               {
-                label: 'Actual Hire %',
+                label: 'Gerçek İşe Alım Oranı (%)',
                 data: actualHireData,
                 backgroundColor: '#10b981',
                 borderRadius: 5,
                 barThickness: 16
               },
               {
-                label: 'Ghost / Abandoned %',
+                label: 'Hayalet İlan / Terk Edilme (%)',
                 data: ghostData,
                 backgroundColor: '#f43f5e',
                 borderRadius: 5,
@@ -661,7 +670,7 @@
       }
 
       // ==========================================
-      // CHART 6: COUNTRY VOLUME BAR CHART
+      // 6. GRAFİK: ÜLKE HACİM GRAFİĞİ
       // ==========================================
       destroyChart('countryBarChart');
       if (data.countryBreakdown) {
@@ -675,7 +684,7 @@
             labels: countryLabels,
             datasets: [
               {
-                label: 'Jobs Posted',
+                label: 'Açılan İlan',
                 data: countryJobs,
                 backgroundColor: '#38bdf8',
                 borderRadius: 5,
@@ -697,7 +706,7 @@
                   afterBody: (context) => {
                     const idx = context[0].dataIndex;
                     const c = data.countryBreakdown[idx];
-                    return `Avg Hire Rate: ${c.avg_hire_rate}%\nTotal Spend: $${Math.round(c.total_client_spend || 0).toLocaleString()}`;
+                    return `Ort. İşe Alım Oranı: %${c.avg_hire_rate}\nToplam Müşteri Harcaması: $${Math.round(c.total_client_spend || 0).toLocaleString()}`;
                   }
                 }
               }
@@ -711,18 +720,18 @@
       }
 
       // ==========================================
-      // SNIPER MATCHES GRID
+      // SNIPER FIRSATLAR GRİDİ
       // ==========================================
       if (data.sniperOpportunities?.length > 0) {
         document.getElementById('sniperGrid').innerHTML = data.sniperOpportunities.slice(0, 4).map(j => {
           const upworkUrl = `https://www.upwork.com/jobs/~02${j.job_id}`;
-          const budgetText = j.budget > 0 ? `$${j.budget.toLocaleString()}` : `$${j.hourly_min || j.hourly_max}–$${j.hourly_max}/hr`;
+          const budgetText = j.budget > 0 ? `$${j.budget.toLocaleString()}` : `$${j.hourly_min || j.hourly_max}–$${j.hourly_max}/saat`;
           return `
             <div class="bg-surfaceHover/80 border border-emerald-500/30 rounded-xl p-4 flex flex-col justify-between hover:border-emerald-500/60 transition">
               <div>
                 <div class="flex items-center justify-between gap-2 mb-2">
                   <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">${j.keyword_matched}</span>
-                  <span class="text-xs font-extrabold text-emerald-400">Score: ${j.sniper_score}/100</span>
+                  <span class="text-xs font-extrabold text-emerald-400">Puan: ${j.sniper_score}/100</span>
                 </div>
                 <a href="${upworkUrl}" target="_blank" rel="noopener" class="text-xs font-semibold text-white hover:text-emerald-400 transition line-clamp-2" title="${j.title}">
                   ${j.title}
@@ -731,25 +740,25 @@
               </div>
               <div class="mt-3 pt-2.5 border-t border-border/60 flex items-center justify-between text-xs font-medium">
                 <span class="text-zinc-200">${budgetText}</span>
-                <span class="text-emerald-400">🎯 Hire: ${j.client_hire_rate}%</span>
+                <span class="text-emerald-400">🎯 İşe Alım: %${j.client_hire_rate}</span>
                 <span class="text-zinc-400">${j.current_proposals_tier}</span>
               </div>
             </div>
           `;
         }).join('');
       } else {
-        document.getElementById('sniperGrid').innerHTML = `<p class="text-xs text-zinc-500 col-span-2">Tracking for high-score opportunities...</p>`;
+        document.getElementById('sniperGrid').innerHTML = `<p class="text-xs text-zinc-500 col-span-2">Yüksek puan kriterine uyan yeni ilanlar taranıyor...</p>`;
       }
     }
 
     async function triggerPoll() {
       const btn = document.getElementById('pollBtn');
       btn.disabled = true;
-      btn.textContent = 'Syncing...';
+      btn.textContent = 'Güncelleniyor...';
       await fetch('/api/poll', { method: 'POST' });
       await loadAnalytics();
       btn.disabled = false;
-      btn.textContent = 'Sync Now';
+      btn.textContent = 'Şimdi Güncelle';
     }
 
     loadAnalytics();
