@@ -127,6 +127,12 @@ for (const [kw, cat] of defaultKeywords) {
 // Deactivate old sub-niches unless explicitly added so we focus on the 5 core categories
 db.exec(`UPDATE tracked_keywords SET active = 0 WHERE keyword IN ('n8n', 'Voice AI', 'Make.com', 'MCP Server', 'Web Scraping');`);
 
+// Clean up corrupted historical velocity values (> 180 mins recorded on old initial sync)
+db.exec(`
+  UPDATE jobs SET mins_to_5_10_proposals = NULL WHERE mins_to_5_10_proposals > 180;
+  UPDATE jobs SET mins_to_10_15_proposals = NULL WHERE mins_to_10_15_proposals > 240;
+`);
+
 // Bootstrap tokens from UPWORK_TOKENS_JSON env var if running on Render/Cloud
 if (process.env.UPWORK_TOKENS_JSON && !getSetting('upwork_tokens')) {
   try {
@@ -186,11 +192,21 @@ function upsertJobAndSnapshot(jobData) {
   const proposalsNumeric = jobData.current_proposals_numeric || tierToNumeric(jobData.current_proposals_tier);
 
   if (!existing) {
-    const minsTo5_10 = proposalsNumeric >= 6 ? minsSincePosted : null;
-    const minsTo10_15 = proposalsNumeric >= 11 ? minsSincePosted : null;
-    const minsTo20Plus = proposalsNumeric >= 20 ? minsSincePosted : null;
-    const minsToInterview = (jobData.interviewing_count || 0) > 0 ? minsSincePosted : null;
-    const minsToHire = (jobData.hires_count || 0) > 0 ? minsSincePosted : null;
+    // Only record exact transition minutes if we caught the job reasonably fresh (<= 60 mins)
+    // OR if it is currently still in that exact tier when first seen within 90 mins.
+    // Otherwise leave null so old jobs discovered late don't pollute velocity averages with 1500+ min values!
+    const caughtFresh = minsSincePosted <= 60;
+    const minsTo5_10 = (caughtFresh && proposalsNumeric >= 6) || (minsSincePosted <= 90 && proposalsNumeric >= 6 && proposalsNumeric <= 10)
+      ? minsSincePosted
+      : null;
+    const minsTo10_15 = (caughtFresh && proposalsNumeric >= 11) || (minsSincePosted <= 120 && proposalsNumeric >= 11 && proposalsNumeric <= 15)
+      ? minsSincePosted
+      : null;
+    const minsTo20Plus = (caughtFresh && proposalsNumeric >= 20) || (minsSincePosted <= 180 && proposalsNumeric >= 20)
+      ? minsSincePosted
+      : null;
+    const minsToInterview = (caughtFresh && (jobData.interviewing_count || 0) > 0) ? minsSincePosted : null;
+    const minsToHire = (minsSincePosted <= 1440 && (jobData.hires_count || 0) > 0) ? minsSincePosted : null;
 
     // Ghost detection heuristic: >24h old, 0 hires, 0 interviews, or client hasn't viewed in >18h
     const isGhost = jobData.is_ghost_job !== undefined

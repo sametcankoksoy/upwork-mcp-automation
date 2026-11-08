@@ -3,129 +3,141 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Upwork Analytics</title>
+  <title>Upwork Market Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
       theme: {
         extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
           colors: {
-            upwork: '#14a800',
-            bg: '#0b0f17',
-            panel: '#111827',
-            line: '#1f2937'
+            bg: '#090a0f',
+            surface: '#11131c',
+            surfaceHover: '#171a26',
+            border: '#1f2433',
+            accent: '#10b981'
           }
         }
       }
     };
   </script>
 </head>
-<body class="bg-bg text-gray-100 min-h-screen font-sans antialiased">
-  <!-- Minimal Top Bar -->
-  <header class="border-b border-line bg-panel">
-    <div class="max-w-5xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
+<body class="bg-bg text-zinc-100 min-h-screen font-sans antialiased selection:bg-emerald-500/20 selection:text-emerald-300">
+  <!-- Top Bar -->
+  <header class="border-b border-border bg-surface/80 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-6xl mx-auto px-5 py-4 flex flex-wrap items-center justify-between gap-4">
       <div class="flex items-center gap-3">
-        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400" id="connDot"></span>
-        <h1 class="text-base font-semibold tracking-tight text-white">Upwork Market Analytics</h1>
-        <span class="text-xs text-gray-400" id="connText">Live MCP</span>
+        <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold text-sm">
+          U
+        </div>
+        <div>
+          <div class="flex items-center gap-2.5">
+            <h1 class="text-sm font-semibold text-white tracking-tight">Upwork Market Radar</h1>
+            <span class="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              Live MCP
+            </span>
+          </div>
+          <p class="text-[11px] text-zinc-400 mt-0.5" id="lastSyncText">Tracking 5 core categories every 5 minutes</p>
+        </div>
       </div>
 
-      <div class="flex items-center gap-2">
-        <select id="keywordFilter" class="bg-bg border border-line text-xs rounded-lg px-3 py-2 text-gray-200 focus:outline-none">
-          <option value="ALL">All Categories</option>
+      <div class="flex items-center gap-2.5">
+        <select id="keywordFilter" class="bg-bg border border-border text-xs font-medium rounded-lg px-3 py-2 text-zinc-200 focus:outline-none focus:border-emerald-500/50 transition">
+          <option value="ALL">All 5 Categories</option>
         </select>
-        <button id="pollBtn" onclick="triggerPoll()" class="bg-upwork hover:bg-emerald-600 text-white text-xs font-medium px-3.5 py-2 rounded-lg transition">
+        <button id="pollBtn" onclick="triggerPoll()" class="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-semibold px-3.5 py-2 rounded-lg transition shadow-sm">
           Sync Now
         </button>
       </div>
     </div>
   </header>
 
-  <main class="max-w-5xl mx-auto px-4 py-6 space-y-6">
-    <!-- 4 Simple KPIs -->
-    <section class="grid grid-cols-2 sm:grid-cols-4 gap-3" id="kpiGrid"></section>
+  <main class="max-w-6xl mx-auto px-5 py-7 space-y-8">
+    <!-- 4 Top Summary Cards -->
+    <section class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="kpiGrid"></section>
 
-    <!-- 1. Category Comparison (Which category has the most jobs & least competition?) -->
-    <section class="bg-panel border border-line rounded-xl p-5">
-      <h2 class="text-sm font-semibold text-white mb-1">1. Category Volume & Competition</h2>
-      <p class="text-xs text-gray-400 mb-4">Comparison across Automation, Data Scraping, AI Automation, Full-Stack & Back-End</p>
+    <!-- 1. Category Comparison Cards -->
+    <section class="space-y-3">
+      <div class="flex items-baseline justify-between">
+        <div>
+          <h2 class="text-sm font-semibold text-white">Category Comparison</h2>
+          <p class="text-xs text-zinc-400">Volume, proposal competition, and client quality across your 5 core niches</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5" id="categoryCards"></div>
+    </section>
+
+    <!-- 2. Two-Column: Time Windows & Client Hire Rate Cohorts -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Best Time Windows -->
+      <div class="bg-surface border border-border rounded-xl p-5 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <h2 class="text-sm font-semibold text-white">Proposal Competition by Time of Day</h2>
+            <span class="text-[11px] text-zinc-400">Turkey Time (UTC+3)</span>
+          </div>
+          <p class="text-xs text-zinc-400 mb-4">Which 3-hour windows have the fewest applicants per job?</p>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead>
+                <tr class="border-b border-border text-zinc-400 font-medium">
+                  <th class="pb-2.5">Time Window</th>
+                  <th class="pb-2.5">Competition</th>
+                  <th class="pb-2.5">Avg. Applies</th>
+                  <th class="pb-2.5">≤10 Applies</th>
+                  <th class="pb-2.5 text-right">Jobs</th>
+                </tr>
+              </thead>
+              <tbody id="timeWindowTableBody" class="divide-y divide-border/60"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Client Hire Rate Cohorts (60%+ vs Under 60%) -->
+      <div class="bg-surface border border-border rounded-xl p-5 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <h2 class="text-sm font-semibold text-white">Client Hire Rate Analysis (≥60% vs. Lower)</h2>
+            <span class="text-[11px] text-zinc-400">Conversion & Ghosting</span>
+          </div>
+          <p class="text-xs text-zinc-400 mb-4">Actual hiring behavior segmented by the client's historical Upwork hire rate</p>
+
+          <div id="cohortCards" class="space-y-3"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Live Tracked Jobs Table -->
+    <section class="bg-surface border border-border rounded-xl p-5">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <div>
+          <h2 class="text-sm font-semibold text-white">Live Job Feed & Lifecycle Status</h2>
+          <p class="text-xs text-zinc-400">Click any job title to open the posting directly on Upwork</p>
+        </div>
+        <span class="text-[11px] text-zinc-400" id="jobCountBadge"></span>
+      </div>
+
       <div class="overflow-x-auto">
         <table class="w-full text-left text-xs">
           <thead>
-            <tr class="border-b border-line text-gray-400">
+            <tr class="border-b border-border text-zinc-400 font-medium">
+              <th class="py-2.5 px-2">Job Title</th>
               <th class="py-2.5 px-2">Category</th>
-              <th class="py-2.5 px-2">Jobs Tracked</th>
-              <th class="py-2.5 px-2">Avg. Applies</th>
-              <th class="py-2.5 px-2">5-10 Apply Speed</th>
-              <th class="py-2.5 px-2">60%+ Hire Clients</th>
-              <th class="py-2.5 px-2">Actual Hire %</th>
-              <th class="py-2.5 px-2">Ghost %</th>
+              <th class="py-2.5 px-2">Pay / Budget</th>
+              <th class="py-2.5 px-2">Client Hire Rate</th>
+              <th class="py-2.5 px-2">Proposals</th>
+              <th class="py-2.5 px-2">Activity</th>
+              <th class="py-2.5 px-2 text-right">Posted</th>
             </tr>
           </thead>
-          <tbody id="keywordTableBody" class="divide-y divide-line"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- 2. Time Windows (When do jobs get the fewest applies?) -->
-    <section class="bg-panel border border-line rounded-xl p-5">
-      <h2 class="text-sm font-semibold text-white mb-1">2. Best Time Windows (Lowest Proposals vs. Volume)</h2>
-      <p class="text-xs text-gray-400 mb-4">Ranked from fewest average proposals per job to most crowded hours (Turkey Time UTC+3)</p>
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs">
-          <thead>
-            <tr class="border-b border-line text-gray-400">
-              <th class="py-2.5 px-2">Hours (TR / UTC+3)</th>
-              <th class="py-2.5 px-2">Status</th>
-              <th class="py-2.5 px-2">Avg. Applies / Job</th>
-              <th class="py-2.5 px-2">≤10 Applies Rate</th>
-              <th class="py-2.5 px-2">5-10 Apply Speed</th>
-              <th class="py-2.5 px-2">Jobs Posted</th>
-            </tr>
-          </thead>
-          <tbody id="timeWindowTableBody" class="divide-y divide-line"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- 3. Client Quality (60%+ Hire Rate vs Others) -->
-    <section class="bg-panel border border-line rounded-xl p-5">
-      <h2 class="text-sm font-semibold text-white mb-1">3. Client Hire Rate Analysis (≥60% vs. Under 60%)</h2>
-      <p class="text-xs text-gray-400 mb-4">How often high hire-rate clients actually hire vs. abandon (ghost) jobs</p>
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs">
-          <thead>
-            <tr class="border-b border-line text-gray-400">
-              <th class="py-2.5 px-2">Client Segment</th>
-              <th class="py-2.5 px-2">Jobs</th>
-              <th class="py-2.5 px-2">Actual Hire Rate</th>
-              <th class="py-2.5 px-2">Ghost Rate</th>
-              <th class="py-2.5 px-2">5-10 Apply Speed</th>
-              <th class="py-2.5 px-2">Avg. Budget</th>
-            </tr>
-          </thead>
-          <tbody id="cohortTableBody" class="divide-y divide-line"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- 4. Live Jobs Feed -->
-    <section class="bg-panel border border-line rounded-xl p-5">
-      <h2 class="text-sm font-semibold text-white mb-3">4. Recent Tracked Jobs</h2>
-      <div class="overflow-x-auto max-h-96 overflow-y-auto">
-        <table class="w-full text-left text-xs">
-          <thead class="sticky top-0 bg-panel border-b border-line text-gray-400">
-            <tr>
-              <th class="py-2 px-2">Job Title</th>
-              <th class="py-2 px-2">Category</th>
-              <th class="py-2 px-2">Budget</th>
-              <th class="py-2 px-2">Client Hire %</th>
-              <th class="py-2 px-2">Proposals</th>
-              <th class="py-2 px-2">Posted</th>
-            </tr>
-          </thead>
-          <tbody id="recentJobsBody" class="divide-y divide-line"></tbody>
+          <tbody id="recentJobsBody" class="divide-y divide-border/60"></tbody>
         </table>
       </div>
     </section>
@@ -133,6 +145,28 @@
 
   <script>
     let currentKeyword = 'ALL';
+
+    function timeAgo(isoStr) {
+      if (!isoStr) return '-';
+      const diffMins = Math.max(1, Math.round((Date.now() - new Date(isoStr).getTime()) / 60000));
+      if (diffMins < 60) return `${diffMins}m ago`;
+      const hrs = Math.floor(diffMins / 60);
+      const mins = diffMins % 60;
+      if (hrs < 24) return `${hrs}h ${mins}m ago`;
+      return `${Math.floor(hrs / 24)}d ago`;
+    }
+
+    function formatMins(m) {
+      if (m === null || m === undefined) return 'Tracking...';
+      if (m < 60) return `${Math.round(m)}m`;
+      return `${(m / 60).toFixed(1)}h`;
+    }
+
+    function formatMoney(n) {
+      if (!n || n <= 0) return '$0';
+      if (n >= 1000) return '$' + (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k';
+      return '$' + Math.round(n);
+    }
 
     async function loadAnalytics() {
       const res = await fetch(`/api/analytics?keyword=${encodeURIComponent(currentKeyword)}`);
@@ -143,7 +177,7 @@
     function renderDashboard(data) {
       const s = data.summary;
 
-      // Dropdown
+      // Populate filter dropdown once
       const select = document.getElementById('keywordFilter');
       if (select.options.length <= 1 && data.trackedKeywords) {
         data.trackedKeywords.filter(k => k.active).forEach(k => {
@@ -158,74 +192,202 @@
         };
       }
 
-      // 4 Clean KPIs
+      if (data.recentRuns?.length > 0) {
+        const lastRun = data.recentRuns[0];
+        document.getElementById('lastSyncText').textContent =
+          `Last synced ${timeAgo(lastRun.finished_at || lastRun.started_at)} · ${s.total_jobs} real-time jobs tracked`;
+      }
+
+      const highHireCohort = data.hireRateCohorts.find(c => c.cohort.includes('60%+'));
+      const highHireCount = highHireCohort ? highHireCohort.jobs_posted : 0;
+      const highHirePct = s.total_jobs > 0 ? Math.round((highHireCount / s.total_jobs) * 100) : 0;
+
+      // Top 4 KPIs
       const kpis = [
-        { label: 'Tracked Jobs', val: s.total_jobs, color: 'text-white' },
-        { label: 'Avg. 5-10 Apply Speed', val: s.avg_mins_to_5_10 ? `${s.avg_mins_to_5_10} min` : 'Tracking...', color: 'text-amber-400' },
-        { label: 'Avg. Client Hire Rate', val: `${s.avg_client_hire_rate || 0}%`, color: 'text-emerald-400' },
-        { label: 'Ghost Job Rate', val: `${s.ghost_job_rate || 0}%`, color: 'text-rose-400' }
+        {
+          label: 'Active Tracked Jobs',
+          val: s.total_jobs,
+          sub: `${s.total_hired_jobs} hired · ${s.total_active_open} open`,
+          color: 'text-white'
+        },
+        {
+          label: '60%+ Hire Rate Clients',
+          val: `${highHirePct}%`,
+          sub: `${highHireCount} of ${s.total_jobs} jobs from top clients`,
+          color: 'text-emerald-400'
+        },
+        {
+          label: '5–10 Apply Saturation Speed',
+          val: formatMins(s.avg_mins_to_5_10),
+          sub: s.avg_mins_to_5_10 ? 'Avg time to reach 5-10 applies' : 'Measuring fresh postings',
+          color: 'text-amber-400'
+        },
+        {
+          label: 'Avg. Client Hire Rate',
+          val: `${s.avg_client_hire_rate || 0}%`,
+          sub: `Avg Fixed Budget: $${(s.avg_fixed_budget || 0).toLocaleString()}`,
+          color: 'text-sky-400'
+        }
       ];
 
       document.getElementById('kpiGrid').innerHTML = kpis.map(k => `
-        <div class="bg-panel border border-line rounded-xl p-4">
-          <div class="text-xs text-gray-400">${k.label}</div>
-          <div class="text-xl font-bold mt-1 ${k.color}">${k.val}</div>
+        <div class="bg-surface border border-border rounded-xl p-4">
+          <div class="text-xs text-zinc-400 font-medium">${k.label}</div>
+          <div class="text-2xl font-bold mt-1.5 tracking-tight ${k.color}">${k.val}</div>
+          <div class="text-[11px] text-zinc-500 mt-1">${k.sub}</div>
         </div>
       `).join('');
 
-      // 1. Category Table
-      document.getElementById('keywordTableBody').innerHTML = data.keywordBreakdown.map(k => `
-        <tr class="hover:bg-gray-800/30">
-          <td class="py-2.5 px-2 font-semibold text-white">${k.keyword}</td>
-          <td class="py-2.5 px-2 font-bold text-white">${k.total_jobs} <span class="text-gray-500 font-normal">(${k.jobs_last_24h || k.total_jobs} today)</span></td>
-          <td class="py-2.5 px-2 text-gray-300">~${k.avg_proposals || 0}</td>
-          <td class="py-2.5 px-2 text-amber-400">${k.avg_mins_to_5_10 ? k.avg_mins_to_5_10 + ' min' : '-'}</td>
-          <td class="py-2.5 px-2 text-emerald-400 font-medium">${k.high_hire_client_pct}%</td>
-          <td class="py-2.5 px-2 text-emerald-400">${k.hire_conversion_pct}%</td>
-          <td class="py-2.5 px-2 text-rose-400">${k.ghost_rate_pct}%</td>
-        </tr>
-      `).join('');
+      // 1. Category Cards (5 Core Niches)
+      document.getElementById('categoryCards').innerHTML = data.keywordBreakdown.map(k => {
+        const isSelected = currentKeyword === k.keyword;
+        const payLabel = k.avg_budget > 0
+          ? `$${k.avg_budget.toLocaleString()} avg`
+          : (k.avg_hourly_rate > 0 ? `$${k.avg_hourly_rate}/hr avg` : 'Mixed');
+        return `
+          <div onclick="selectCategory('${k.keyword}')" class="cursor-pointer bg-surface hover:bg-surfaceHover border ${isSelected ? 'border-emerald-500' : 'border-border'} rounded-xl p-4 transition flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-xs font-semibold text-white truncate">${k.keyword}</span>
+                <span class="text-xs font-bold px-2 py-0.5 rounded bg-zinc-800 text-zinc-200">${k.total_jobs} jobs</span>
+              </div>
+              <div class="mt-3 pt-3 border-t border-border/60 space-y-2 text-xs">
+                <div class="flex justify-between">
+                  <span class="text-zinc-400">Avg. Applies</span>
+                  <span class="font-semibold text-zinc-200">~${k.avg_proposals || 0}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-zinc-400">≤10 Applies</span>
+                  <span class="font-medium text-sky-400">${k.low_apply_pct || 0}%</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-zinc-400">60%+ Hire Clients</span>
+                  <span class="font-semibold text-emerald-400">${k.high_hire_client_pct}%</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-zinc-400">Avg. Pay</span>
+                  <span class="font-medium text-zinc-300">${payLabel}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
 
-      // 2. Time Windows Table
+      // 2. Time Windows Table (Only show windows with actual data on top, empty windows dimmed)
       if (data.timeBlockWindows) {
         document.getElementById('timeWindowTableBody').innerHTML = data.timeBlockWindows.map(w => {
+          if (w.total_jobs === 0) {
+            return `
+              <tr class="text-zinc-600">
+                <td class="py-2.5 font-medium">${w.block_trt.replace(' (UTC+3)', '')}</td>
+                <td class="py-2.5">No postings yet</td>
+                <td class="py-2.5">-</td>
+                <td class="py-2.5">-</td>
+                <td class="py-2.5 text-right">0</td>
+              </tr>
+            `;
+          }
           const isLow = w.competition_level.includes('Low');
+          const isMod = w.competition_level.includes('Moderate');
+          const badge = isLow
+            ? '<span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">Low (Best)</span>'
+            : (isMod
+                ? '<span class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 font-medium">Moderate</span>'
+                : '<span class="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 font-medium">Crowded</span>');
           return `
-            <tr class="hover:bg-gray-800/30">
-              <td class="py-2.5 px-2 font-medium text-white">${w.block_trt}</td>
-              <td class="py-2.5 px-2 ${isLow ? 'text-emerald-400 font-semibold' : 'text-gray-400'}">${isLow ? '🟢 Low Competition' : '🟡 Normal / Busy'}</td>
-              <td class="py-2.5 px-2 font-bold ${isLow ? 'text-emerald-400' : 'text-gray-200'}">${w.avg_proposals_per_job} applies</td>
-              <td class="py-2.5 px-2 text-sky-400">${w.low_competition_pct}%</td>
-              <td class="py-2.5 px-2 text-amber-300">${w.avg_mins_to_5_10 || '-'} min</td>
-              <td class="py-2.5 px-2 text-gray-300">${w.total_jobs}</td>
+            <tr class="hover:bg-surfaceHover/60">
+              <td class="py-2.5 font-medium text-zinc-200">${w.block_trt.replace(' (UTC+3)', '')}</td>
+              <td class="py-2.5">${badge}</td>
+              <td class="py-2.5 font-semibold ${isLow ? 'text-emerald-400' : 'text-zinc-200'}">~${w.avg_proposals_per_job} applies</td>
+              <td class="py-2.5 text-sky-400 font-medium">${w.low_competition_pct}%</td>
+              <td class="py-2.5 text-right font-semibold text-zinc-300">${w.total_jobs}</td>
             </tr>
           `;
         }).join('');
       }
 
       // 3. Client Hire Rate Cohorts
-      document.getElementById('cohortTableBody').innerHTML = data.hireRateCohorts.map(c => `
-        <tr class="hover:bg-gray-800/30">
-          <td class="py-2.5 px-2 font-medium text-white">${c.cohort}</td>
-          <td class="py-2.5 px-2">${c.jobs_posted}</td>
-          <td class="py-2.5 px-2 text-emerald-400 font-bold">${c.actual_hire_conversion_pct}% (${c.jobs_hired})</td>
-          <td class="py-2.5 px-2 text-rose-400">${c.ghost_rate_pct}% (${c.ghost_jobs})</td>
-          <td class="py-2.5 px-2 text-amber-300">${c.avg_mins_to_5_10_apply || '-'} min</td>
-          <td class="py-2.5 px-2">$${(c.avg_budget || 0).toLocaleString()}</td>
-        </tr>
-      `).join('');
+      document.getElementById('cohortCards').innerHTML = data.hireRateCohorts.map(c => {
+        const isHigh = c.cohort.includes('60%+');
+        const isMed = c.cohort.includes('35%');
+        const borderCol = isHigh ? 'border-emerald-500/30 bg-emerald-500/[0.03]' : 'border-border bg-bg/40';
+        const titleColor = isHigh ? 'text-emerald-400' : (isMed ? 'text-amber-300' : 'text-zinc-400');
 
-      // 4. Recent Jobs
-      document.getElementById('recentJobsBody').innerHTML = data.recentJobs.map(j => `
-        <tr class="hover:bg-gray-800/30">
-          <td class="py-2 px-2 font-medium text-white truncate max-w-xs" title="${j.title}">${j.title}</td>
-          <td class="py-2 px-2 text-gray-400">${j.keyword_matched}</td>
-          <td class="py-2 px-2">${j.budget > 0 ? '$' + j.budget.toLocaleString() : '$' + j.hourly_max + '/hr'}</td>
-          <td class="py-2 px-2 ${j.client_hire_rate >= 60 ? 'text-emerald-400 font-bold' : 'text-gray-400'}">${j.client_hire_rate}%</td>
-          <td class="py-2 px-2 text-amber-300">${j.current_proposals_tier}</td>
-          <td class="py-2 px-2 text-gray-400">${new Date(j.posted_at).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'})}</td>
-        </tr>
-      `).join('');
+        return `
+          <div class="border ${borderCol} rounded-lg p-3.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold ${titleColor}">${c.cohort}</span>
+              <span class="text-xs font-bold text-white">${c.jobs_posted} jobs</span>
+            </div>
+            <div class="grid grid-cols-3 gap-2 mt-2.5 pt-2.5 border-t border-border/60 text-xs">
+              <div>
+                <div class="text-[11px] text-zinc-400">Hired So Far</div>
+                <div class="font-semibold text-emerald-400 mt-0.5">${c.actual_hire_conversion_pct}% (${c.jobs_hired})</div>
+              </div>
+              <div>
+                <div class="text-[11px] text-zinc-400">Ghost / Abandoned</div>
+                <div class="font-semibold text-rose-400 mt-0.5">${c.ghost_rate_pct}% (${c.ghost_jobs})</div>
+              </div>
+              <div>
+                <div class="text-[11px] text-zinc-400">Avg. Fixed Budget</div>
+                <div class="font-semibold text-zinc-200 mt-0.5">${c.avg_budget ? '$' + c.avg_budget.toLocaleString() : 'Hourly'}</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // 4. Recent Tracked Jobs Table
+      document.getElementById('jobCountBadge').textContent = `Showing ${data.recentJobs.length} jobs`;
+      document.getElementById('recentJobsBody').innerHTML = data.recentJobs.map(j => {
+        const budgetText = j.budget > 0
+          ? `$${j.budget.toLocaleString()}`
+          : (j.hourly_max > 0 ? `$${j.hourly_min || j.hourly_max}–$${j.hourly_max}/hr` : 'Hourly');
+
+        const hrBadge = j.client_hire_rate >= 60
+          ? `<span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-semibold">${j.client_hire_rate}%</span>`
+          : (j.client_hire_rate >= 35
+              ? `<span class="px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 font-medium">${j.client_hire_rate}%</span>`
+              : `<span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">${j.client_hire_rate}%</span>`);
+
+        let activityHtml = `<span class="text-zinc-500">Open</span>`;
+        if (j.hires_count > 0 || j.job_status === 'hired') {
+          activityHtml = `<span class="text-emerald-400 font-semibold">✅ ${j.hires_count || 1} Hired</span>`;
+        } else if (j.interviewing_count > 0) {
+          activityHtml = `<span class="text-sky-400 font-medium">💬 ${j.interviewing_count} Interviewing</span>`;
+        } else if (j.is_ghost_job) {
+          activityHtml = `<span class="text-rose-400">👻 Ghosted</span>`;
+        }
+
+        const upworkUrl = `https://www.upwork.com/jobs/~02${j.job_id}`;
+
+        return `
+          <tr class="hover:bg-surfaceHover/60 transition">
+            <td class="py-3 px-2 max-w-xs">
+              <a href="${upworkUrl}" target="_blank" rel="noopener" class="font-medium text-zinc-100 hover:text-emerald-400 transition line-clamp-1" title="${j.title}">
+                ${j.title}
+              </a>
+              <div class="text-[11px] text-zinc-500 mt-0.5">${j.client_country} · ${formatMoney(j.client_total_spent)} spent</div>
+            </td>
+            <td class="py-3 px-2">
+              <span class="px-2 py-0.5 rounded bg-zinc-800/80 text-zinc-300 text-[11px] font-medium">${j.keyword_matched}</span>
+            </td>
+            <td class="py-3 px-2 font-medium text-zinc-200">${budgetText}</td>
+            <td class="py-3 px-2">${hrBadge}</td>
+            <td class="py-3 px-2 font-medium ${j.current_proposals_numeric <= 10 ? 'text-emerald-400' : 'text-zinc-300'}">${j.current_proposals_tier}</td>
+            <td class="py-3 px-2">${activityHtml}</td>
+            <td class="py-3 px-2 text-right text-zinc-400 whitespace-nowrap">${timeAgo(j.posted_at)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function selectCategory(kw) {
+      const select = document.getElementById('keywordFilter');
+      currentKeyword = currentKeyword === kw ? 'ALL' : kw;
+      select.value = currentKeyword;
+      loadAnalytics();
     }
 
     async function triggerPoll() {

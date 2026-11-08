@@ -111,9 +111,11 @@ function getFullMarketAnalytics(keywordFilter = null) {
     const weightedProps = totalJobs > 0
       ? Math.round((slice.reduce((a, b) => a + (b.avg_total_proposals * b.jobs_count), 0) / totalJobs) * 10) / 10
       : 0;
-    const weighted5_10 = totalJobs > 0
-      ? Math.round((slice.reduce((a, b) => a + ((b.avg_mins_to_5_10 || 25) * b.jobs_count), 0) / totalJobs) * 10) / 10
-      : 0;
+    const valid5_10 = slice.filter(b => b.avg_mins_to_5_10 !== null && b.jobs_count > 0);
+    const valid5_10Jobs = valid5_10.reduce((a, b) => a + b.jobs_count, 0);
+    const weighted5_10 = valid5_10Jobs > 0
+      ? Math.round((valid5_10.reduce((a, b) => a + (b.avg_mins_to_5_10 * b.jobs_count), 0) / valid5_10Jobs) * 10) / 10
+      : null;
     const weightedHire = totalJobs > 0
       ? Math.round((slice.reduce((a, b) => a + (b.hire_rate_pct * b.jobs_count), 0) / totalJobs) * 10) / 10
       : 0;
@@ -123,18 +125,31 @@ function getFullMarketAnalytics(keywordFilter = null) {
     const startTrt = (startUtc + 3) % 24;
     const endTrt = (startTrt + 3) % 24;
 
+    let compLevel = 'No Data Yet';
+    if (totalJobs > 0) {
+      if (weightedProps <= 12) compLevel = 'Low Competition (Golden Window)';
+      else if (weightedProps <= 22) compLevel = 'Moderate Competition';
+      else compLevel = 'High Competition (Crowded)';
+    }
+
     timeBlockWindows.push({
       block_utc: `${String(startUtc).padStart(2, '0')}:00 - ${String((startUtc + 3) % 24).padStart(2, '0')}:00 UTC`,
       block_trt: `${String(startTrt).padStart(2, '0')}:00 - ${String(endTrt).padStart(2, '0')}:00 (UTC+3)`,
       total_jobs: totalJobs,
-      avg_proposals_per_job: weightedProps,
-      avg_mins_to_5_10: weighted5_10,
+      avg_proposals_per_job: totalJobs > 0 ? weightedProps : null,
+      avg_mins_to_5_10: totalJobs > 0 ? weighted5_10 : null,
       low_competition_pct: lowCompPct,
       hire_rate_pct: weightedHire,
-      competition_level: weightedProps <= 12 ? 'Low Competition (Golden Window)' : (weightedProps <= 20 ? 'Moderate Competition' : 'High Competition (Crowded)')
+      competition_level: compLevel
     });
   }
-  timeBlockWindows.sort((a, b) => a.avg_proposals_per_job - b.avg_proposals_per_job);
+  // Sort blocks with actual jobs first (by lowest proposals), and put 0-job blocks at the bottom
+  timeBlockWindows.sort((a, b) => {
+    if (a.total_jobs === 0 && b.total_jobs === 0) return 0;
+    if (a.total_jobs === 0) return 1;
+    if (b.total_jobs === 0) return -1;
+    return a.avg_proposals_per_job - b.avg_proposals_per_job;
+  });
 
   // 4. Keyword / Niche Breakdown (Job Volume, Velocity, Avg Applies, Ghost Rate, Hire Rate)
   const keywordBreakdown = db.prepare(`
@@ -143,12 +158,15 @@ function getFullMarketAnalytics(keywordFilter = null) {
       COUNT(*) as total_jobs,
       SUM(CASE WHEN datetime(posted_at) >= datetime('now', '-24 hours') THEN 1 ELSE 0 END) as jobs_last_24h,
       ROUND(AVG(current_proposals_numeric), 1) as avg_proposals,
+      SUM(CASE WHEN current_proposals_numeric <= 10 THEN 1 ELSE 0 END) as low_apply_jobs,
+      ROUND(SUM(CASE WHEN current_proposals_numeric <= 10 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as low_apply_pct,
       ROUND(AVG(mins_to_5_10_proposals), 1) as avg_mins_to_5_10,
       ROUND(AVG(mins_to_10_15_proposals), 1) as avg_mins_to_10_15,
       ROUND(SUM(CASE WHEN job_status = 'hired' OR hires_count > 0 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as hire_conversion_pct,
       ROUND(SUM(CASE WHEN is_ghost_job = 1 OR job_status = 'ghost' THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as ghost_rate_pct,
       ROUND(SUM(CASE WHEN client_hire_rate >= 60 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as high_hire_client_pct,
-      ROUND(AVG(CASE WHEN budget > 0 THEN budget ELSE NULL END), 0) as avg_budget
+      ROUND(AVG(CASE WHEN budget > 0 THEN budget ELSE NULL END), 0) as avg_budget,
+      ROUND(AVG(CASE WHEN hourly_max > 0 THEN hourly_max ELSE NULL END), 0) as avg_hourly_rate
     FROM jobs
     GROUP BY keyword_matched
     ORDER BY jobs_last_24h DESC, total_jobs DESC

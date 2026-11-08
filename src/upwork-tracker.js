@@ -114,7 +114,7 @@ function parseBudgetField(budgetStr, jobType) {
   return { budget: parseMoneyString(s), hourlyMin: 0, hourlyMax: 0 };
 }
 
-async function fetchLiveJobsForKeyword(keyword, accessToken, orgUid, enrichLimit = 4) {
+async function fetchLiveJobsForKeyword(keyword, accessToken, orgUid, enrichLimit = 10) {
   const searchRes = await callUpworkMcpTool(
     'upwork__find_jobs',
     {
@@ -143,8 +143,8 @@ async function fetchLiveJobsForKeyword(keyword, accessToken, orgUid, enrichLimit
     let clientTotalHires = existing?.client_total_hires ?? 0;
     let clientTotalSpent = existing?.client_total_spent ?? parseMoneyString(j.client?.total_spent);
 
-    // Enrich with exact client_record (hire_rate_percent, jobs_with_hires, open_jobs) for newly discovered jobs
-    if (clientHireRate === null && i < enrichLimit) {
+    // Enrich with exact client_record (hire_rate_percent, jobs_with_hires, open_jobs)
+    if ((clientHireRate === null || (clientHireRate === 0 && clientTotalSpent > 0)) && i < enrichLimit) {
       try {
         const detail = await callUpworkMcpTool(
           'upwork__find_jobs',
@@ -225,7 +225,7 @@ async function runTrackerCycle(options = {}) {
     if (accessToken) {
       const orgUid = await getTalentOrgUid(accessToken);
       for (const kw of activeKeywords) {
-        const fetched = await fetchLiveJobsForKeyword(kw, accessToken, orgUid, 5);
+        const fetched = await fetchLiveJobsForKeyword(kw, accessToken, orgUid, 10);
         for (const job of fetched) {
           const isNew = upsertJobAndSnapshot(job);
           if (isNew) newJobsFound++;
