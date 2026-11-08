@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Upwork Opportunity & Market Radar</title>
+  <title>Upwork Market Intelligence & Opportunity Engine</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -36,13 +36,13 @@
         </div>
         <div>
           <div class="flex items-center gap-2.5">
-            <h1 class="text-sm font-semibold text-white tracking-tight">Upwork Opportunity & Market Radar</h1>
+            <h1 class="text-sm font-semibold text-white tracking-tight">Upwork Market Intelligence & Opportunity Engine</h1>
             <span class="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
               Live Telemetry
             </span>
           </div>
-          <p class="text-[11px] text-zinc-400 mt-0.5" id="lastSyncText">Real-time competitive intelligence for high-conversion bidding</p>
+          <p class="text-[11px] text-zinc-400 mt-0.5" id="lastSyncText">Statistical decision-support platform for Software, AI & Automation</p>
         </div>
       </div>
 
@@ -57,111 +57,119 @@
     </div>
   </header>
 
-  <main class="max-w-7xl mx-auto px-5 py-7 space-y-7">
-    <!-- 4 Top Executive KPIs -->
+  <main class="max-w-7xl mx-auto px-5 py-7 space-y-8">
+    <!-- Executive KPI Row -->
     <section class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="kpiGrid"></section>
 
-    <!-- 1. Macro Industry Group Competition (Where is competition lowest vs highest?) -->
+    <!-- SECTION 1: Hourly Posting Volume vs. Proposal Scarcity (Golden Hours Spotlight) -->
     <section class="bg-surface border border-border rounded-xl p-5 space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 class="text-sm font-semibold text-white">🎯 Industry Group Competition Ranking</h2>
-          <p class="text-xs text-zinc-400">Direct comparison across macro sectors: Which groups have the lowest applicant saturation?</p>
+          <div class="flex items-center gap-2">
+            <span class="text-base">🔥</span>
+            <h2 class="text-sm font-semibold text-white">Daily Hourly Job Volume vs. Proposal Scarcity (Golden Hours Index)</h2>
+          </div>
+          <p class="text-xs text-zinc-400 mt-0.5">Which hours see high job posting activity with abnormally low applicant pressure?</p>
         </div>
-        <span class="text-xs text-zinc-400" id="groupCountText"></span>
+        <div class="flex items-center gap-3 text-xs">
+          <span class="flex items-center gap-1.5 text-emerald-400 font-medium">
+            <span class="w-2.5 h-2.5 rounded bg-emerald-400 animate-pulse"></span>
+            Golden Hours (High Jobs, Low Proposals)
+          </span>
+          <span class="flex items-center gap-1.5 text-zinc-400">
+            <span class="w-2.5 h-2.5 rounded bg-zinc-700"></span>
+            Normal / High Competition
+          </span>
+        </div>
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="groupCards"></div>
+
+      <!-- 24-Hour Column Chart -->
+      <div id="hourlyBarChart" class="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 lg:grid-cols-24 gap-2 pt-2"></div>
+
+      <!-- Golden Hours Cards Callout -->
+      <div class="pt-3 border-t border-border/60">
+        <h3 class="text-xs font-semibold text-emerald-400 mb-2">⭐ Top Detected Golden Opportunity Windows (Turkey Time UTC+3):</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" id="goldenHourCards"></div>
+      </div>
     </section>
 
-    <!-- 2. Detailed Niche Bar Charts + Country Distribution -->
-    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Horizontal Bar Chart: Category Volume & Competition -->
-      <div class="lg:col-span-2 bg-surface border border-border rounded-xl p-5">
-        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-          <div>
-            <h2 class="text-sm font-semibold text-white">📊 Specific Niche Competition (Avg Applies & Volume)</h2>
-            <p class="text-xs text-zinc-400">Sorted from lowest competition (easiest to win) to crowded niches</p>
-          </div>
-          <span class="text-xs px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold" id="total24hBadge"></span>
+    <!-- SECTION 2: Budget Analysis ($0–100, $100–500, $500–1K, $1K–5K, $5K+) -->
+    <section class="bg-surface border border-border rounded-xl p-5 space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 class="text-sm font-semibold text-white">💰 Budget Tier Analysis ($0–100, $100–500, $500–1K, $1K–5K, $5K+)</h2>
+          <p class="text-xs text-zinc-400 mt-0.5">Where is the competition lowest across different budget levels?</p>
         </div>
-        <div id="categoryBarChart" class="space-y-3"></div>
       </div>
 
-      <!-- Top Client Countries -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead>
+            <tr class="border-b border-border text-zinc-400 font-medium">
+              <th class="pb-2.5">Budget Tier</th>
+              <th class="pb-2.5">Job Volume</th>
+              <th class="pb-2.5">Avg. Proposals</th>
+              <th class="pb-2.5">≤10 Applies Rate</th>
+              <th class="pb-2.5">60%+ Hire Rate Clients</th>
+              <th class="pb-2.5 text-right">Actual Hire %</th>
+            </tr>
+          </thead>
+          <tbody id="budgetTierBody" class="divide-y divide-border/60"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SECTION 3: Technology & Skill Trends (Python, AI Agents, n8n, Web Scraping, etc.) -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2 bg-surface border border-border rounded-xl p-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-semibold text-white">⚡ Technology & Skill Demand Matrix</h2>
+            <p class="text-xs text-zinc-400">Demand, competition, and average payout extracted directly from job descriptions</p>
+          </div>
+        </div>
+        <div id="techTrendList" class="space-y-3"></div>
+      </div>
+
+      <!-- Country Breakdown -->
       <div class="bg-surface border border-border rounded-xl p-5 flex flex-col justify-between">
         <div>
-          <div class="flex items-center justify-between mb-1">
-            <h2 class="text-sm font-semibold text-white">🌍 Top Client Countries</h2>
-            <span class="text-[11px] text-zinc-400">Where clients spend</span>
-          </div>
-          <p class="text-xs text-zinc-400 mb-4">Volume, average hire rate, and budget by country</p>
-          <div id="countryBarList" class="space-y-3.5"></div>
+          <h2 class="text-sm font-semibold text-white mb-1">🌍 Top Client Countries</h2>
+          <p class="text-xs text-zinc-400 mb-4">Volume & client hire conversion by geography</p>
+          <div id="countryBarList" class="space-y-3"></div>
         </div>
       </div>
     </section>
 
-    <!-- 3. Hourly Apply Rate & Saturation Heatmap -->
-    <section class="bg-surface border border-border rounded-xl p-5">
-      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-        <div>
-          <h2 class="text-sm font-semibold text-white">⏰ Hourly Job Volume vs. Proposal Pressure (Turkey Time UTC+3)</h2>
-          <p class="text-xs text-zinc-400">Green hours indicate the lowest applicant density (golden opportunity windows)</p>
-        </div>
-        <div class="flex items-center gap-4 text-xs">
-          <span class="flex items-center gap-1.5 text-emerald-400"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-400"></span> Golden Hours (≤12 avg applies)</span>
-          <span class="flex items-center gap-1.5 text-sky-400"><span class="w-2.5 h-2.5 rounded-sm bg-sky-500/70"></span> Crowded Hours</span>
-        </div>
-      </div>
-      <div id="hourlyBarChart" class="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 lg:grid-cols-24 gap-2 pt-2"></div>
-    </section>
-
-    <!-- 4. Two-Column: Golden Time Windows + Client Hire Rate Cohorts (60%+ vs Under 60%) -->
+    <!-- SECTION 4: Competition & Client Quality Analysis -->
     <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- Best Time Windows (Lowest Competition) -->
+      <!-- Proposal Distribution Buckets -->
       <div class="bg-surface border border-border rounded-xl p-5">
-        <div class="flex items-center justify-between mb-1">
-          <h2 class="text-sm font-semibold text-white">🏆 Best Time Windows Ranked</h2>
-          <span class="text-[11px] text-zinc-400">3-Hour Blocks (UTC+3)</span>
-        </div>
-        <p class="text-xs text-zinc-400 mb-4">Ranked from fewest average competitors per job to most crowded</p>
-
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs">
-            <thead>
-              <tr class="border-b border-border text-zinc-400 font-medium">
-                <th class="pb-2.5">Time Window</th>
-                <th class="pb-2.5">Competition</th>
-                <th class="pb-2.5">Avg. Competitors</th>
-                <th class="pb-2.5">≤10 Applies Rate</th>
-                <th class="pb-2.5 text-right">Jobs Posted</th>
-              </tr>
-            </thead>
-            <tbody id="timeWindowTableBody" class="divide-y divide-border/60"></tbody>
-          </table>
-        </div>
+        <h2 class="text-sm font-semibold text-white mb-1">🥊 Proposal Saturation Tiers (<5, 5–10, 10–20, 20+)</h2>
+        <p class="text-xs text-zinc-400 mb-4">How many jobs remain uncontested versus heavily saturated?</p>
+        <div id="proposalTierCards" class="space-y-3"></div>
       </div>
 
-      <!-- Client Hire Rate Cohorts (60%+ vs Under 60%) -->
-      <div class="space-y-6">
-        <div class="bg-surface border border-border rounded-xl p-5">
-          <div class="flex items-center justify-between mb-1">
-            <h2 class="text-sm font-semibold text-white">🎯 Client Hire Rate Analysis (≥60% vs. Lower)</h2>
-            <span class="text-[11px] text-zinc-400">Whales vs. Ghosters</span>
-          </div>
-          <p class="text-xs text-zinc-400 mb-4">Historical hire rate correlation with actual project funding vs. abandonment</p>
-          <div id="cohortCards" class="space-y-3"></div>
-        </div>
+      <!-- Client Quality & Whale Tracking -->
+      <div class="bg-surface border border-border rounded-xl p-5">
+        <h2 class="text-sm font-semibold text-white mb-1">🎯 Client Quality Analysis (≥60% vs. Lower)</h2>
+        <p class="text-xs text-zinc-400 mb-4">Real conversion rates: Do high hire rate clients actually pay out?</p>
+        <div id="cohortCards" class="space-y-3"></div>
+      </div>
+    </section>
 
-        <!-- Proposal Velocity Distribution Bars -->
-        <div class="bg-surface border border-border rounded-xl p-5">
-          <div class="flex items-center justify-between mb-1">
-            <h2 class="text-sm font-semibold text-white">🚀 Proposal Saturation Speed Distribution</h2>
-            <span class="text-[11px] text-zinc-400">How fast jobs fill up</span>
+    <!-- SECTION 5: AI Job Opportunity Scoring (Top Sniper Opportunities) -->
+    <section class="bg-surface border border-border rounded-xl p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-base">🎯</span>
+            <h2 class="text-sm font-semibold text-white">AI Opportunity Scoring (Top 100-Point Matches)</h2>
           </div>
-          <p class="text-xs text-zinc-400 mb-4">Speed at which new jobs climb from &lt;5 to 5–10 proposals</p>
-          <div id="velocityBarList" class="space-y-3"></div>
+          <p class="text-xs text-zinc-400 mt-0.5">Ranked by algorithm: High budget attractiveness + Proven client quality + Low applicant saturation</p>
         </div>
       </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="sniperGrid"></div>
     </section>
   </main>
 
@@ -199,8 +207,8 @@
       'Pakistan': '🇵🇰'
     };
 
-    function getFlag(country) {
-      return COUNTRY_FLAGS[country] || '🌐';
+    function getFlag(c) {
+      return COUNTRY_FLAGS[c] || '🌐';
     }
 
     function timeAgo(isoStr) {
@@ -264,14 +272,14 @@
       if (data.recentRuns?.length > 0) {
         const lastRun = data.recentRuns[0];
         document.getElementById('lastSyncText').textContent =
-          `Last synced ${timeAgo(lastRun.finished_at || lastRun.started_at)} · Analyzing ${s.total_jobs} jobs across ${data.keywordBreakdown.length} niches`;
+          `Last synced ${timeAgo(lastRun.finished_at || lastRun.started_at)} · Tracking ${s.total_jobs} jobs in real-time`;
       }
 
       const highHireCohort = data.hireRateCohorts.find(c => c.cohort.includes('60%+'));
       const highHireCount = highHireCohort ? highHireCohort.jobs_posted : 0;
       const highHirePct = s.total_jobs > 0 ? Math.round((highHireCount / s.total_jobs) * 100) : 0;
 
-      // 4 Top KPIs
+      // Top 4 KPIs
       const kpis = [
         {
           label: 'Jobs Shared (Last 24h)',
@@ -286,15 +294,15 @@
           color: 'text-emerald-400'
         },
         {
-          label: '5–10 Apply Speed',
+          label: 'Avg. 5–10 Apply Speed',
           val: formatMins(s.avg_mins_to_5_10),
           sub: 'Speed to reach 5-10 proposals',
           color: 'text-amber-400'
         },
         {
-          label: 'Top Opportunity Sector',
+          label: 'Lowest Competition Group',
           val: data.groupBreakdown?.[0]?.group_name || 'Automation',
-          sub: `Lowest avg competition: ~${data.groupBreakdown?.[0]?.avg_proposals || 0} applies`,
+          sub: `Avg proposals: ~${data.groupBreakdown?.[0]?.avg_proposals || 0}`,
           color: 'text-sky-400'
         }
       ];
@@ -307,182 +315,156 @@
         </div>
       `).join('');
 
-      // 1. Macro Industry Group Cards
-      if (data.groupBreakdown?.length > 0) {
-        document.getElementById('groupCountText').textContent = `${data.groupBreakdown.length} industry clusters`;
-        document.getElementById('groupCards').innerHTML = data.groupBreakdown.map((g, idx) => {
-          const isSelected = currentKeyword === `GROUP:${g.group_name}`;
-          const isLowestComp = idx === 0;
-          const badge = isLowestComp
-            ? '<span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-semibold">Lowest Competition</span>'
-            : (g.avg_proposals <= 20
-                ? '<span class="text-[10px] px-2 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30 font-medium">Moderate</span>'
-                : '<span class="text-[10px] px-2 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/30 font-medium">Crowded</span>');
-
-          return `
-            <div onclick="selectGroup('${g.group_name}')" class="cursor-pointer group p-4 rounded-xl border ${isSelected ? 'border-emerald-500 bg-surfaceHover' : 'border-border bg-surface'} hover:bg-surfaceHover transition flex flex-col justify-between">
-              <div>
-                <div class="flex items-center justify-between gap-2 mb-2">
-                  <h3 class="text-xs font-bold text-white group-hover:text-emerald-400 transition">${g.group_name}</h3>
-                  ${badge}
-                </div>
-                <div class="space-y-1.5 text-xs mt-3">
-                  <div class="flex justify-between">
-                    <span class="text-zinc-400">Avg. Competitors</span>
-                    <span class="font-bold ${isLowestComp ? 'text-emerald-400' : 'text-zinc-200'}">~${g.avg_proposals} applies</span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-zinc-400">≤10 Applies Rate</span>
-                    <span class="font-medium text-sky-400">${g.low_apply_pct}%</span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-zinc-400">60%+ Hire Clients</span>
-                    <span class="font-semibold text-emerald-400">${g.high_hire_client_pct}%</span>
-                  </div>
-                </div>
-              </div>
-              <div class="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-[11px] text-zinc-500">
-                <span>${g.total_jobs} total jobs</span>
-                <span class="font-medium text-zinc-300">${g.jobs_last_24h} in 24h</span>
-              </div>
-            </div>
-          `;
-        }).join('');
-      }
-
-      // 2. Horizontal Bar Chart: Category Volume (Sorted by competition)
-      const maxCatJobs = Math.max(1, ...data.keywordBreakdown.map(k => k.total_jobs));
-      const total24hAll = data.keywordBreakdown.reduce((a, b) => a + (b.jobs_last_24h || 0), 0);
-      document.getElementById('total24hBadge').textContent = `${total24hAll} Jobs in Last 24h`;
-
-      document.getElementById('categoryBarChart').innerHTML = data.keywordBreakdown.map(k => {
-        const widthPct = Math.max(6, Math.round((k.total_jobs / maxCatJobs) * 100));
-        const isSelected = currentKeyword === k.keyword;
-        const isLowComp = k.avg_proposals <= 15;
-        const payLabel = k.avg_budget > 0
-          ? `$${k.avg_budget.toLocaleString()} avg fixed`
-          : (k.avg_hourly_rate > 0 ? `$${k.avg_hourly_rate}/hr avg` : '');
-
-        return `
-          <div onclick="selectCategory('${k.keyword}')" class="cursor-pointer group p-2.5 rounded-lg hover:bg-surfaceHover transition ${isSelected ? 'ring-1 ring-emerald-500 bg-surfaceHover' : ''}">
-            <div class="flex flex-wrap items-center justify-between text-xs mb-1.5 gap-2">
-              <div class="flex items-center gap-2">
-                <span class="font-semibold text-white group-hover:text-emerald-400 transition">${k.keyword}</span>
-                <span class="text-[10px] px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-400">${k.category_group || ''}</span>
-                <span class="text-[11px] text-zinc-500">${payLabel}</span>
-              </div>
-              <div class="flex items-center gap-3 text-[11px]">
-                <span class="${isLowComp ? 'text-emerald-400 font-semibold' : 'text-zinc-300'}">Avg: ~${k.avg_proposals} applies</span>
-                <span class="text-sky-400">≤10: <b>${k.low_apply_pct || 0}%</b></span>
-                <span class="text-emerald-400 font-medium">${k.high_hire_client_pct}% top clients</span>
-                <span class="font-bold text-white">${k.jobs_last_24h || k.total_jobs} in 24h</span>
-              </div>
-            </div>
-            <div class="w-full bg-bg h-2.5 rounded-full overflow-hidden border border-border/60">
-              <div class="h-full rounded-full ${isLowComp ? 'bg-gradient-to-r from-emerald-600 to-emerald-400' : 'bg-gradient-to-r from-sky-600 to-sky-400'} transition-all duration-500" style="width: ${widthPct}%"></div>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      // 3. Country Breakdown Bar List
-      const maxCountryJobs = Math.max(1, ...(data.countryBreakdown || []).map(c => c.total_jobs));
-      document.getElementById('countryBarList').innerHTML = (data.countryBreakdown || []).map(c => {
-        const widthPct = Math.max(6, Math.round((c.total_jobs / maxCountryJobs) * 100));
-        const payInfo = c.avg_budget > 0 ? `$${c.avg_budget.toLocaleString()}` : (c.avg_hourly > 0 ? `$${c.avg_hourly}/hr` : '');
-        return `
-          <div>
-            <div class="flex items-center justify-between text-xs mb-1">
-              <span class="font-medium text-zinc-200">${getFlag(c.country)} ${c.country} <span class="text-zinc-500 text-[11px]">${payInfo}</span></span>
-              <span class="text-[11px] text-zinc-400">
-                <b class="text-white">${c.total_jobs} jobs</b> · <span class="text-emerald-400">${c.avg_hire_rate}% hire</span>
-              </span>
-            </div>
-            <div class="w-full bg-bg h-2 rounded-full overflow-hidden border border-border/50">
-              <div class="h-full rounded-full bg-sky-500/80" style="width: ${widthPct}%"></div>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      // 4. 24-Hour Vertical Bar Chart
+      // 1. 24-Hour Column Chart & Golden Hours Callout
       const maxHourly = Math.max(1, ...data.hourlyDistribution.map(h => h.jobs_count));
       document.getElementById('hourlyBarChart').innerHTML = data.hourlyDistribution.map(h => {
         const heightPct = h.jobs_count > 0 ? Math.max(12, Math.round((h.jobs_count / maxHourly) * 100)) : 4;
-        const isLowComp = h.jobs_count > 0 && h.avg_total_proposals <= 12;
         const barColor = h.jobs_count === 0
           ? 'bg-zinc-800/50'
-          : (isLowComp ? 'bg-emerald-400' : 'bg-sky-500/70');
+          : (h.is_golden_hour ? 'bg-emerald-400' : 'bg-sky-500/70');
 
         return `
-          <div class="flex flex-col items-center bg-bg/60 border ${isLowComp ? 'border-emerald-500/40' : 'border-border/60'} rounded-lg p-2" title="${h.window_label_trt} | ${h.jobs_count} Jobs | Avg Proposals: ~${h.avg_total_proposals}">
+          <div class="flex flex-col items-center bg-bg/60 border ${h.is_golden_hour ? 'border-emerald-500/50 ring-1 ring-emerald-500/20' : 'border-border/60'} rounded-lg p-2" title="${h.window_label_trt} | ${h.jobs_count} Jobs | Avg Proposals: ~${h.avg_total_proposals} | ${h.opportunity_verdict}">
             <div class="text-[10px] text-zinc-400 font-medium">${h.hour_label_trt.replace(':00 UTC+3', '')}:00</div>
             <div class="h-24 w-full flex items-end justify-center my-1.5 bg-bg rounded p-1">
               <div class="w-full rounded ${barColor} transition-all duration-300" style="height: ${heightPct}%"></div>
             </div>
             <div class="text-[11px] font-bold text-white">${h.jobs_count}</div>
-            <div class="text-[10px] ${isLowComp ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}">${h.jobs_count > 0 ? '~' + h.avg_total_proposals + ' app' : '-'}</div>
+            <div class="text-[10px] ${h.is_golden_hour ? 'text-emerald-400 font-bold' : 'text-zinc-500'}">${h.jobs_count > 0 ? '~' + h.avg_total_proposals + ' app' : '-'}</div>
           </div>
         `;
       }).join('');
 
-      // 5. Time Windows Table
-      if (data.timeBlockWindows) {
-        document.getElementById('timeWindowTableBody').innerHTML = data.timeBlockWindows.map(w => {
-          if (w.total_jobs === 0) {
-            return `
-              <tr class="text-zinc-600">
-                <td class="py-2.5 font-medium">${w.block_trt.replace(' (UTC+3)', '')}</td>
-                <td class="py-2.5">Collecting...</td>
-                <td class="py-2.5">-</td>
-                <td class="py-2.5">-</td>
-                <td class="py-2.5 text-right">0</td>
-              </tr>
-            `;
-          }
-          const isLow = w.competition_level.includes('Low');
-          const isMod = w.competition_level.includes('Moderate');
-          const badge = isLow
-            ? '<span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">Low (Best)</span>'
-            : (isMod
-                ? '<span class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 font-medium">Moderate</span>'
-                : '<span class="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 font-medium">Crowded</span>');
+      const goldenHours = data.hourlyDistribution.filter(h => h.is_golden_hour);
+      if (goldenHours.length > 0) {
+        document.getElementById('goldenHourCards').innerHTML = goldenHours.slice(0, 4).map(gh => `
+          <div class="bg-emerald-500/[0.04] border border-emerald-500/30 rounded-lg p-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-emerald-400">${gh.hour_label_trt}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold">${gh.jobs_count} jobs shared</span>
+            </div>
+            <div class="mt-2 text-xs text-zinc-300">
+              Avg proposals: <b class="text-emerald-400">~${gh.avg_total_proposals} applies</b>
+            </div>
+            <div class="text-[11px] text-zinc-500 mt-0.5">${gh.low_competition_pct}% of jobs stay ≤10 proposals</div>
+          </div>
+        `).join('');
+      } else {
+        document.getElementById('goldenHourCards').innerHTML = `<p class="text-xs text-zinc-500 col-span-4">Collecting more hourly snapshots to detect new golden windows.</p>`;
+      }
+
+      // 2. Budget Tier Analysis Table
+      if (data.budgetTiers) {
+        document.getElementById('budgetTierBody').innerHTML = data.budgetTiers.map(b => `
+          <tr class="hover:bg-surfaceHover/60 transition">
+            <td class="py-2.5 font-semibold text-white">${b.tier_label}</td>
+            <td class="py-2.5 font-medium text-zinc-200">${b.job_count} jobs</td>
+            <td class="py-2.5 font-bold ${b.avg_proposals <= 15 ? 'text-emerald-400' : 'text-zinc-200'}">~${b.avg_proposals} applies</td>
+            <td class="py-2.5 text-sky-400 font-medium">${b.low_comp_pct}%</td>
+            <td class="py-2.5 text-emerald-400">${b.high_hire_client_pct}%</td>
+            <td class="py-2.5 text-right font-semibold text-zinc-300">${b.hire_rate_pct}%</td>
+          </tr>
+        `).join('');
+      }
+
+      // 3. Technology Trends Matrix
+      if (data.techTrends) {
+        const maxTechJobs = Math.max(1, ...data.techTrends.map(t => t.total_jobs));
+        document.getElementById('techTrendList').innerHTML = data.techTrends.map(t => {
+          const widthPct = Math.max(8, Math.round((t.total_jobs / maxTechJobs) * 100));
+          const isLowComp = t.avg_proposals <= 15;
+          const payLabel = t.avg_budget > 0
+            ? `$${t.avg_budget.toLocaleString()} avg fixed`
+            : (t.avg_hourly > 0 ? `$${t.avg_hourly}/hr avg` : '');
+
           return `
-            <tr class="hover:bg-surfaceHover/60">
-              <td class="py-2.5 font-medium text-zinc-200">${w.block_trt.replace(' (UTC+3)', '')}</td>
-              <td class="py-2.5">${badge}</td>
-              <td class="py-2.5 font-semibold ${isLow ? 'text-emerald-400' : 'text-zinc-200'}">~${w.avg_proposals_per_job} applies</td>
-              <td class="py-2.5 text-sky-400 font-medium">${w.low_competition_pct}%</td>
-              <td class="py-2.5 text-right font-semibold text-zinc-300">${w.total_jobs}</td>
-            </tr>
+            <div class="p-2.5 rounded-lg bg-bg/50 border border-border/60 hover:border-border transition">
+              <div class="flex flex-wrap items-center justify-between text-xs mb-1.5 gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="font-semibold text-white">${t.technology}</span>
+                  <span class="text-[11px] text-zinc-500">${payLabel}</span>
+                </div>
+                <div class="flex items-center gap-3 text-[11px]">
+                  <span class="${isLowComp ? 'text-emerald-400 font-semibold' : 'text-zinc-300'}">~${t.avg_proposals} applies</span>
+                  <span class="text-sky-400">≤10: <b>${t.low_comp_pct}%</b></span>
+                  <span class="text-emerald-400 font-medium">${t.high_hire_client_pct}% top clients</span>
+                  <span class="font-bold text-white">${t.total_jobs} jobs</span>
+                </div>
+              </div>
+              <div class="w-full bg-bg h-2 rounded-full overflow-hidden border border-border/40">
+                <div class="h-full rounded-full ${isLowComp ? 'bg-emerald-400' : 'bg-sky-500'}" style="width: ${widthPct}%"></div>
+              </div>
+            </div>
           `;
         }).join('');
+      }
+
+      // 4. Country Breakdown
+      if (data.countryBreakdown) {
+        const maxCountryJobs = Math.max(1, ...data.countryBreakdown.map(c => c.total_jobs));
+        document.getElementById('countryBarList').innerHTML = data.countryBreakdown.map(c => {
+          const widthPct = Math.max(6, Math.round((c.total_jobs / maxCountryJobs) * 100));
+          return `
+            <div>
+              <div class="flex items-center justify-between text-xs mb-1">
+                <span class="font-medium text-zinc-200">${getFlag(c.country)} ${c.country}</span>
+                <span class="text-[11px] text-zinc-400">
+                  <b class="text-white">${c.total_jobs} jobs</b> · <span class="text-emerald-400">${c.avg_hire_rate}% hire</span>
+                </span>
+              </div>
+              <div class="w-full bg-bg h-2 rounded-full overflow-hidden border border-border/50">
+                <div class="h-full rounded-full bg-sky-500/80" style="width: ${widthPct}%"></div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // 5. Proposal Distribution Buckets
+      if (data.proposalBuckets) {
+        document.getElementById('proposalTierCards').innerHTML = data.proposalBuckets.map(pb => `
+          <div class="border border-border/80 rounded-lg p-3 bg-bg/40">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-semibold text-white">${pb.proposal_tier}</span>
+              <span class="font-bold text-zinc-200">${pb.job_count} jobs</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-border/60 text-xs">
+              <div>
+                <span class="text-[11px] text-zinc-400">Actual Hire Rate</span>
+                <div class="font-semibold text-emerald-400 mt-0.5">${pb.actual_hire_rate_pct}%</div>
+              </div>
+              <div>
+                <span class="text-[11px] text-zinc-400">Avg. Client Hire Rate</span>
+                <div class="font-semibold text-sky-400 mt-0.5">${pb.avg_client_hire_rate}%</div>
+              </div>
+            </div>
+          </div>
+        `).join('');
       }
 
       // 6. Client Hire Rate Cohorts
       document.getElementById('cohortCards').innerHTML = data.hireRateCohorts.map(c => {
         const isHigh = c.cohort.includes('60%+');
-        const isMed = c.cohort.includes('35%');
         const borderCol = isHigh ? 'border-emerald-500/30 bg-emerald-500/[0.03]' : 'border-border bg-bg/40';
-        const titleColor = isHigh ? 'text-emerald-400' : (isMed ? 'text-amber-300' : 'text-zinc-400');
+        const titleColor = isHigh ? 'text-emerald-400' : 'text-zinc-300';
 
         return `
-          <div class="border ${borderCol} rounded-lg p-3.5">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-semibold ${titleColor}">${c.cohort}</span>
-              <span class="text-xs font-bold text-white">${c.jobs_posted} jobs</span>
+          <div class="border ${borderCol} rounded-lg p-3">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-semibold ${titleColor}">${c.cohort}</span>
+              <span class="font-bold text-white">${c.jobs_posted} jobs</span>
             </div>
-            <div class="grid grid-cols-3 gap-2 mt-2.5 pt-2.5 border-t border-border/60 text-xs">
+            <div class="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-border/60 text-xs">
               <div>
-                <div class="text-[11px] text-zinc-400">Hired So Far</div>
-                <div class="font-semibold text-emerald-400 mt-0.5">${c.actual_hire_conversion_pct}% (${c.jobs_hired})</div>
+                <span class="text-[11px] text-zinc-400">Hired So Far</span>
+                <div class="font-semibold text-emerald-400 mt-0.5">${c.actual_hire_conversion_pct}%</div>
               </div>
               <div>
-                <div class="text-[11px] text-zinc-400">Ghost / Abandoned</div>
-                <div class="font-semibold text-rose-400 mt-0.5">${c.ghost_rate_pct}% (${c.ghost_jobs})</div>
+                <span class="text-[11px] text-zinc-400">Ghost / Abandoned</span>
+                <div class="font-semibold text-rose-400 mt-0.5">${c.ghost_rate_pct}%</div>
               </div>
               <div>
-                <div class="text-[11px] text-zinc-400">Avg. Fixed Budget</div>
+                <span class="text-[11px] text-zinc-400">Avg. Fixed Budget</span>
                 <div class="font-semibold text-zinc-200 mt-0.5">${c.avg_budget ? '$' + c.avg_budget.toLocaleString() : 'Hourly'}</div>
               </div>
             </div>
@@ -490,37 +472,34 @@
         `;
       }).join('');
 
-      // 7. Proposal Velocity Bars
-      const totalVel = (data.velocityBuckets || []).reduce((a, b) => a + b.job_count, 0) || 1;
-      document.getElementById('velocityBarList').innerHTML = (data.velocityBuckets || []).map(v => {
-        const pct = Math.round((v.job_count / totalVel) * 100);
-        return `
-          <div>
-            <div class="flex justify-between text-xs mb-1">
-              <span class="text-zinc-200 font-medium">${v.speed_bucket}</span>
-              <span class="text-zinc-400"><b>${v.job_count} jobs</b> (${pct}%)</span>
+      // 7. AI Opportunity Scoring (Top Sniper Opportunities)
+      if (data.sniperOpportunities?.length > 0) {
+        document.getElementById('sniperGrid').innerHTML = data.sniperOpportunities.slice(0, 6).map(j => {
+          const upworkUrl = `https://www.upwork.com/jobs/~02${j.job_id}`;
+          const budgetText = j.budget > 0 ? `$${j.budget.toLocaleString()}` : `$${j.hourly_min || j.hourly_max}–$${j.hourly_max}/hr`;
+          return `
+            <div class="bg-surface border border-emerald-500/30 rounded-xl p-4 flex flex-col justify-between hover:border-emerald-500/60 transition">
+              <div>
+                <div class="flex items-center justify-between gap-2 mb-2">
+                  <span class="text-[11px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">${j.keyword_matched}</span>
+                  <span class="text-xs font-bold text-emerald-400">Score: ${j.sniper_score}/100</span>
+                </div>
+                <a href="${upworkUrl}" target="_blank" rel="noopener" class="text-xs font-semibold text-white hover:text-emerald-400 transition line-clamp-2" title="${j.title}">
+                  ${j.title}
+                </a>
+                <p class="text-[11px] text-zinc-400 mt-2 line-clamp-2">${j.description || ''}</p>
+              </div>
+              <div class="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-xs">
+                <span class="font-semibold text-zinc-200">${budgetText}</span>
+                <span class="text-emerald-400 font-medium">🎯 Hire: ${j.client_hire_rate}%</span>
+                <span class="text-zinc-400">${j.current_proposals_tier}</span>
+              </div>
             </div>
-            <div class="w-full bg-bg h-2 rounded-full overflow-hidden border border-border/50">
-              <div class="bg-amber-400 h-full rounded-full" style="width: ${pct}%"></div>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    function selectCategory(kw) {
-      const select = document.getElementById('keywordFilter');
-      currentKeyword = currentKeyword === kw ? 'ALL' : kw;
-      select.value = currentKeyword;
-      loadAnalytics();
-    }
-
-    function selectGroup(grp) {
-      const select = document.getElementById('keywordFilter');
-      const val = `GROUP:${grp}`;
-      currentKeyword = currentKeyword === val ? 'ALL' : val;
-      select.value = currentKeyword;
-      loadAnalytics();
+          `;
+        }).join('');
+      } else {
+        document.getElementById('sniperGrid').innerHTML = `<p class="text-xs text-zinc-500 col-span-3">No sniper opportunities currently meet the strict score threshold.</p>`;
+      }
     }
 
     async function triggerPoll() {

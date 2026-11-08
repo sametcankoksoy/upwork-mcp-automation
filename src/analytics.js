@@ -35,7 +35,48 @@ function getFullMarketAnalytics(keywordFilter = null) {
   summary.hire_conversion_rate = Math.round(((summary.total_hired_jobs || 0) / total) * 1000) / 10;
   summary.ghost_job_rate = Math.round(((summary.total_ghost_jobs || 0) / total) * 1000) / 10;
 
-  // 2. Client Hire Rate Cohort Analysis (>= 60% vs 35-59% vs < 35%)
+  // 2. Budget Tier Distribution ($0–100, $100–500, $500–1K, $1K–5K, $5K+)
+  const budgetTiers = db.prepare(`
+    SELECT
+      CASE
+        WHEN budget > 0 AND budget <= 100 THEN '$0 – $100 (Micro)'
+        WHEN budget > 100 AND budget <= 500 THEN '$100 – $500 (Small)'
+        WHEN budget > 500 AND budget <= 1000 THEN '$500 – $1,000 (Medium)'
+        WHEN budget > 1000 AND budget <= 5000 THEN '$1,000 – $5,000 (High Value)'
+        WHEN budget > 5000 THEN '$5,000+ (Enterprise / Whale)'
+        WHEN hourly_max > 0 AND hourly_max <= 25 THEN 'Hourly: Under $25/hr'
+        WHEN hourly_max > 25 AND hourly_max <= 50 THEN 'Hourly: $25 – $50/hr'
+        ELSE 'Hourly: $50+/hr (Premium)'
+      END as tier_label,
+      COUNT(*) as job_count,
+      ROUND(AVG(current_proposals_numeric), 1) as avg_proposals,
+      ROUND(SUM(CASE WHEN current_proposals_numeric <= 10 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as low_comp_pct,
+      ROUND(SUM(CASE WHEN client_hire_rate >= 60 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as high_hire_client_pct,
+      ROUND(SUM(CASE WHEN job_status = 'hired' OR hires_count > 0 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as hire_rate_pct
+    FROM jobs
+    ${whereClause}
+    GROUP BY tier_label
+    ORDER BY MIN(CASE WHEN budget > 0 THEN budget ELSE hourly_max * 40 END) ASC
+  `).all();
+
+  // 2b. Proposal Competition Buckets (<5, 5–10, 10–20, 20+)
+  const proposalBuckets = db.prepare(`
+    SELECT
+      CASE
+        WHEN current_proposals_numeric < 5 THEN '< 5 Proposals (Fresh / Uncontested)'
+        WHEN current_proposals_numeric <= 10 THEN '5 – 10 Proposals (Active Window)'
+        WHEN current_proposals_numeric <= 20 THEN '10 – 20 Proposals (Competitive)'
+        ELSE '20+ Proposals (Heavily Saturated)'
+      END as proposal_tier,
+      COUNT(*) as job_count,
+      ROUND(SUM(CASE WHEN job_status = 'hired' OR hires_count > 0 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as actual_hire_rate_pct,
+      ROUND(AVG(client_hire_rate), 1) as avg_client_hire_rate,
+      ROUND(AVG(CASE WHEN budget > 0 THEN budget ELSE NULL END), 0) as avg_budget
+    FROM jobs
+    ${whereClause}
+    GROUP BY proposal_tier
+    ORDER BY MIN(current_proposals_numeric) ASC
+  `).all();
   const hireRateCohorts = db.prepare(`
     SELECT
       CASE
@@ -92,17 +133,34 @@ function getFullMarketAnalytics(keywordFilter = null) {
       ghost_rate_pct: 0
     };
     const trtHour = (h + 3) % 24;
-    // Opportunity Ratio: High Hire Rate + Low Proposals + Slow Saturation
-    const compScore = row.jobs_count > 0
+    // Calculate Golden Hour Opportunity Index: High job volume paired with low proposal pressure
+    let verdict = 'Quiet Hour (Low Volume)';
+    let isGoldenHour = false;
+    if (row.jobs_count >= 2 && row.avg_total_proposals <= 12) {
+      verdict = '🔥 Golden Hour (High Volume, Low Proposals)';
+      isGoldenHour = true;
+    } else if (row.jobs_count > 0 && row.avg_total_proposals <= 10) {
+      verdict = '🟢 Favorable (Low Proposals)';
+      isGoldenHour = true;
+    } else if (row.jobs_count >= 3 && row.avg_total_proposals > 20) {
+      verdict = '⚠️ Crowded (High Jobs, Saturated Proposals)';
+    } else if (row.jobs_count > 0) {
+      verdict = '🟡 Moderate';
+    }
+
+    const opportunityScore = row.jobs_count > 0
       ? Math.round(
-          (row.hire_rate_pct * 0.5) +
-          (Math.max(0, 40 - (row.avg_total_proposals || 20)) * 1.1) +
-          (Math.min(40, row.avg_mins_to_5_10 || 20) * 0.6)
+          (Math.min(10, row.jobs_count) * 4) +
+          (Math.max(0, 35 - row.avg_total_proposals) * 1.5) +
+          (row.low_competition_pct * 0.2)
         )
       : 0;
+
     hourlyDistribution.push({
       ...row,
-      opportunity_score: Math.min(100, Math.max(0, compScore)),
+      is_golden_hour: isGoldenHour,
+      opportunity_verdict: verdict,
+      opportunity_score: Math.min(100, Math.max(0, opportunityScore)),
       hour_label_utc: `${String(h).padStart(2, '0')}:00 UTC`,
       hour_label_trt: `${String(trtHour).padStart(2, '0')}:00 UTC+3`,
       window_label_utc: `${String(h).padStart(2, '0')}:00 - ${String((h + 1) % 24).padStart(2, '0')}:00 UTC`,
@@ -220,7 +278,50 @@ function getFullMarketAnalytics(keywordFilter = null) {
     GROUP BY speed_bucket
   `).all();
 
-  // 5b. Country Breakdown (Which countries are posting the most jobs & highest budgets?)
+  // 5c. Technology & Skill Trends Extraction (Python, AI Agents, OpenAI, Web Scraping, Next.js, n8n, etc.)
+  const trackedTechList = [
+    { name: 'Python', regex: /python/i },
+    { name: 'AI Agents / LLM', regex: /(agent|claude|gpt|llm|openai|deepseek)/i },
+    { name: 'n8n / Make.com / Zapier', regex: /(n8n|make\.com|zapier|automation)/i },
+    { name: 'Web Scraping', regex: /(scrap|crawl|extract|puppeteer|selenium|playwright)/i },
+    { name: 'React / Next.js', regex: /(react|next\.js|typescript|frontend|tailwind)/i },
+    { name: 'Node.js / Backend', regex: /(node|express|fastapi|django|postgres|supabase|backend|api)/i },
+    { name: 'LangChain / RAG', regex: /(langchain|llamaindex|rag|vector|embeddings)/i },
+    { name: 'Mobile (Flutter / React Native)', regex: /(flutter|react native|ios|android)/i }
+  ];
+
+  const allJobsForTech = db.prepare(`SELECT * FROM jobs ${whereClause}`).all();
+  const techTrends = trackedTechList.map(tech => {
+    const matched = allJobsForTech.filter(j => tech.regex.test(j.title || '') || tech.regex.test(j.description || ''));
+    const totalJobs = matched.length;
+    if (totalJobs === 0) return null;
+
+    const jobs24h = matched.filter(j => {
+      const diff = (Date.now() - new Date(j.posted_at).getTime()) / 3600000;
+      return diff <= 24;
+    }).length;
+
+    const avgProps = Math.round((matched.reduce((a, b) => a + (b.current_proposals_numeric || 0), 0) / totalJobs) * 10) / 10;
+    const lowComp = Math.round((matched.filter(j => (j.current_proposals_numeric || 0) <= 10).length / totalJobs) * 100);
+    const highHire = Math.round((matched.filter(j => (j.client_hire_rate || 0) >= 60).length / totalJobs) * 100);
+
+    const budgets = matched.filter(j => j.budget > 0).map(j => j.budget);
+    const avgBudget = budgets.length > 0 ? Math.round(budgets.reduce((a, b) => a + b, 0) / budgets.length) : 0;
+
+    const hourlies = matched.filter(j => j.hourly_max > 0).map(j => j.hourly_max);
+    const avgHourly = hourlies.length > 0 ? Math.round(hourlies.reduce((a, b) => a + b, 0) / hourlies.length) : 0;
+
+    return {
+      technology: tech.name,
+      total_jobs: totalJobs,
+      jobs_last_24h: jobs24h,
+      avg_proposals: avgProps,
+      low_comp_pct: lowComp,
+      avg_budget: avgBudget,
+      avg_hourly: avgHourly,
+      high_hire_client_pct: highHire
+    };
+  }).filter(Boolean).sort((a, b) => b.total_jobs - a.total_jobs);
   const countryBreakdown = db.prepare(`
     SELECT
       COALESCE(client_country, 'Unknown') as country,
@@ -263,12 +364,15 @@ function getFullMarketAnalytics(keywordFilter = null) {
   return {
     generated_at: new Date().toISOString(),
     summary,
+    budgetTiers,
+    proposalBuckets,
     hireRateCohorts,
     hourlyDistribution,
     timeBlockWindows,
     groupBreakdown,
     keywordBreakdown,
     countryBreakdown,
+    techTrends,
     velocityBuckets,
     sniperOpportunities,
     recentJobs
