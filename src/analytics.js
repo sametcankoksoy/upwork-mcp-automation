@@ -77,6 +77,36 @@ function getFullMarketAnalytics(keywordFilter = null) {
     GROUP BY proposal_tier
     ORDER BY MIN(current_proposals_numeric) ASC
   `).all();
+
+  // 2c. Bütçe Dilimlerine Göre Teklif Doygunluğu Matrisi (Budget Tier vs Proposal Saturation)
+  const budgetVsSaturation = db.prepare(`
+    SELECT
+      CASE
+        WHEN job_type = 'Hourly' AND hourly_max >= 50 THEN 'Saatlik: $50+/sa'
+        WHEN job_type = 'Hourly' AND hourly_max >= 25 THEN 'Saatlik: $25–$50/sa'
+        WHEN job_type = 'Hourly' THEN 'Saatlik: <$25/sa'
+        WHEN budget >= 5000 THEN 'Sabit: $5K+'
+        WHEN budget >= 1000 THEN 'Sabit: $1K–$5K'
+        WHEN budget >= 500 THEN 'Sabit: $500–$1K'
+        WHEN budget >= 100 THEN 'Sabit: $100–$500'
+        ELSE 'Sabit: $0–$100'
+      END as tier_label,
+      COUNT(*) as total_jobs,
+      ROUND(AVG(current_proposals_numeric), 1) as avg_proposals,
+      ROUND(SUM(CASE WHEN current_proposals_numeric < 5 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as under_5_pct,
+      ROUND(SUM(CASE WHEN current_proposals_numeric >= 5 AND current_proposals_numeric <= 10 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as between_5_10_pct,
+      ROUND(SUM(CASE WHEN current_proposals_numeric > 10 AND current_proposals_numeric <= 20 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as between_10_20_pct,
+      ROUND(SUM(CASE WHEN current_proposals_numeric > 20 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as over_20_pct,
+      ROUND(SUM(CASE WHEN current_proposals_numeric <= 10 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as low_comp_pct,
+      ROUND(AVG(client_hire_rate), 1) as avg_client_hire_rate,
+      ROUND(AVG(client_total_spent), 0) as avg_client_spend
+    FROM jobs
+    ${whereClause}
+    GROUP BY tier_label
+    ORDER BY MIN(CASE WHEN budget > 0 THEN budget ELSE hourly_max * 40 END) ASC
+  `).all();
+
+  // 2d. Müşteri Kalite Karnesi (Whales vs Medium vs Ghost/Riskli Müşteriler)
   const hireRateCohorts = db.prepare(`
     SELECT
       CASE
@@ -85,6 +115,14 @@ function getFullMarketAnalytics(keywordFilter = null) {
         ELSE 'Under 35% Low Hire Rate'
       END as cohort,
       COUNT(*) as jobs_posted,
+      ROUND(AVG(client_hire_rate), 1) as avg_client_hire_rate,
+      ROUND(AVG(client_total_spent), 0) as avg_client_spend,
+      ROUND(AVG(client_total_posted), 1) as avg_jobs_posted,
+      ROUND(AVG(client_total_hires), 1) as avg_hires_made,
+      ROUND(AVG(client_rating), 2) as avg_rating,
+      ROUND(SUM(CASE WHEN client_payment_verified = 1 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as payment_verified_pct,
+      ROUND(AVG(current_proposals_numeric), 1) as avg_proposals,
+      ROUND(SUM(CASE WHEN interviewing_count > 0 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as interviewing_rate_pct,
       SUM(CASE WHEN job_status = 'hired' OR hires_count > 0 THEN 1 ELSE 0 END) as jobs_hired,
       ROUND(SUM(CASE WHEN job_status = 'hired' OR hires_count > 0 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as actual_hire_conversion_pct,
       SUM(CASE WHEN is_ghost_job = 1 OR job_status = 'ghost' THEN 1 ELSE 0 END) as ghost_jobs,
@@ -366,6 +404,7 @@ function getFullMarketAnalytics(keywordFilter = null) {
     summary,
     budgetTiers,
     proposalBuckets,
+    budgetVsSaturation,
     hireRateCohorts,
     hourlyDistribution,
     timeBlockWindows,
