@@ -9,6 +9,7 @@ function getFullMarketAnalytics(keywordFilter = null) {
   const summary = db.prepare(`
     SELECT
       COUNT(*) as total_jobs,
+      SUM(CASE WHEN datetime(posted_at) >= datetime('now', '-24 hours') THEN 1 ELSE 0 END) as jobs_last_24h,
       SUM(CASE WHEN job_status = 'hired' OR hires_count > 0 THEN 1 ELSE 0 END) as total_hired_jobs,
       SUM(CASE WHEN is_ghost_job = 1 OR job_status = 'ghost' THEN 1 ELSE 0 END) as total_ghost_jobs,
       SUM(CASE WHEN job_status = 'open' AND is_ghost_job = 0 THEN 1 ELSE 0 END) as total_active_open,
@@ -190,13 +191,32 @@ function getFullMarketAnalytics(keywordFilter = null) {
     GROUP BY speed_bucket
   `).all();
 
+  // 5b. Country Breakdown (Which countries are posting the most jobs & highest budgets?)
+  const countryBreakdown = db.prepare(`
+    SELECT
+      COALESCE(client_country, 'Unknown') as country,
+      COUNT(*) as total_jobs,
+      SUM(CASE WHEN datetime(posted_at) >= datetime('now', '-24 hours') THEN 1 ELSE 0 END) as jobs_last_24h,
+      ROUND(AVG(client_hire_rate), 1) as avg_hire_rate,
+      ROUND(SUM(CASE WHEN client_hire_rate >= 60 THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*), 1) as high_hire_pct,
+      ROUND(AVG(current_proposals_numeric), 1) as avg_proposals,
+      ROUND(AVG(CASE WHEN budget > 0 THEN budget ELSE NULL END), 0) as avg_budget,
+      ROUND(AVG(CASE WHEN hourly_max > 0 THEN hourly_max ELSE NULL END), 0) as avg_hourly,
+      ROUND(SUM(client_total_spent), 0) as total_client_spend
+    FROM jobs
+    ${whereClause}
+    GROUP BY country
+    ORDER BY total_jobs DESC, avg_hire_rate DESC
+    LIMIT 12
+  `).all();
+
   // 6. Recent Tracked Jobs with Full Lifecycle Metrics
   const recentJobs = db.prepare(`
     SELECT *
     FROM jobs
     ${whereClause}
     ORDER BY posted_at DESC
-    LIMIT 60
+    LIMIT 100
   `).all();
 
   // 7. Sniper Opportunities (Open, Client Hire Rate >= 60%, < 10 proposals, not ghost)
@@ -218,6 +238,7 @@ function getFullMarketAnalytics(keywordFilter = null) {
     hourlyDistribution,
     timeBlockWindows,
     keywordBreakdown,
+    countryBreakdown,
     velocityBuckets,
     sniperOpportunities,
     recentJobs

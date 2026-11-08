@@ -225,14 +225,14 @@ async function runTrackerCycle(options = {}) {
     if (accessToken) {
       const orgUid = await getTalentOrgUid(accessToken);
       for (const kw of activeKeywords) {
-        const fetched = await fetchLiveJobsForKeyword(kw, accessToken, orgUid, 10);
+        const fetched = await fetchLiveJobsForKeyword(kw, accessToken, orgUid, 5);
         for (const job of fetched) {
           const isNew = upsertJobAndSnapshot(job);
           if (isNew) newJobsFound++;
           else jobsUpdated++;
         }
         // Safe pause between keyword searches
-        await new Promise(r => setTimeout(r, 800));
+        await new Promise(r => setTimeout(r, 400));
       }
     } else if (options.simulateStep) {
       const openJobs = db.prepare(`SELECT * FROM jobs WHERE job_status = 'open' ORDER BY posted_at DESC LIMIT 25`).all();
