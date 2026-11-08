@@ -1,0 +1,20 @@
+{
+  "name": "upwork-market-intelligence",
+  "version": "1.0.0",
+  "description": "Upwork Market Intelligence, Job Lifecycle & Ghost Job Analytics Bot + MCP Server",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "mcp": "node src/mcp-server.js",
+    "seed": "node src/seed.js",
+    "test": "node src/test-all.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "zod": "^3.24.1"
+  }
+}
