@@ -43,29 +43,29 @@ def get_video_duration(video_path):
 
 def human_scroll_curve(t_norm, max_scroll):
     """
-    Simulates human reading dynamics:
-    0.00 - 0.20: Pause at top reading title & tags (0px)
-    0.20 - 0.52: Smooth scroll down into the project description
-    0.52 - 0.72: Pause to read the middle requirements (with subtle micro-drift)
-    0.72 - 0.90: Scroll down to end of description / client track record
-    0.90 - 1.00: Rest naturally at the end of the text
+    Active, dynamic human scroll reading curve:
+    0.00 - 0.06: Quick glance at title & budget (1s)
+    0.06 - 0.48: Active, confident scroll down through the primary job description (to 65% depth)
+    0.48 - 0.58: Short natural reading glide on key deliverables
+    0.58 - 0.88: Smooth continuous scroll through client history & job footer (to 100%)
+    0.88 - 1.00: Rest naturally on the complete proposal target card while finishing pitch
     """
     if max_scroll <= 10:
         return 0
-    if t_norm <= 0.20:
+    if t_norm <= 0.06:
         return 0
-    elif t_norm <= 0.52:
-        p = (t_norm - 0.20) / 0.32
+    elif t_norm <= 0.48:
+        p = (t_norm - 0.06) / 0.42
         ease = p * p * (3 - 2 * p)
-        return ease * (max_scroll * 0.55)
-    elif t_norm <= 0.72:
-        base = max_scroll * 0.55
-        micro = np.sin((t_norm - 0.52) * 15) * 1.5
-        return base + micro
-    elif t_norm <= 0.90:
-        p = (t_norm - 0.72) / 0.18
+        return ease * (max_scroll * 0.65)
+    elif t_norm <= 0.58:
+        base = max_scroll * 0.65
+        drift = ((t_norm - 0.48) / 0.10) * (max_scroll * 0.05)
+        return base + drift
+    elif t_norm <= 0.88:
+        p = (t_norm - 0.58) / 0.30
         ease = p * p * (3 - 2 * p)
-        return (max_scroll * 0.55) + ease * (max_scroll * 0.45)
+        return (max_scroll * 0.70) + ease * (max_scroll * 0.30)
     else:
         return max_scroll
 
@@ -188,20 +188,20 @@ def record_job_background(job, output_bg_path, duration_secs, target_url=None):
             time.sleep(1)
 
         # Calculate EXACT text-based scroll depth:
-        # Never scroll past the job content card into empty whitespace!
+        # Scroll actively through the entire job post without falling into void whitespace
         scroll_calc_js = """
         const card = document.querySelector('.job-card') || document.querySelector('main') || document.body;
-        if (!card) return 100;
+        if (!card) return 250;
         const cardTop = card.offsetTop;
         const cardBottom = cardTop + card.offsetHeight;
         const winH = window.innerHeight;
-        // If content fits completely inside screen, only drift 40-70px gently
+        // If content fits completely inside screen, drift comfortably
         if (cardBottom <= winH - 40) {
-            return Math.min(60, Math.floor(card.offsetHeight * 0.12));
+            return Math.min(100, Math.floor(card.offsetHeight * 0.18));
         }
-        // If content extends beyond screen, scroll only enough to reveal the card bottom + comfortable 40px margin
-        const needed = cardBottom - winH + 40;
-        return Math.min(needed, 520);
+        // Reveal entire card through client stats + comfortable 50px bottom padding
+        const needed = cardBottom - winH + 50;
+        return Math.max(250, Math.min(needed, 850));
         """
         max_scroll = int(driver.execute_script(scroll_calc_js))
         print(f"Calculated text-bounded scroll depth: {max_scroll}px across {total_frames} frames")
