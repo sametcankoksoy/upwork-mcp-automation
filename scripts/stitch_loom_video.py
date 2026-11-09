@@ -43,31 +43,35 @@ def get_video_duration(video_path):
 
 def human_scroll_curve(t_norm, max_scroll):
     """
-    Active, dynamic human scroll reading curve:
-    0.00 - 0.06: Quick glance at title & budget (1s)
-    0.06 - 0.48: Active, confident scroll down through the primary job description (to 65% depth)
-    0.48 - 0.58: Short natural reading glide on key deliverables
-    0.58 - 0.88: Smooth continuous scroll through client history & job footer (to 100%)
-    0.88 - 1.00: Rest naturally on the complete proposal target card while finishing pitch
+    Fast, energetic down-and-up inspection curve:
+    0.00 - 0.10: Start at top (intro: looking at title & budget)
+    0.10 - 0.46: Fast, smooth scroll DOWN to the bottom (inspecting full scope & requirements)
+    0.46 - 0.58: Short pause at bottom reviewing client history & details
+    0.58 - 0.88: Fast, smooth scroll BACK UP to the top
+    0.88 - 1.00: Rest cleanly at the top hero section while delivering pitch
     """
     if max_scroll <= 10:
         return 0
-    if t_norm <= 0.06:
+    if t_norm <= 0.10:
         return 0
-    elif t_norm <= 0.48:
-        p = (t_norm - 0.06) / 0.42
+    elif t_norm <= 0.46:
+        # Fast scroll DOWN
+        p = (t_norm - 0.10) / 0.36
         ease = p * p * (3 - 2 * p)
-        return ease * (max_scroll * 0.65)
+        return ease * max_scroll
     elif t_norm <= 0.58:
-        base = max_scroll * 0.65
-        drift = ((t_norm - 0.48) / 0.10) * (max_scroll * 0.05)
-        return base + drift
+        # Brief pause at bottom with subtle micro drift
+        base = max_scroll
+        micro = np.sin((t_norm - 0.46) * 20) * 3
+        return base - abs(micro)
     elif t_norm <= 0.88:
+        # Fast scroll BACK UP
         p = (t_norm - 0.58) / 0.30
         ease = p * p * (3 - 2 * p)
-        return (max_scroll * 0.70) + ease * (max_scroll * 0.30)
+        return max_scroll * (1.0 - ease)
     else:
-        return max_scroll
+        # Back at top
+        return 0
 
 def generate_local_job_html(job):
     """High-fidelity, crisp 1080p Upwork Job Post HTML page with dark mode and crisp fonts."""
@@ -191,17 +195,12 @@ def record_job_background(job, output_bg_path, duration_secs, target_url=None):
         # Scroll actively through the entire job post without falling into void whitespace
         scroll_calc_js = """
         const card = document.querySelector('.job-card') || document.querySelector('main') || document.body;
-        if (!card) return 250;
+        if (!card) return 600;
         const cardTop = card.offsetTop;
         const cardBottom = cardTop + card.offsetHeight;
         const winH = window.innerHeight;
-        // If content fits completely inside screen, drift comfortably
-        if (cardBottom <= winH - 40) {
-            return Math.min(100, Math.floor(card.offsetHeight * 0.18));
-        }
-        // Reveal entire card through client stats + comfortable 50px bottom padding
-        const needed = cardBottom - winH + 50;
-        return Math.max(250, Math.min(needed, 850));
+        const needed = cardBottom - winH + 60;
+        return Math.max(500, Math.min(needed, 850));
         """
         max_scroll = int(driver.execute_script(scroll_calc_js))
         print(f"Calculated text-bounded scroll depth: {max_scroll}px across {total_frames} frames")
