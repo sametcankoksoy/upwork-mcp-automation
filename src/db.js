@@ -134,6 +134,32 @@ for (const [kw, cat] of defaultKeywords) {
 db.exec(`UPDATE tracked_keywords SET active = 1 WHERE keyword IN (${defaultKeywords.map(k => `'${k[0]}'`).join(',')});`);
 db.exec(`UPDATE tracked_keywords SET active = 0 WHERE keyword NOT IN (${defaultKeywords.map(k => `'${k[0]}'`).join(',')});`);
 
+// Ensure flagship Loom showcase job is permanently available
+db.prepare(`
+  INSERT OR IGNORE INTO jobs (
+    job_id, title, description, keyword_matched, job_type, budget, hourly_min, hourly_max,
+    posted_at, posted_hour_utc, posted_day_of_week, first_seen_at, last_checked_at,
+    client_country, client_total_spent, client_hire_rate, client_total_posted, client_total_hires,
+    client_payment_verified, client_rating, current_proposals_tier, current_proposals_numeric,
+    interviewing_count, invites_sent, unanswered_invites, hires_count, job_status, sniper_score
+  ) VALUES (
+    '2119487430141316904',
+    'AI engineering consultant to audit how I build software with AI agents, top to bottom',
+    'I run a small service business and I am not a professional engineer. Over the past few months I have built our operating software, a web and desktop app the team uses every day, almost entirely with AI coding agents. It works and we depend on it heavily, but I need a senior AI engineer to audit the architecture, data security, error handling, and deployment pipeline.',
+    'AI Automation',
+    'Hourly',
+    0, 45, 90,
+    '2026-11-08T17:49:39.027Z',
+    17, 0,
+    '2026-11-08T18:14:38.933Z',
+    '2026-11-08T21:41:48.700Z',
+    'United States',
+    62138.41,
+    100, 29, 52, 1, 4.99,
+    '20 to 50', 35, 0, 0, 0, 0, 'open', 75
+  )
+`).run();
+
 // Clean up corrupted historical velocity values (> 180 mins recorded on old initial sync)
 db.exec(`
   UPDATE jobs SET mins_to_5_10_proposals = NULL WHERE mins_to_5_10_proposals > 180;

@@ -98,7 +98,7 @@
       <!-- Video Title & Author Header -->
       <div class="space-y-2">
         <h1 class="text-xl sm:text-2xl font-bold text-white tracking-tight" id="loomVideoTitle">
-          Quick Walkthrough for Your Project
+          Walkthrough: AI engineering consultant to audit how I build software with AI agents
         </h1>
         <div class="flex flex-wrap items-center gap-3 text-xs text-zinc-400">
           <div class="flex items-center gap-2">
@@ -444,10 +444,12 @@
         const res = await fetch(`/api/job/${jobId}`);
         const job = await res.json();
 
-        const title = job.title || 'Your Project Requirements';
+        const title = (job && job.title) ? job.title : 'AI engineering consultant to audit how I build software with AI agents, top to bottom';
         document.title = `${title} | Loom`;
         const titleEl = document.getElementById('loomVideoTitle');
-        if (titleEl) titleEl.textContent = `Walkthrough for: ${title}`;
+        if (titleEl) {
+          titleEl.textContent = title.toLowerCase().startsWith('walkthrough') ? title : `Walkthrough: ${title}`;
+        }
 
         const upworkUrl = `https://www.upwork.com/jobs/~02${job.job_id || jobId}`;
         const topBtn = document.getElementById('ctaUpworkBtnTop');
