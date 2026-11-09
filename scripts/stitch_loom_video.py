@@ -41,70 +41,61 @@ def get_video_duration(video_path):
     except Exception as e:
         return 15.0
 
-def snappy_human_scroll(f, total_frames=300, max_scroll=900):
+def snappy_human_scroll(f, total_frames=300, max_scroll=850):
     """
     Simulates real fast human mouse-wheel flicks:
-    - 0 to 1.2s: Stays at top looking at title
-    - 1.2s to 3.8s: 3 FAST energetic downward wheel flicks down to bottom!
-    - 3.8s to 6.2s: Natural reading pause at bottom inspecting client stats & scope
-    - 6.2s to 8.8s: 2 FAST energetic upward wheel flicks back up to top!
-    - 8.8s to 15s: Rest cleanly at top while delivering pitch
+    - 0 to 1.2s: Stays at top looking at title & budget
+    - 1.2s to 4.0s (56 frames = 2.8s): Downward mouse wheel flicks down to bottom
+    - 4.0s to 7.0s (60 frames = 3.0s): Reading & inspecting client stats & scope at bottom
+    - 7.0s to 8.4s (26 frames = 1.3s): 2X FASTER UPWARD FLICK! (whips back up in half the time)
+    - 8.4s to 15.0s: Rest cleanly at top hero section while delivering pitch
     """
     if max_scroll <= 10:
         return 0
 
-    scale = max_scroll / 900.0
+    scale = max_scroll / 850.0
 
     # Phase 1: 0 - 24 frames (0 - 1.2s) -> Looking at top
     if f < 24:
         return 0
 
-    # Phase 2: 24 - 76 frames (1.2s - 3.8s) -> 3 fast downward wheel flicks
-    elif f < 76:
-        # Flick 1: 24..40 -> 0 to 420px
-        if f < 40:
-            p = (f - 24) / 16.0
+    # Phase 2: 24 - 80 frames (1.2s - 4.0s) -> Downward scroll (2.8 seconds)
+    elif f < 80:
+        # Flick 1: 24..44 -> 0 to 420px
+        if f < 44:
+            p = (f - 24) / 20.0
             ease = 1.0 - (1.0 - p)**3
             return int(ease * 420 * scale)
-        # Micro pause: 40..46
-        elif f < 46:
+        # Micro pause: 44..50
+        elif f < 50:
             return int(420 * scale)
-        # Flick 2: 46..62 -> 420 to 760px
-        elif f < 62:
-            p = (f - 46) / 16.0
+        # Flick 2: 50..70 -> 420 to 760px
+        elif f < 70:
+            p = (f - 50) / 20.0
             ease = 1.0 - (1.0 - p)**3
             return int((420 + ease * 340) * scale)
-        # Micro pause: 62..66
-        elif f < 66:
+        # Micro pause: 70..74
+        elif f < 74:
             return int(760 * scale)
-        # Flick 3: 66..76 -> 760 to max_scroll
+        # Flick 3: 74..80 -> 760 to max_scroll
         else:
-            p = (f - 66) / 10.0
+            p = (f - 74) / 6.0
             ease = 1.0 - (1.0 - p)**3
-            return int((760 + ease * 140) * scale)
+            return int((760 + ease * 90) * scale)
 
-    # Phase 3: 76 - 126 frames (3.8s - 6.3s) -> Reading bottom client stats
-    elif f < 126:
-        micro = np.sin((f - 76) * 0.18) * 2.5
+    # Phase 3: 80 - 140 frames (4.0s - 7.0s) -> Reading bottom client stats (3.0 seconds)
+    elif f < 140:
+        micro = np.sin((f - 80) * 0.15) * 2.0
         return int(max_scroll - abs(micro))
 
-    # Phase 4: 126 - 176 frames (6.3s - 8.8s) -> 2 fast upward wheel flicks
-    elif f < 176:
-        # Flick Up 1: 126..150 -> max_scroll to 320px
-        if f < 150:
-            p = (f - 126) / 24.0
-            ease = 1.0 - (1.0 - p)**3
-            return int(max_scroll - ease * (max_scroll - 320 * scale))
-        # Micro pause: 150..156
-        elif f < 156:
-            return int(320 * scale)
-        # Flick Up 2: 156..176 -> 320px to 0px
-        else:
-            p = (f - 156) / 20.0
-            ease = 1.0 - (1.0 - p)**3
-            return int((320 * scale) * (1.0 - ease))
+    # Phase 4: 140 - 166 frames (7.0s - 8.3s) -> 2X FASTER UPWARD WHIP (takes only 1.3 seconds!)
+    elif f < 166:
+        p = (f - 140) / 26.0
+        # Swift upward whip with natural damping
+        ease = 1.0 - (1.0 - p)**3
+        return int(max_scroll * (1.0 - ease))
 
-    # Phase 5: 176 - 300 frames (8.8s - 15.0s) -> Rest cleanly at top for pitch
+    # Phase 5: 166 - 300 frames (8.3s - 15.0s) -> Rest cleanly at top for pitch
     else:
         return 0
 
