@@ -41,31 +41,31 @@ def get_video_duration(video_path):
     except Exception as e:
         return 15.0
 
-def human_scroll_curve(t_norm, max_scroll=650):
+def human_scroll_curve(t_norm, max_scroll):
     """
     Simulates human reading dynamics:
-    0.00 - 0.15: Pause at top reading title & tags (0px)
-    0.15 - 0.45: Smooth scroll down into the project description
-    0.45 - 0.65: Pause to read the core requirements (with tiny micro-movement)
-    0.65 - 0.88: Scroll down to check client spend, hire rate & verification
-    0.88 - 1.00: Pause at the bottom inspecting client credentials
+    0.00 - 0.20: Pause at top reading title & tags (0px)
+    0.20 - 0.52: Smooth scroll down into the project description
+    0.52 - 0.72: Pause to read the middle requirements (with subtle micro-drift)
+    0.72 - 0.90: Scroll down to end of description / client track record
+    0.90 - 1.00: Rest naturally at the end of the text
     """
-    if t_norm <= 0.15:
+    if max_scroll <= 10:
         return 0
-    elif t_norm <= 0.45:
-        p = (t_norm - 0.15) / 0.30
-        # Smooth cubic ease-in-out
+    if t_norm <= 0.20:
+        return 0
+    elif t_norm <= 0.52:
+        p = (t_norm - 0.20) / 0.32
         ease = p * p * (3 - 2 * p)
-        return ease * (max_scroll * 0.48)
-    elif t_norm <= 0.62:
-        base = max_scroll * 0.48
-        # Tiny subtle breathing/reading micro-motion (1-2px)
-        micro = np.sin((t_norm - 0.45) * 25) * 2
+        return ease * (max_scroll * 0.55)
+    elif t_norm <= 0.72:
+        base = max_scroll * 0.55
+        micro = np.sin((t_norm - 0.52) * 15) * 1.5
         return base + micro
-    elif t_norm <= 0.88:
-        p = (t_norm - 0.62) / 0.26
+    elif t_norm <= 0.90:
+        p = (t_norm - 0.72) / 0.18
         ease = p * p * (3 - 2 * p)
-        return (max_scroll * 0.48) + ease * (max_scroll * 0.52)
+        return (max_scroll * 0.55) + ease * (max_scroll * 0.45)
     else:
         return max_scroll
 
@@ -94,9 +94,9 @@ def generate_local_job_html(job):
       display: flex; align-items: center; justify-content: space-between;
     }}
     .logo {{ color: #10b981; font-weight: 800; font-size: 24px; letter-spacing: -0.5px; }}
-    .container {{ max-width: 1080px; margin: 40px auto; padding: 0 32px; padding-bottom: 240px; }}
+    .container {{ max-width: 1080px; margin: 32px auto; padding: 0 32px; padding-bottom: 50px; }}
     .job-card {{
-      background: #151d2f; border: 1px solid #233047; border-radius: 18px; padding: 44px;
+      background: #151d2f; border: 1px solid #233047; border-radius: 18px; padding: 40px;
       box-shadow: 0 20px 40px -10px rgba(0,0,0,0.5);
     }}
     .badge {{
@@ -104,19 +104,19 @@ def generate_local_job_html(job):
       border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 14px; border-radius: 8px;
       font-size: 13px; font-weight: 700; margin-bottom: 18px;
     }}
-    h1 {{ font-size: 30px; color: #ffffff; margin: 0 0 20px 0; line-height: 1.35; font-weight: 800; }}
+    h1 {{ font-size: 28px; color: #ffffff; margin: 0 0 18px 0; line-height: 1.35; font-weight: 800; }}
     .meta-bar {{
-      display: flex; gap: 32px; padding-bottom: 24px; border-bottom: 1px solid #233047;
-      color: #94a3b8; font-size: 16px; margin-bottom: 28px;
+      display: flex; gap: 32px; padding-bottom: 22px; border-bottom: 1px solid #233047;
+      color: #94a3b8; font-size: 15px; margin-bottom: 24px;
     }}
     .meta-val {{ color: #ffffff; font-weight: 700; }}
     .description {{ font-size: 16px; line-height: 1.85; color: #cbd5e1; white-space: pre-wrap; font-weight: 400; }}
     .client-sidebar {{
-      margin-top: 40px; padding: 28px; background: #0f1523; border-radius: 14px;
+      margin-top: 36px; padding: 24px; background: #0f1523; border-radius: 14px;
       border: 1px solid #1e293b; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
     }}
     .client-stat-title {{ font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }}
-    .client-stat-val {{ font-size: 20px; font-weight: 800; color: #ffffff; margin-top: 6px; }}
+    .client-stat-val {{ font-size: 18px; font-weight: 800; color: #ffffff; margin-top: 5px; }}
   </style>
 </head>
 <body>
@@ -187,9 +187,24 @@ def record_job_background(job, output_bg_path, duration_secs, target_url=None):
             driver.get(f"file:///{temp_html_path}")
             time.sleep(1)
 
-        # Get total scrollable height
-        max_scroll = driver.execute_script("return Math.max(document.body.scrollHeight - window.innerHeight + 100, 500);")
-        print(f"Max scroll depth: {max_scroll}px across {total_frames} frames")
+        # Calculate EXACT text-based scroll depth:
+        # Never scroll past the job content card into empty whitespace!
+        scroll_calc_js = """
+        const card = document.querySelector('.job-card') || document.querySelector('main') || document.body;
+        if (!card) return 100;
+        const cardTop = card.offsetTop;
+        const cardBottom = cardTop + card.offsetHeight;
+        const winH = window.innerHeight;
+        // If content fits completely inside screen, only drift 40-70px gently
+        if (cardBottom <= winH - 40) {
+            return Math.min(60, Math.floor(card.offsetHeight * 0.12));
+        }
+        // If content extends beyond screen, scroll only enough to reveal the card bottom + comfortable 40px margin
+        const needed = cardBottom - winH + 40;
+        return Math.min(needed, 520);
+        """
+        max_scroll = int(driver.execute_script(scroll_calc_js))
+        print(f"Calculated text-bounded scroll depth: {max_scroll}px across {total_frames} frames")
 
         # Capture frames following the realistic human scroll curve
         for f_idx in range(total_frames):
