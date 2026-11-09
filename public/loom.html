@@ -131,6 +131,42 @@
             </div>
           </button>
 
+          <!-- Video End Screen Overlay (Triggers when video finishes) -->
+          <div id="endScreenOverlay" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center text-center p-6 z-30 opacity-0 pointer-events-none transition-all duration-300 transform scale-95">
+            <div class="relative mb-3">
+              <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 border-emerald-400 shadow-2xl shadow-emerald-500/30">
+                <img src="/profile_pic.jpg" alt="Sametcan Koksoy" class="w-full h-full object-cover" />
+              </div>
+              <div class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center text-xs font-black border-2 border-slate-900 shadow" title="Verified">
+                ✓
+              </div>
+            </div>
+
+            <div class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-semibold mb-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>Ready to start milestone 1</span>
+            </div>
+
+            <h3 class="text-lg sm:text-2xl font-extrabold text-white tracking-tight mb-1">
+              Want to Discuss Your Project?
+            </h3>
+            <p class="text-xs sm:text-sm text-zinc-300 max-w-md mb-5 leading-relaxed">
+              I can get started right away. Click below to reply and chat directly on Upwork.
+            </p>
+
+            <div class="flex flex-wrap items-center justify-center gap-3 w-full max-w-sm">
+              <a id="endScreenCtaBtn" href="#" target="_blank" rel="noopener" class="flex-1 min-w-[200px] py-3.5 px-5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs sm:text-sm text-center transition shadow-xl shadow-emerald-500/30 transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
+                <span class="text-base">💬</span>
+                <span>Send Message on Upwork</span>
+                <span>↗</span>
+              </a>
+              <button onclick="replayVideo()" class="py-3 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-zinc-200 text-xs font-bold transition flex items-center gap-1.5 border border-white/10">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                <span>Replay</span>
+              </button>
+            </div>
+          </div>
+
           <!-- Loom Floating Emoji Reactions (Iconic Loom Feature!) -->
           <div class="absolute right-3.5 bottom-16 flex flex-col gap-2 z-20">
             <button onclick="sendReaction('👍')" class="reaction-pill w-9 h-9 rounded-full bg-black/60 backdrop-blur border border-white/10 flex items-center justify-center text-sm shadow-lg hover:bg-black/80">
@@ -301,7 +337,32 @@
     const speeds = [1, 1.25, 1.5, 2];
     let currentSpeedIdx = 0;
 
+    const endScreen = document.getElementById('endScreenOverlay');
+
+    function showEndScreen() {
+      if (!endScreen) return;
+      centerPlayBtn.classList.add('hidden');
+      endScreen.classList.remove('opacity-0', 'pointer-events-none', 'scale-95');
+      endScreen.classList.add('opacity-100', 'pointer-events-auto', 'scale-100');
+    }
+
+    function hideEndScreen() {
+      if (!endScreen) return;
+      endScreen.classList.add('opacity-0', 'pointer-events-none', 'scale-95');
+      endScreen.classList.remove('opacity-100', 'pointer-events-auto', 'scale-100');
+    }
+
+    function replayVideo() {
+      hideEndScreen();
+      video.currentTime = 0;
+      video.play();
+      playIcon.classList.add('hidden');
+      pauseIcon.classList.remove('hidden');
+      centerPlayBtn.classList.add('hidden');
+    }
+
     function togglePlay() {
+      hideEndScreen();
       if (video.paused) {
         video.play();
         playIcon.classList.add('hidden');
@@ -332,10 +393,11 @@
     video.addEventListener('ended', () => {
       playIcon.classList.remove('hidden');
       pauseIcon.classList.add('hidden');
-      centerPlayBtn.classList.remove('hidden');
+      showEndScreen();
     });
 
     function seekVideo(e) {
+      hideEndScreen();
       const rect = e.currentTarget.getBoundingClientRect();
       const pos = (e.clientX - rect.left) / rect.width;
       video.currentTime = pos * video.duration;
@@ -385,6 +447,8 @@
         if (mainBtn) mainBtn.href = upworkUrl;
         const ctaSidebar = document.getElementById('ctaUpworkSidebarBtn');
         if (ctaSidebar) ctaSidebar.href = upworkUrl;
+        const endBtn = document.getElementById('endScreenCtaBtn');
+        if (endBtn) endBtn.href = upworkUrl;
 
         // Set video source
         const videoSrc = document.getElementById('videoSrc');
