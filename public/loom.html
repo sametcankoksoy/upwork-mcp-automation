@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loom - Video Walkthrough for Your Project</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] },
+          colors: {
+            bg: '#0a0d16',
+            surface: '#121826',
+            surfaceHover: '#182135',
+            border: '#1f2a3f',
+            accent: '#10b981',
+            loom: '#625df5'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background-color: #0a0d16; color: #f1f5f9; }
+    video { border-radius: 14px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans antialiased selection:bg-loom/30">
+
+  <!-- Header -->
+  <header class="border-b border-border/70 bg-surface/80 backdrop-blur sticky top-0 z-50 px-6 py-3.5">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-loom to-pink-500 flex items-center justify-center font-bold text-white shadow-lg shadow-loom/25">
+          ▶
+        </div>
+        <div>
+          <span class="text-sm font-bold text-white tracking-tight">loom</span>
+          <span class="text-[10px] ml-1.5 px-1.5 py-0.5 rounded bg-loom/15 text-loom border border-loom/30 font-semibold">Video Proposal</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <a id="upworkTopBtn" href="#" target="_blank" rel="noopener" class="px-4 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition shadow-md shadow-emerald-500/20">
+          Reply on Upwork ↗
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Video Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex-1 grid grid-cols-1 lg:grid-cols-3 gap-8">
+    
+    <!-- Video Player Column (2 Cols) -->
+    <div class="lg:col-span-2 space-y-4">
+      <div class="bg-surface border border-border/80 rounded-2xl p-2.5 sm:p-4">
+        <div class="relative bg-black rounded-xl overflow-hidden aspect-video flex items-center justify-center">
+          <video id="loomVideo" controls autoplay playsinline class="w-full h-full object-contain">
+            <source id="videoSource" src="" type="video/mp4">
+            Your browser does not support HTML5 video.
+          </video>
+        </div>
+      </div>
+
+      <!-- Video Details & Title -->
+      <div class="bg-surface border border-border/80 rounded-2xl p-6 space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <span class="text-xs font-semibold px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            Recorded for your job posting
+          </span>
+          <span class="text-xs text-zinc-400" id="videoDate">Just now</span>
+        </div>
+        <h1 class="text-lg sm:text-xl font-bold text-white" id="jobTitle">
+          Project Architecture & Execution Walkthrough
+        </h1>
+        <p class="text-xs text-zinc-300 leading-relaxed" id="jobDesc">
+          Loading project context...
+        </p>
+      </div>
+    </div>
+
+    <!-- Right Sidebar (Profile & Direct Call to Action) -->
+    <div class="space-y-5">
+      <!-- Freelancer Profile Card -->
+      <div class="bg-surface border border-border/80 rounded-2xl p-6 space-y-4">
+        <div class="flex items-center gap-3.5">
+          <div class="w-14 h-14 rounded-full bg-gradient-to-tr from-emerald-500 to-sky-500 flex items-center justify-center text-xl font-extrabold text-slate-950 shadow-md">
+            SC
+          </div>
+          <div>
+            <div class="text-sm font-bold text-white flex items-center gap-1.5">
+              Samet Can Koksoy
+              <span class="text-xs" title="Top Rated Plus">⭐</span>
+            </div>
+            <div class="text-[11px] text-emerald-400 font-semibold">Top Rated Freelancer · AI & Full-Stack</div>
+            <div class="text-[10px] text-zinc-400 mt-0.5">100% Job Success Score</div>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-xl bg-bg/60 border border-border text-xs space-y-2">
+          <div class="flex justify-between">
+            <span class="text-zinc-400">Core Expertise:</span>
+            <span class="font-bold text-zinc-200">AI Agents, Python, Node.js</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-zinc-400">Response Time:</span>
+            <span class="font-bold text-emerald-400">&lt; 15 minutes</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-zinc-400">Delivery Guarantee:</span>
+            <span class="font-bold text-zinc-200">100% Code Handover & Docs</span>
+          </div>
+        </div>
+
+        <div class="space-y-2 pt-2">
+          <a id="upworkCtaBtn" href="#" target="_blank" rel="noopener" class="w-full block text-center py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-sm transition shadow-lg shadow-emerald-500/25">
+            💬 Reply on Upwork
+          </a>
+          <p class="text-[11px] text-center text-zinc-400">
+            Let's discuss requirements & kick off milestone 1.
+          </p>
+        </div>
+      </div>
+
+      <!-- Target Job Summary -->
+      <div class="bg-surface border border-border/80 rounded-2xl p-5 space-y-3">
+        <div class="text-xs font-bold text-zinc-400 uppercase tracking-wider">Target Job Details</div>
+        <div class="space-y-2 text-xs">
+          <div class="flex justify-between py-1 border-b border-border/50">
+            <span class="text-zinc-400">Budget:</span>
+            <span class="font-bold text-white" id="jobBudget">$2,000</span>
+          </div>
+          <div class="flex justify-between py-1 border-b border-border/50">
+            <span class="text-zinc-400">Client Hire Rate:</span>
+            <span class="font-bold text-emerald-400" id="jobHireRate">%90</span>
+          </div>
+          <div class="flex justify-between py-1">
+            <span class="text-zinc-400">Location:</span>
+            <span class="font-bold text-zinc-200" id="jobCountry">United States</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const jobId = window.location.pathname.split('/').pop();
+
+    async function loadJob() {
+      try {
+        const res = await fetch(`/api/job/${jobId}`);
+        const job = await res.json();
+        
+        document.getElementById('jobTitle').textContent = `Walkthrough for: ${job.title}`;
+        document.getElementById('jobDesc').textContent = job.description || 'Custom technical walkthrough for your job posting requirements.';
+        
+        const budgetText = job.budget > 0 ? `$${job.budget.toLocaleString()}` : `$${job.hourly_min || 25}-$${job.hourly_max || 50}/hr`;
+        document.getElementById('jobBudget').textContent = budgetText;
+        document.getElementById('jobHireRate').textContent = `%${job.client_hire_rate || 80}`;
+        document.getElementById('jobCountry').textContent = job.client_country || 'United States';
+
+        const upworkUrl = `https://www.upwork.com/jobs/~02${job.job_id || jobId}`;
+        document.getElementById('upworkTopBtn').href = upworkUrl;
+        document.getElementById('upworkCtaBtn').href = upworkUrl;
+
+        // Set video source
+        const videoElem = document.getElementById('loomVideo');
+        const sourceElem = document.getElementById('videoSource');
+        sourceElem.src = `/videos/${job.job_id || jobId}.mp4`;
+        videoElem.load();
+        videoElem.play().catch(() => {});
+      } catch (err) {
+        console.error('Error loading job for Loom page:', err);
+      }
+    }
+
+    loadJob();
+  </script>
+</body>
+</html>

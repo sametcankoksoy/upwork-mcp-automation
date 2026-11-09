@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('node:path');
+const fs = require('node:fs');
+const { execFile } = require('node:child_process');
 require('dotenv').config();
 
 const { db, upsertJobAndSnapshot, getSetting } = require('./db');
@@ -12,6 +14,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
+
+// Ensure public/videos directory exists and serve statically
+const videosDir = path.join(__dirname, '..', 'public', 'videos');
+if (!fs.existsSync(videosDir)) {
+  fs.mkdirSync(videosDir, { recursive: true });
+}
+app.use('/videos', express.static(videosDir));
 
 // API: Full Market Intelligence Analytics
 app.get('/api/analytics', async (req, res) => {
@@ -126,6 +135,52 @@ app.post('/api/ingest', (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// API: Single Job Details
+app.get('/api/job/:jobId', (req, res) => {
+  try {
+    const job = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(req.params.jobId);
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    const videoExists = fs.existsSync(path.join(videosDir, `${req.params.jobId}.mp4`));
+    res.json({
+      ...job,
+      video_url: videoExists ? `/videos/${req.params.jobId}.mp4` : null
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// API: Generate Loom Video for a Job (SeleniumBase + MoviePy)
+app.post('/api/generate-loom/:jobId', (req, res) => {
+  const jobId = req.params.jobId;
+  const scriptPath = path.join(__dirname, '..', 'scripts', 'stitch_loom_video.py');
+
+  execFile('python', [scriptPath, '--job-id', jobId], { maxBuffer: 1024 * 1024 * 10 }, (err, stdout, stderr) => {
+    if (err) {
+      console.error('Python video stitch error:', stderr || err.message);
+      return res.status(500).json({ error: stderr || err.message });
+    }
+    const videoFile = `/videos/${jobId}.mp4`;
+    const loomPage = `/loom/${jobId}`;
+    const job = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(jobId);
+    const title = job?.title || 'your project';
+    const proposalText = `Hey there,\n\nI saw your post regarding '${title}'. Instead of a long generic proposal, I recorded a quick 1-minute Loom video walking through your exact requirements and how I will execute this:\n\n👉 https://upwork-mcp-automation.onrender.com/loom/${jobId}\n\nLet me know what you think after watching, and we can discuss next steps!\n\nBest,\nSamet Can Koksoy`;
+
+    res.json({
+      ok: true,
+      job_id: jobId,
+      video_url: videoFile,
+      loom_url: loomPage,
+      proposal_text: proposalText
+    });
+  });
+});
+
+// Route: Loom View Player Page
+app.get('/loom/:jobId', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'loom.html'));
 });
 
 const PORT = process.env.PORT || 3050;

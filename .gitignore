@@ -4,3 +4,4 @@ data/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+downloaded_files/
