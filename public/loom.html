@@ -199,36 +199,6 @@
           <span>↗</span>
         </a>
       </div>
-
-      <!-- Loom AI Summary & Tabs -->
-      <div class="bg-loomSurface border border-loomBorder rounded-2xl p-6 space-y-4">
-        <div class="flex items-center gap-6 border-b border-loomBorder pb-3 text-xs font-semibold">
-          <button class="text-white border-b-2 border-loomPurple pb-3 -mb-3 flex items-center gap-1.5">
-            <span class="text-loomPurple">✨</span> Loom AI Summary
-          </button>
-          <button class="text-zinc-400 hover:text-zinc-200 transition">Job Details</button>
-        </div>
-
-        <div class="space-y-2.5 text-xs text-zinc-300 leading-relaxed">
-          <div class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Executive Overview</div>
-          <ul class="space-y-2 list-disc list-inside text-zinc-300" id="aiSummaryList">
-            <li>Targeted review of your job post and automation architecture.</li>
-            <li>Identified critical data bottlenecks &amp; mapped out end-to-end pipeline.</li>
-            <li>Production-ready code handover with 100% satisfaction guarantee.</li>
-          </ul>
-        </div>
-      </div>
-
-      <!-- Comments Area -->
-      <div class="bg-loomSurface border border-loomBorder rounded-2xl p-5 space-y-3">
-        <div class="text-xs font-bold text-zinc-300">Questions &amp; Direct Message</div>
-        <div class="flex items-center gap-3">
-          <input type="text" placeholder="Have questions about the video? Ask here..." class="flex-1 bg-black/40 border border-loomBorder rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-loomPurple/60" />
-          <a id="ctaUpworkBtnComment" href="#" target="_blank" class="px-4 py-2 rounded-xl bg-loomPurple hover:bg-loomPurpleHover text-white text-xs font-semibold transition">
-            Send on Upwork
-          </a>
-        </div>
-      </div>
     </div>
 
     <!-- SAĞ KOLON: UPWORK PROFİL KARTI & DİREKT MESAJ BUTONU (Sticky Sidebar) -->
@@ -312,28 +282,6 @@
             <span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-200 border border-zinc-700 font-medium">Web Scraping</span>
             <span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-200 border border-zinc-700 font-medium">Node.js / React</span>
             <span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-200 border border-zinc-700 font-medium">n8n / Automations</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Müşterinin İlan Özeti Kartı -->
-      <div class="bg-loomSurface border border-loomBorder rounded-2xl p-5 space-y-3">
-        <div class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
-          <span>Target Job Overview</span>
-          <span class="text-[10px] text-emerald-400 font-mono">Matched</span>
-        </div>
-        <div class="space-y-2 text-xs">
-          <div class="flex justify-between py-1 border-b border-loomBorder/60">
-            <span class="text-zinc-400">Stated Budget:</span>
-            <span class="font-bold text-white" id="jobBudgetDisplaySidebar">$2,000</span>
-          </div>
-          <div class="flex justify-between py-1 border-b border-loomBorder/60">
-            <span class="text-zinc-400">Client Hire Rate:</span>
-            <span class="font-bold text-emerald-400" id="jobHireRateDisplaySidebar">%100</span>
-          </div>
-          <div class="flex justify-between py-1">
-            <span class="text-zinc-400">Location:</span>
-            <span class="font-medium text-zinc-300" id="jobCountryDisplaySidebar">United States</span>
           </div>
         </div>
       </div>
@@ -449,25 +397,14 @@
 
         const title = job.title || 'Your Project Requirements';
         document.title = `${title} | Loom`;
-        document.getElementById('loomVideoTitle').textContent = `Walkthrough for: ${title}`;
-
-        const budgetText = job.budget > 0 ? `$${job.budget.toLocaleString()}` : `$${job.hourly_min || 25}–$${job.hourly_max || 50}/hr`;
-        document.getElementById('jobBudgetDisplay').textContent = budgetText;
-        document.getElementById('jobHireRateDisplay').textContent = `%${job.client_hire_rate || 80}`;
-        document.getElementById('jobCountryDisplay').textContent = job.client_country || 'United States';
-
-        // Update Sidebar Stats
-        const budgetSidebar = document.getElementById('jobBudgetDisplaySidebar');
-        if (budgetSidebar) budgetSidebar.textContent = budgetText;
-        const hireSidebar = document.getElementById('jobHireRateDisplaySidebar');
-        if (hireSidebar) hireSidebar.textContent = `%${job.client_hire_rate || 80}`;
-        const countrySidebar = document.getElementById('jobCountryDisplaySidebar');
-        if (countrySidebar) countrySidebar.textContent = job.client_country || 'United States';
+        const titleEl = document.getElementById('loomVideoTitle');
+        if (titleEl) titleEl.textContent = `Walkthrough for: ${title}`;
 
         const upworkUrl = `https://www.upwork.com/jobs/~02${job.job_id || jobId}`;
-        document.getElementById('ctaUpworkBtnTop').href = upworkUrl;
-        document.getElementById('ctaUpworkBtnMain').href = upworkUrl;
-        document.getElementById('ctaUpworkBtnComment').href = upworkUrl;
+        const topBtn = document.getElementById('ctaUpworkBtnTop');
+        if (topBtn) topBtn.href = upworkUrl;
+        const mainBtn = document.getElementById('ctaUpworkBtnMain');
+        if (mainBtn) mainBtn.href = upworkUrl;
         const ctaSidebar = document.getElementById('ctaUpworkSidebarBtn');
         if (ctaSidebar) ctaSidebar.href = upworkUrl;
 
