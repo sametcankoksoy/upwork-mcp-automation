@@ -316,16 +316,15 @@ function getFullMarketAnalytics(keywordFilter = null) {
     GROUP BY speed_bucket
   `).all();
 
-  // 5c. Technology & Skill Trends Extraction (Python, AI Agents, OpenAI, Web Scraping, Next.js, n8n, etc.)
+  // 5c. Technology & Skill Trends Extraction (Aligned with Sametcan's Stack)
   const trackedTechList = [
-    { name: 'Python', regex: /python/i },
-    { name: 'AI Agents / LLM', regex: /(agent|claude|gpt|llm|openai|deepseek)/i },
-    { name: 'n8n / Make.com / Zapier', regex: /(n8n|make\.com|zapier|automation)/i },
-    { name: 'Web Scraping', regex: /(scrap|crawl|extract|puppeteer|selenium|playwright)/i },
-    { name: 'React / Next.js', regex: /(react|next\.js|typescript|frontend|tailwind)/i },
-    { name: 'Node.js / Backend', regex: /(node|express|fastapi|django|postgres|supabase|backend|api)/i },
-    { name: 'LangChain / RAG', regex: /(langchain|llamaindex|rag|vector|embeddings)/i },
-    { name: 'Mobile (Flutter / React Native)', regex: /(flutter|react native|ios|android)/i }
+    { name: 'Python Automation', regex: /(python|script)/i },
+    { name: 'AI Agents & LLM', regex: /(agent|claude|gpt|llm|openai|deepseek|langchain|llamaindex)/i },
+    { name: 'Playwright & Selenium', regex: /(playwright|selenium|puppeteer|browser automation)/i },
+    { name: 'Website Scraping', regex: /(scrap|crawl|anti-bot|cloudflare|stealth)/i },
+    { name: 'Node.js & Backend', regex: /(node|express|fastapi|django|postgres|supabase|backend|api)/i },
+    { name: 'Full-Stack Development', regex: /(full-stack|full stack|react|next\.js|typescript)/i },
+    { name: 'Workflow Automation', regex: /(automation|workflow|n8n|make\.com)/i }
   ];
 
   const allJobsForTech = db.prepare(`SELECT * FROM jobs ${whereClause}`).all();
@@ -387,14 +386,22 @@ function getFullMarketAnalytics(keywordFilter = null) {
     LIMIT 100
   `).all();
 
-  // 7. Sniper Opportunities (Open, Client Hire Rate >= 60%, < 10 proposals, not ghost)
+  // 7. Sniper Opportunities (Open, Not Ghost, High Sniper Score, Filter-Aware)
+  let sniperWhere = `WHERE job_status = 'open' AND is_ghost_job = 0 AND sniper_score >= 60`;
+  if (keywordFilter && keywordFilter !== 'ALL') {
+    if (keywordFilter.startsWith('GROUP:')) {
+      const grp = keywordFilter.slice(6).replace(/'/g, "''");
+      sniperWhere += ` AND keyword_matched IN (SELECT keyword FROM tracked_keywords WHERE category = '${grp}')`;
+    } else {
+      const kw = keywordFilter.replace(/'/g, "''");
+      sniperWhere += ` AND keyword_matched = '${kw}'`;
+    }
+  }
+
   const sniperOpportunities = db.prepare(`
     SELECT *
     FROM jobs
-    WHERE job_status = 'open'
-      AND is_ghost_job = 0
-      AND client_hire_rate >= 60
-      AND current_proposals_numeric <= 10
+    ${sniperWhere}
     ORDER BY sniper_score DESC, posted_at DESC
     LIMIT 15
   `).all();

@@ -112,20 +112,20 @@ function setSetting(key, val) {
   `).run(key, JSON.stringify(val));
 }
 
-// Seed all major Upwork categories
+// Seed user's exact specialized niche stack
 const defaultKeywords = [
-  ['AI & Machine Learning', 'AI & Data'],
-  ['AI Automation', 'AI & Data'],
-  ['Automation', 'Automation'],
-  ['Data Scraping', 'AI & Data'],
-  ['Full-Stack Development', 'Development'],
-  ['Back-End Development', 'Development'],
-  ['Front-End Development', 'Development'],
-  ['Mobile App Development', 'Development'],
-  ['Digital Marketing', 'Marketing'],
-  ['SEO & Lead Generation', 'Marketing'],
-  ['UI/UX & Web Design', 'Design'],
-  ['DevOps & Cloud', 'Development']
+  ['Playwright', 'Browser Automation'],
+  ['Selenium', 'Browser Automation'],
+  ['Browser Automation', 'Browser Automation'],
+  ['Web Scraping', 'Website Scraping'],
+  ['AI Agent', 'AI & Agents'],
+  ['AI Automation', 'AI & Agents'],
+  ['Automation Script', 'Scripting & Automation'],
+  ['Python Automation', 'Scripting & Automation'],
+  ['Full-Stack Development', 'Full-Stack & Backend'],
+  ['Node.js', 'Full-Stack & Backend'],
+  ['Automation', 'Scripting & Automation'],
+  ['LLM', 'AI & Agents']
 ];
 const insertKw = db.prepare('INSERT OR IGNORE INTO tracked_keywords (keyword, category, active) VALUES (?, ?, 1)');
 for (const [kw, cat] of defaultKeywords) {
@@ -191,29 +191,80 @@ function tierToNumeric(tier) {
 
 function calculateSniperScore(job) {
   let score = 50;
-  // Client hire rate impact
-  if (job.client_hire_rate >= 80) score += 25;
-  else if (job.client_hire_rate >= 60) score += 18;
-  else if (job.client_hire_rate < 35) score -= 25;
+  const text = `${job.title || ''} ${job.description || ''}`.toLowerCase();
 
-  // Client total spent impact
+  // 1. Client Hire Rate & Track Record
+  if (job.client_hire_rate >= 80) {
+    score += 25;
+  } else if (job.client_hire_rate >= 60) {
+    score += 18;
+  } else if (job.client_hire_rate < 35) {
+    if (job.client_total_posted && job.client_total_posted >= 3) {
+      score -= 30; // Habitual ghost client with zero hires
+    } else if (!job.client_payment_verified) {
+      score -= 20; // Unverified zero-history poster
+    } else {
+      score -= 8; // Fresh client with verified payment method
+    }
+  }
+
+  // 2. Client Lifetime Spend
   if (job.client_total_spent >= 50000) score += 15;
   else if (job.client_total_spent >= 10000) score += 10;
+  else if (job.client_total_spent >= 1000) score += 5;
   else if (job.client_total_spent === 0 && !job.client_payment_verified) score -= 20;
 
-  // Budget impact
-  if (job.budget >= 2000 || job.hourly_max >= 60) score += 12;
-  else if (job.budget > 0 && job.budget < 200) score -= 15;
+  // 3. User Stack Alignment Boost (+20)
+  // Target: Automation, AI Agent, Website Scraping, Playwright, Selenium, Browser Automation, Python, Node.js, Automation Script
+  const isHighFitStack = /(playwright|selenium|browser automation|puppeteer|anti-bot|cloudflare|stealth|crawler|web scraping|scrape|website scraper|ai agent|agentic|llm|claude|langchain|llamaindex|automation script|python automation|python script|node\.js|full-stack|full stack)/i.test(text);
+  if (isHighFitStack) {
+    score += 20;
+  }
 
-  // Competition impact
+  // 4. Low-Quality Lead Scraping Penalty (-40)
+  // User explicitly wants website scraping, NOT generic sales lead lists / cold email databases
+  const isGenericLeadGen = /(b2b lead|lead gen|lead generation|email list|cold email|email outreach|apollo\.io|apollo|linkedin lead|yellow pages|google maps lead|contact list|lead scraper|data entry|virtual assistant|skip tracing)/i.test(text);
+  if (isGenericLeadGen) {
+    score -= 40;
+  }
+
+  // 4b. Unrelated Non-Dev Tasks Penalty (-35) (e.g. SEO, Social Media, Telemedicine Marketing)
+  const isUnrelatedNonDev = /(seo, ads|marketing agency|social media|funnels|video editing|cold calling|sales rep|virtual assistant|copywriter|content writer|appointment setter|trading mentor)/i.test(text)
+    && !/(playwright|selenium|scraping|crawler|puppeteer|browser automation|python|node\.js|full-stack|full stack)/i.test(text);
+  if (isUnrelatedNonDev) {
+    score -= 35;
+  }
+
+  // 5. Budget / Rate Alignment (Target: Sametcan $40/hr Top Rated)
+  if (job.hourly_max >= 40 || job.budget >= 1500) score += 15;
+  else if (job.hourly_max >= 30 || job.budget >= 400) score += 8;
+  else if (job.budget > 0 && job.budget < 100) score -= 25;
+  else if (job.hourly_max > 0 && job.hourly_max < 20) score -= 20;
+
+  // 6. Competition Window
   const numProps = job.current_proposals_numeric || tierToNumeric(job.current_proposals_tier);
-  if (numProps <= 5) score += 10;
+  if (numProps <= 5) score += 15;
+  else if (numProps <= 10) score += 8;
   else if (numProps >= 35) score -= 15;
 
-  // Ghost penalty
+  // 7. Ghost Job Penalty
   if (job.is_ghost_job) score -= 40;
 
   return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+// Refresh sniper scores across all existing jobs
+try {
+  const existingJobs = db.prepare('SELECT * FROM jobs').all();
+  const updateScoreStmt = db.prepare('UPDATE jobs SET sniper_score = ? WHERE job_id = ?');
+  for (const j of existingJobs) {
+    const newScore = calculateSniperScore(j);
+    if (newScore !== j.sniper_score) {
+      updateScoreStmt.run(newScore, j.job_id);
+    }
+  }
+} catch (e) {
+  console.error('Sniper score refresh error:', e.message);
 }
 
 function upsertJobAndSnapshot(jobData) {
