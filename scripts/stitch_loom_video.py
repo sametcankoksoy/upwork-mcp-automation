@@ -41,36 +41,71 @@ def get_video_duration(video_path):
     except Exception as e:
         return 15.0
 
-def human_scroll_curve(t_norm, max_scroll):
+def snappy_human_scroll(f, total_frames=300, max_scroll=900):
     """
-    Fast, energetic down-and-up inspection curve:
-    0.00 - 0.10: Start at top (intro: looking at title & budget)
-    0.10 - 0.46: Fast, smooth scroll DOWN to the bottom (inspecting full scope & requirements)
-    0.46 - 0.58: Short pause at bottom reviewing client history & details
-    0.58 - 0.88: Fast, smooth scroll BACK UP to the top
-    0.88 - 1.00: Rest cleanly at the top hero section while delivering pitch
+    Simulates real fast human mouse-wheel flicks:
+    - 0 to 1.2s: Stays at top looking at title
+    - 1.2s to 3.8s: 3 FAST energetic downward wheel flicks down to bottom!
+    - 3.8s to 6.2s: Natural reading pause at bottom inspecting client stats & scope
+    - 6.2s to 8.8s: 2 FAST energetic upward wheel flicks back up to top!
+    - 8.8s to 15s: Rest cleanly at top while delivering pitch
     """
     if max_scroll <= 10:
         return 0
-    if t_norm <= 0.10:
+
+    scale = max_scroll / 900.0
+
+    # Phase 1: 0 - 24 frames (0 - 1.2s) -> Looking at top
+    if f < 24:
         return 0
-    elif t_norm <= 0.46:
-        # Fast scroll DOWN
-        p = (t_norm - 0.10) / 0.36
-        ease = p * p * (3 - 2 * p)
-        return ease * max_scroll
-    elif t_norm <= 0.58:
-        # Brief pause at bottom with subtle micro drift
-        base = max_scroll
-        micro = np.sin((t_norm - 0.46) * 20) * 3
-        return base - abs(micro)
-    elif t_norm <= 0.88:
-        # Fast scroll BACK UP
-        p = (t_norm - 0.58) / 0.30
-        ease = p * p * (3 - 2 * p)
-        return max_scroll * (1.0 - ease)
+
+    # Phase 2: 24 - 76 frames (1.2s - 3.8s) -> 3 fast downward wheel flicks
+    elif f < 76:
+        # Flick 1: 24..40 -> 0 to 420px
+        if f < 40:
+            p = (f - 24) / 16.0
+            ease = 1.0 - (1.0 - p)**3
+            return int(ease * 420 * scale)
+        # Micro pause: 40..46
+        elif f < 46:
+            return int(420 * scale)
+        # Flick 2: 46..62 -> 420 to 760px
+        elif f < 62:
+            p = (f - 46) / 16.0
+            ease = 1.0 - (1.0 - p)**3
+            return int((420 + ease * 340) * scale)
+        # Micro pause: 62..66
+        elif f < 66:
+            return int(760 * scale)
+        # Flick 3: 66..76 -> 760 to max_scroll
+        else:
+            p = (f - 66) / 10.0
+            ease = 1.0 - (1.0 - p)**3
+            return int((760 + ease * 140) * scale)
+
+    # Phase 3: 76 - 126 frames (3.8s - 6.3s) -> Reading bottom client stats
+    elif f < 126:
+        micro = np.sin((f - 76) * 0.18) * 2.5
+        return int(max_scroll - abs(micro))
+
+    # Phase 4: 126 - 176 frames (6.3s - 8.8s) -> 2 fast upward wheel flicks
+    elif f < 176:
+        # Flick Up 1: 126..150 -> max_scroll to 320px
+        if f < 150:
+            p = (f - 126) / 24.0
+            ease = 1.0 - (1.0 - p)**3
+            return int(max_scroll - ease * (max_scroll - 320 * scale))
+        # Micro pause: 150..156
+        elif f < 156:
+            return int(320 * scale)
+        # Flick Up 2: 156..176 -> 320px to 0px
+        else:
+            p = (f - 156) / 20.0
+            ease = 1.0 - (1.0 - p)**3
+            return int((320 * scale) * (1.0 - ease))
+
+    # Phase 5: 176 - 300 frames (8.8s - 15.0s) -> Rest cleanly at top for pitch
     else:
-        # Back at top
         return 0
 
 def generate_local_job_html(job):
@@ -205,10 +240,9 @@ def record_job_background(job, output_bg_path, duration_secs, target_url=None):
         max_scroll = int(driver.execute_script(scroll_calc_js))
         print(f"Calculated text-bounded scroll depth: {max_scroll}px across {total_frames} frames")
 
-        # Capture frames following the realistic human scroll curve
+        # Capture frames following fast, snappy human mouse-wheel flicks
         for f_idx in range(total_frames):
-            t_norm = f_idx / max(1, total_frames - 1)
-            target_y = int(human_scroll_curve(t_norm, max_scroll))
+            target_y = int(snappy_human_scroll(f_idx, total_frames, max_scroll))
             
             # Instant position jump to target_y (smoothest per-frame capture)
             driver.execute_script(f"window.scrollTo(0, {target_y});")
