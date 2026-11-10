@@ -137,6 +137,30 @@ app.post('/api/ingest', (req, res) => {
   }
 });
 
+// API: Bulk Ingest from Local / Client with Token Sync
+app.post('/api/bulk-ingest', (req, res) => {
+  try {
+    const { jobs, tokens } = req.body;
+    let added = 0;
+    if (Array.isArray(jobs)) {
+      for (const j of jobs) {
+        if (j.job_id && j.title) {
+          upsertJobAndSnapshot(j);
+          added++;
+        }
+      }
+    }
+    if (tokens && tokens.access_token) {
+      const { setSetting } = require('./db');
+      setSetting('upwork_tokens', tokens);
+      if (tokens.org_uid) setSetting('upwork_org_uid', tokens.org_uid);
+    }
+    res.json({ ok: true, ingested: added, totalInDb: db.prepare('SELECT COUNT(*) as c FROM jobs').get().c });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // API: Single Job Details
 app.get('/api/job/:jobId', (req, res) => {
   try {

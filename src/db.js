@@ -450,6 +450,23 @@ function upsertJobAndSnapshot(jobData) {
   return !existing;
 }
 
+// Bootstrap historical dataset from seed_jobs.json if database has fewer than 20 jobs (e.g. fresh Render container deploys)
+const seedJsonPath = path.join(dataDir, 'seed_jobs.json');
+if (fs.existsSync(seedJsonPath)) {
+  const currentCount = db.prepare('SELECT COUNT(*) as c FROM jobs').get().c;
+  if (currentCount < 20) {
+    try {
+      const seedJobs = JSON.parse(fs.readFileSync(seedJsonPath, 'utf8'));
+      console.log(`Bootstrapping ${seedJobs.length} historical jobs on Render/cloud into SQLite...`);
+      for (const j of seedJobs) {
+        upsertJobAndSnapshot(j);
+      }
+    } catch (e) {
+      console.error('Failed to bootstrap seed_jobs.json:', e.message);
+    }
+  }
+}
+
 module.exports = {
   db,
   upsertJobAndSnapshot,
