@@ -229,8 +229,8 @@ function calculateSniperScore(job) {
     score -= 40;
   }
 
-  // 4b. Unrelated Non-Dev Tasks Penalty (-40) (e.g. SEO, Social Media, Translation, Speakers, Voice Recording, Annotation)
-  const isUnrelatedNonDev = /(seo, ads|marketing agency|social media|funnels|video editing|cold calling|sales rep|virtual assistant|copywriter|content writer|appointment setter|trading mentor|speakers?|voice actor|voice over|transcription|translator|translation|audio collection|survey respondent|data labeling|data annotation|annotate)/i.test(text)
+  // 4b. Unrelated Non-Dev Tasks Penalty (-40) (e.g. SEO, Social Media, Translation, Speakers, Voice Recording, Video Editors)
+  const isUnrelatedNonDev = /(seo, ads|marketing agency|social media|funnels|video edit(ing|ors?)|cold calling|sales rep|virtual assistant|copywriter|content writer|appointment setter|trading mentor|speakers?|voice actor|voice over|transcription|translator|translation|audio collection|survey respondent|data labeling|data annotation|annotate)/i.test(text)
     && !/(playwright|selenium|scraping|crawler|puppeteer|browser automation|python|node\.js|full-stack|full stack)/i.test(text);
   if (isUnrelatedNonDev) {
     score -= 45;
