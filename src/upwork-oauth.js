@@ -119,8 +119,9 @@ async function getValidAccessToken() {
   const tokens = getSetting('upwork_tokens');
   if (!tokens || !tokens.access_token) return null;
 
-  // Refresh if expiring in < 2 minutes
-  if (tokens.expires_at && Date.now() > tokens.expires_at - 120000 && tokens.refresh_token) {
+  // Proactively refresh if expiring within 6 hours (rolling renewal window)
+  const sixHoursMs = 6 * 60 * 60 * 1000;
+  if (tokens.expires_at && Date.now() > tokens.expires_at - sixHoursMs && tokens.refresh_token) {
     try {
       const body = new URLSearchParams({
         grant_type: 'refresh_token',
@@ -138,9 +139,11 @@ async function getValidAccessToken() {
           ...tokens,
           access_token: refreshed.access_token,
           refresh_token: refreshed.refresh_token || tokens.refresh_token,
-          expires_at: Date.now() + ((refreshed.expires_in || 3600) * 1000)
+          expires_at: Date.now() + ((refreshed.expires_in || 86400) * 1000),
+          last_refreshed_at: new Date().toISOString()
         };
         setSetting('upwork_tokens', updated);
+        console.log('Proactive token refresh successful. New validity: 24h from now.');
         return updated.access_token;
       }
     } catch (e) {

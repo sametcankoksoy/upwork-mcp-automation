@@ -10,8 +10,9 @@ if (!fs.existsSync(dataDir)) {
 const dbPath = path.join(dataDir, 'upwork_analytics.sqlite');
 const db = new DatabaseSync(dbPath);
 
-// Enable WAL mode for high concurrency
+// Enable WAL mode for high concurrency & set busy_timeout to prevent 'database is locked' errors
 db.exec('PRAGMA journal_mode = WAL;');
+db.exec('PRAGMA busy_timeout = 10000;');
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS tracked_keywords (

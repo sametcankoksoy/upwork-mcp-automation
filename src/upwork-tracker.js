@@ -75,6 +75,11 @@ async function callUpworkMcpTool(toolName, args, accessToken, retry = true) {
 
   const parsed = JSON.parse(contentText);
   if (parsed.status === 'error') {
+    if (parsed.error_code === 'SENSITIVE_RATE_LIMIT_EXCEEDED' && retry) {
+      console.log('Upwork MCP rate limit encountered, waiting 5.5s before retry...');
+      await new Promise(r => setTimeout(r, 5500));
+      return callUpworkMcpTool(toolName, args, accessToken, false);
+    }
     throw new Error(`${parsed.error_code}: ${parsed.reason}`);
   }
   return parsed;
@@ -231,8 +236,8 @@ async function runTrackerCycle(options = {}) {
           if (isNew) newJobsFound++;
           else jobsUpdated++;
         }
-        // Safe pause between keyword searches
-        await new Promise(r => setTimeout(r, 400));
+        // Safe pause between keyword searches to respect Upwork rate limits
+        await new Promise(r => setTimeout(r, 2500));
       }
     } else if (options.simulateStep) {
       const openJobs = db.prepare(`SELECT * FROM jobs WHERE job_status = 'open' ORDER BY posted_at DESC LIMIT 25`).all();
