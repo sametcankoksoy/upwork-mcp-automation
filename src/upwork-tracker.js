@@ -148,8 +148,8 @@ async function fetchLiveJobsForKeyword(keyword, accessToken, orgUid, enrichLimit
     let clientTotalHires = existing?.client_total_hires ?? 0;
     let clientTotalSpent = existing?.client_total_spent ?? parseMoneyString(j.client?.total_spent);
 
-    // Enrich with exact client_record (hire_rate_percent, jobs_with_hires, open_jobs)
-    if ((clientHireRate === null || (clientHireRate === 0 && clientTotalSpent > 0)) && i < enrichLimit) {
+    // Enrich with exact client_record only when needed for high-spend clients (rate limit safe)
+    if ((clientHireRate === null || (clientHireRate === 0 && clientTotalSpent > 5000)) && i < 1) {
       try {
         const detail = await callUpworkMcpTool(
           'upwork__find_jobs',
@@ -236,8 +236,8 @@ async function runTrackerCycle(options = {}) {
           if (isNew) newJobsFound++;
           else jobsUpdated++;
         }
-        // Safe pause between keyword searches to respect Upwork rate limits
-        await new Promise(r => setTimeout(r, 2500));
+        // Safe pause between keyword searches to respect Upwork rate limits (~12 req/min)
+        await new Promise(r => setTimeout(r, 4000));
       }
     } else if (options.simulateStep) {
       const openJobs = db.prepare(`SELECT * FROM jobs WHERE job_status = 'open' ORDER BY posted_at DESC LIMIT 25`).all();

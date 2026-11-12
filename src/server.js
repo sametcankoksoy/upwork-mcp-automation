@@ -243,10 +243,10 @@ if (require.main === module) {
     runTrackerCycle({ simulateStep: false }).catch(console.error);
   }, 5000);
 
-  // Background polling timer every 5 minutes (safe rate limit)
+  // Background polling timer every 8 minutes (rate limit safe & catches fresh jobs)
   setInterval(() => {
     runTrackerCycle({ simulateStep: false }).catch(console.error);
-  }, 5 * 60 * 1000);
+  }, 8 * 60 * 1000);
 
   // Self keep-alive ping every 4 minutes
   const externalUrl = process.env.RENDER_EXTERNAL_URL || 'https://upwork-mcp-automation.onrender.com';
