@@ -28,7 +28,7 @@ MASK_PATH = os.path.join(ASSETS_DIR, "bubble_mask_1728x1080.png")
 TRANSITION_SEC = 8.15
 SPEED = 1.15
 FPS = 25
-MAX_SCROLL_Y = 380
+MAX_SCROLL_Y = 520
 
 def generate_proposal_video(url, out_video_path, proxy=None):
     t0 = time.time()
@@ -78,15 +78,15 @@ def generate_proposal_video(url, out_video_path, proxy=None):
         ]
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         
-        # Phase 1: 0 to 1.0s (25 frames) Top (y=0)
-        p1_frames = int(1.0 * FPS)
+        # Phase 1: 0 to 2.4s (Hold at top y=0 while saying "Hey how's it going?")
+        p1_frames = int(2.4 * FPS)
         sb.execute_script("window.scrollTo(0, 0);")
         top_frame = sb.driver.get_screenshot_as_png()
         for _ in range(p1_frames):
             proc.stdin.write(top_frame)
             
-        # Phase 2: 1.0 to 4.2s (80 frames) 100% UNIQUE FRAMES Scroll down to job text (0 -> MAX_SCROLL_Y)
-        p2_frames = int(3.2 * FPS)
+        # Phase 2: 0.3s lightning-fast flick down (0 -> MAX_SCROLL_Y)
+        p2_frames = max(1, int(0.3 * FPS)) # 7-8 frames
         for i in range(p2_frames):
             prog = (i + 1) / float(p2_frames)
             ease = 3 * (prog ** 2) - 2 * (prog ** 3)
@@ -95,14 +95,14 @@ def generate_proposal_video(url, out_video_path, proxy=None):
             f = sb.driver.get_screenshot_as_png()
             proc.stdin.write(f)
             
-        # Phase 3: 4.2 to 5.0s (20 frames) Hold at text
-        p3_frames = int(0.8 * FPS)
+        # Phase 3: 0.35s quick glance at job description
+        p3_frames = max(1, int(0.35 * FPS)) # ~9 frames
         bottom_frame = sb.driver.get_screenshot_as_png()
         for _ in range(p3_frames):
             proc.stdin.write(bottom_frame)
             
-        # Phase 4: 5.0 to 6.6s (40 frames) 100% UNIQUE FRAMES 2x Fast scroll up (MAX_SCROLL_Y -> 0)
-        p4_frames = int(1.6 * FPS)
+        # Phase 4: 0.2s lightning-fast flick back up to top (MAX_SCROLL_Y -> 0)
+        p4_frames = max(1, int(0.2 * FPS)) # 5 frames
         for i in range(p4_frames):
             prog = (i + 1) / float(p4_frames)
             ease = 3 * (prog ** 2) - 2 * (prog ** 3)
@@ -111,7 +111,7 @@ def generate_proposal_video(url, out_video_path, proxy=None):
             f = sb.driver.get_screenshot_as_png()
             proc.stdin.write(f)
             
-        # Phase 5: 6.6 to 8.15s (remaining frames) Hold at top (y=0)
+        # Phase 5: Hold at top y=0 for the rest of Scene 1
         sb.execute_script("window.scrollTo(0, 0);")
         final_top = sb.driver.get_screenshot_as_png()
         written = p1_frames + p2_frames + p3_frames + p4_frames
