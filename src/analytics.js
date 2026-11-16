@@ -386,8 +386,8 @@ function getFullMarketAnalytics(keywordFilter = null) {
     LIMIT 100
   `).all();
 
-  // 7. Sniper Opportunities (Prioritize < 5 Proposals, Fresh & Uncontested)
-  let sniperWhere = `WHERE job_status = 'open' AND is_ghost_job = 0`;
+  // 7. Sniper Opportunities (Prioritize < 5 Proposals & Client Hire Rate >= 50%)
+  let sniperWhere = `WHERE job_status = 'open' AND is_ghost_job = 0 AND client_hire_rate >= 50`;
   if (keywordFilter && keywordFilter !== 'ALL') {
     if (keywordFilter.startsWith('GROUP:')) {
       const grp = keywordFilter.slice(6).replace(/'/g, "''");
@@ -405,6 +405,7 @@ function getFullMarketAnalytics(keywordFilter = null) {
     ORDER BY 
       CASE WHEN current_proposals_tier = 'Less than 5' OR current_proposals_numeric < 5 THEN 0 ELSE 1 END ASC,
       sniper_score DESC, 
+      client_hire_rate DESC,
       posted_at DESC
     LIMIT 20
   `).all();
