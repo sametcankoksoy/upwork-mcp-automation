@@ -9,11 +9,12 @@ from seleniumbase import SB
 
 IS_LINUX = platform.system().lower() == "linux"
 
-# Locate FFmpeg
-if IS_LINUX:
+# Locate FFmpeg dynamically
+try:
+    import imageio_ffmpeg
+    FFMPEG_EXE = imageio_ffmpeg.get_ffmpeg_exe()
+except Exception:
     FFMPEG_EXE = "ffmpeg"
-else:
-    FFMPEG_EXE = r"C:\Users\root\AppData\Local\Programs\Python\Python312\Lib\site-packages\imageio_ffmpeg\binaries\ffmpeg-win-x86_64-v7.1.exe"
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS_DIR = os.path.join(PROJECT_DIR, "assets")

@@ -231,21 +231,31 @@ app.get('/api/job/:jobId', (req, res) => {
   }
 });
 
-// API: Generate Loom Video for a Job (SeleniumBase + MoviePy)
+// API: Generate Loom Video for a Job (SeleniumBase UC + Chrome + FFmpeg)
 app.post('/api/generate-loom/:jobId', (req, res) => {
   const jobId = req.params.jobId;
-  const scriptPath = path.join(__dirname, '..', 'scripts', 'stitch_loom_video.py');
+  const scriptPath = path.join(__dirname, '..', 'scripts', 'render_video_generator.py');
+  const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+  const upworkUrl = jobId.startsWith('http')
+    ? jobId
+    : (jobId.startsWith('~') ? `https://www.upwork.com/jobs/${jobId}` : `https://www.upwork.com/jobs/~02${jobId}`);
+  const outPath = path.join(videosDir, `${jobId}.mp4`);
 
-  execFile('python', [scriptPath, '--job-id', jobId], { maxBuffer: 1024 * 1024 * 10 }, (err, stdout, stderr) => {
+  console.log(`[Video-Gen] Generating video for ${jobId} -> ${upworkUrl}...`);
+
+  execFile(pythonCmd, [scriptPath, upworkUrl, outPath], { maxBuffer: 1024 * 1024 * 20, timeout: 120000 }, (err, stdout, stderr) => {
     if (err) {
-      console.error('Python video stitch error:', stderr || err.message);
-      return res.status(500).json({ error: stderr || err.message });
+      console.error('[Video-Gen] Error:', stderr || err.message);
+      return res.status(500).json({ ok: false, error: stderr || err.message });
     }
     const videoFile = `/videos/${jobId}.mp4`;
     const loomPage = `/loom/${jobId}`;
     const job = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(jobId);
     const title = job?.title || 'your project';
-    const proposalText = `Hey there,\n\nI saw your post regarding '${title}'. Instead of a long generic proposal, I recorded a quick 1-minute Loom video walking through your exact requirements and how I will execute this:\n\n👉 https://upwork-mcp-automation.onrender.com/loom/${jobId}\n\nLet me know what you think after watching, and we can discuss next steps!\n\nBest,\nSamet Can Koksoy`;
+    const host = req.get('host') || `localhost:${PORT}`;
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    const baseUrl = `${protocol}://${host}`;
+    const proposalText = `Hey there,\n\nI saw your post regarding '${title}'. Instead of a long generic proposal, I recorded a quick 1-minute Loom video walking through your exact requirements and how I will execute this:\n\n👉 ${baseUrl}/loom/${jobId}\n\nLet me know what you think after watching, and we can discuss next steps!\n\nBest,\nSamet Can Koksoy`;
 
     res.json({
       ok: true,
