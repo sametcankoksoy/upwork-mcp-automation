@@ -143,10 +143,14 @@ def generate_proposal_video(url, out_video_path, proxy=None):
     ]
     subprocess.run(cmd_s1, check=True)
     
-    print("Con-catenating Scene 1 & Scene 2 with 1.15x speed...")
+    print("Con-catenating Scene 1 & Scene 2 with 1.15x speed & burned subtitles...")
+    srt_path = os.path.abspath(os.path.join(ASSETS_DIR, "subtitles_master.srt")).replace("\\", "/")
+    escaped_srt = srt_path.replace(":", r"\:")
+    sub_style = "FontName=Arial,FontSize=22,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=3,Outline=2,BackColour=&H80000000,MarginV=45"
+    
     filter_concat = (
         f"[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[cv][ca];"
-        f"[cv]setpts=PTS/{SPEED}[v];"
+        f"[cv]setpts=PTS/{SPEED},subtitles='{escaped_srt}':force_style='{sub_style}'[v];"
         f"[ca]atempo={SPEED}[a]"
     )
     cmd_concat = [
