@@ -12,17 +12,17 @@ Style: Default,Arial,34,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:01.10,0:00:02.45,Default,,0,0,0,,Hey, how's it going?
-Dialogue: 0,0:00:02.45,0:00:04.15,Default,,0,0,0,,I was just looking at your job post\Nright here
-Dialogue: 0,0:00:04.15,0:00:05.75,Default,,0,0,0,,This is honestly right up my alley
-Dialogue: 0,0:00:05.75,0:00:07.85,Default,,0,0,0,,I have direct experience\Nworking on these types of projects
-Dialogue: 0,0:00:08.85,0:00:11.15,Default,,0,0,0,,And if we head over\Nto my profile right here
-Dialogue: 0,0:00:11.15,0:00:13.00,Default,,0,0,0,,You can see that I've never had a bad review
-Dialogue: 0,0:00:13.00,0:00:14.70,Default,,0,0,0,,And I've done a lot of work on Upwork
-Dialogue: 0,0:00:14.70,0:00:17.40,Default,,0,0,0,,You can even see real examples\Nof me building automations right here
-Dialogue: 0,0:00:17.40,0:00:19.70,Default,,0,0,0,,And I have a 100% Job Success Score
-Dialogue: 0,0:00:19.70,0:00:23.50,Default,,0,0,0,,Which means I've consistently delivered\Ngreat results for my previous clients
+Dialogue: 0,0:00:01.10,0:00:02.45,Default,,0,0,0,,Hey how's it going?
+Dialogue: 0,0:00:02.45,0:00:04.15,Default,,0,0,0,,I was just looking your job post\Nright here
+Dialogue: 0,0:00:04.15,0:00:05.75,Default,,0,0,0,,this is honestly right up my alley.
+Dialogue: 0,0:00:05.75,0:00:07.85,Default,,0,0,0,,I've direct experience\Nworking on these types of projects
+Dialogue: 0,0:00:08.85,0:00:11.15,Default,,0,0,0,,and if you actually you head over\Nto my profile right here,
+Dialogue: 0,0:00:11.15,0:00:13.00,Default,,0,0,0,,you can see that\NI've never had a bad review
+Dialogue: 0,0:00:13.00,0:00:14.70,Default,,0,0,0,,and I've done a lot of work on upwork
+Dialogue: 0,0:00:14.70,0:00:17.40,Default,,0,0,0,,you can even see real examples\Nof me building automations right here
+Dialogue: 0,0:00:17.40,0:00:19.70,Default,,0,0,0,,and I have 100% jss
+Dialogue: 0,0:00:19.70,0:00:23.50,Default,,0,0,0,,which means I've consistently delivered\Ngreat results for my previous clients .
 Dialogue: 0,0:00:24.80,0:00:27.10,Default,,0,0,0,,I'd love to work with you too
-Dialogue: 0,0:00:27.10,0:00:30.40,Default,,0,0,0,,I just wanted to introduce myself\Nand give you a better idea
-Dialogue: 0,0:00:30.40,0:00:32.10,Default,,0,0,0,,Of who's behind the proposal
-Dialogue: 0,0:00:32.10,0:00:35.30,Default,,0,0,0,,Thanks for taking the time to watch, speak soon!
+Dialogue: 0,0:00:27.10,0:00:30.40,Default,,0,0,0,,and I just wanted to quickly introduce myself\Nand give you a better idea
+Dialogue: 0,0:00:30.40,0:00:32.10,Default,,0,0,0,,of who's behind the proposal
+Dialogue: 0,0:00:32.10,0:00:35.30,Default,,0,0,0,,and yes Thanks for taking time to watch, speak soon
