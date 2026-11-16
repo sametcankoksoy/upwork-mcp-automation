@@ -255,7 +255,8 @@ app.post('/api/generate-loom/:jobId', (req, res) => {
     const host = req.get('host') || `localhost:${PORT}`;
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
     const baseUrl = `${protocol}://${host}`;
-    const proposalText = `Hey there,\n\nI saw your post regarding '${title}'. Instead of a long generic proposal, I recorded a quick 1-minute Loom video walking through your exact requirements and how I will execute this:\n\n👉 ${baseUrl}/loom/${jobId}\n\nLet me know what you think after watching, and we can discuss next steps!\n\nBest,\nSamet Can Koksoy`;
+    const cleanTopic = title.replace(/[^a-zA-Z0-9\s,.-]/g, '').trim().toLowerCase();
+    const proposalText = `hey there, made you a quick loom video showing exactly how i'd handle this:\n\n${baseUrl}/loom/${jobId}\n\ni've done this exact style of project before, i've built ${cleanTopic}\n\nps i've never had a bad review and only 5 stars on upwork so you're in safe hands`;
 
     res.json({
       ok: true,
