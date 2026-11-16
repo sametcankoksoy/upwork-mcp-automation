@@ -1,0 +1,25 @@
+[Script Info]
+Title: Upwork Proposal Subtitles
+ScriptType: v4.00+
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+PlayResX: 1728
+PlayResY: 1080
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,24,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,3,1.5,0,2,440,40,25,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:02.80,Default,,0,0,0,,Hey, how's it going?
+Dialogue: 0,0:00:02.80,0:00:06.80,Default,,0,0,0,,I was just looking at your job post right here
+Dialogue: 0,0:00:06.80,0:00:09.80,Default,,0,0,0,,This is 100% right up my alley
+Dialogue: 0,0:00:09.80,0:00:13.80,Default,,0,0,0,,I have direct experience working on this type of project
+Dialogue: 0,0:00:13.80,0:00:17.20,Default,,0,0,0,,And if we head over to my profile right here
+Dialogue: 0,0:00:17.20,0:00:20.50,Default,,0,0,0,,You can see that I've never had a bad review
+Dialogue: 0,0:00:20.50,0:00:23.20,Default,,0,0,0,,And I've done a lot of work on Upwork
+Dialogue: 0,0:00:23.20,0:00:26.80,Default,,0,0,0,,You can even see real examples of me building automations
+Dialogue: 0,0:00:26.80,0:00:30.20,Default,,0,0,0,,And I have a 100% Job Success Score
+Dialogue: 0,0:00:30.20,0:00:33.00,Default,,0,0,0,,I just wanted to introduce myself and say hi
+Dialogue: 0,0:00:33.00,0:00:35.40,Default,,0,0,0,,Thanks for watching, speak soon!
