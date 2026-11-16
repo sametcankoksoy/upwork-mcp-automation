@@ -698,7 +698,7 @@ def main():
         f"hey there, made you a quick loom video showing exactly how i'd handle this:\n\n"
         f"https://upwork-mcp-automation.onrender.com/loom/{job_id}\n\n"
         f"i've done this exact style of project before, i've built {clean_topic}\n\n"
-        f"ps i've never had a bad review and only 5 stars on upwork so you're in safe hands"
+        f"P.S: i've never had a bad review and only 5 stars on upwork so you're in safe hands"
     )
 
     result = {
