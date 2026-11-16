@@ -9,27 +9,27 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
     tailwind.config = {
       theme: {
         extend: {
           fontFamily: { sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'] },
           colors: {
-            loomBg: '#0f1015',
-            loomSurface: '#181920',
-            loomBorder: '#282a36',
+            loomBg: '#f8f9fa',
+            loomSurface: '#ffffff',
+            loomBorder: '#e5e7eb',
             loomPurple: '#625df5',
             loomPurpleHover: '#504be5',
-            loomText: '#f3f4f6',
-            loomMuted: '#9ca3af'
+            loomText: '#111827',
+            loomMuted: '#6b7280'
           }
         }
       }
     }
   </script>
   <style>
-    body { background-color: #0f1015; color: #f3f4f6; font-family: 'Inter', sans-serif; }
+    body { background-color: #f8f9fa; color: #111827; font-family: 'Inter', sans-serif; }
     /* Custom video scrubber style */
     input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none;
@@ -46,12 +46,12 @@
     }
   </style>
 </head>
-<body class="min-h-screen flex flex-col antialiased selection:bg-loomPurple/30">
+<body class="min-h-screen flex flex-col antialiased bg-[#f8f9fa] text-[#111827] selection:bg-loomPurple/20">
 
   <!-- ==========================================
-       LOOM OFFICIAL NAVBAR
+       LOOM OFFICIAL NAVBAR (CLEAN WHITE)
        ========================================== -->
-  <header class="border-b border-loomBorder bg-[#13141b] sticky top-0 z-50 px-5 py-2.5 flex items-center justify-between">
+  <header class="border-b border-gray-200 bg-white sticky top-0 z-50 px-6 py-3 flex items-center justify-between shadow-sm">
     <!-- Left: Loom Logo & Workspace -->
     <div class="flex items-center gap-3">
       <a href="https://www.loom.com" target="_blank" class="flex items-center gap-2 hover:opacity-90 transition">
@@ -63,57 +63,57 @@
           <path d="M6 16C6 13.2386 8.23858 11 11 11C13.7614 11 16 13.2386 16 16C16 18.7614 13.7614 21 11 21C8.23858 21 6 18.7614 6 16Z" fill="#4E48E8"/>
           <path d="M16 16C16 13.2386 18.2386 11 21 11C23.7614 11 26 13.2386 26 16C26 18.7614 23.7614 21 21 21C18.7614 21 16 18.7614 16 16Z" fill="#FF5E82"/>
         </svg>
-        <span class="text-white font-bold text-lg tracking-tight">loom</span>
+        <span class="text-gray-900 font-bold text-lg tracking-tight">loom</span>
       </a>
-      <span class="text-xs text-zinc-500 hidden sm:inline">|</span>
-      <span class="text-xs text-zinc-400 hidden sm:inline font-medium">Shared Video</span>
+      <span class="text-xs text-gray-300 hidden sm:inline">|</span>
+      <span class="text-xs text-gray-500 hidden sm:inline font-medium">Shared Video</span>
     </div>
 
     <!-- Right: Loom Actions (CTA, Profile) -->
-    <div class="flex items-center gap-2.5">
-      <a id="ctaUpworkBtnTop" href="#" target="_blank" rel="noopener" class="group flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#14a800] hover:bg-[#108a00] text-white text-xs font-extrabold transition-all shadow-md shadow-[#14a800]/25 transform hover:-translate-y-0.5">
-        <span class="w-5 h-5 rounded-full bg-white flex items-center justify-center flex-shrink-0 p-0.5 shadow-sm">
+    <div class="flex items-center gap-3">
+      <a id="ctaUpworkBtnTop" href="#" target="_blank" rel="noopener" class="group flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-[#14a800] hover:bg-[#108a00] text-white text-xs font-bold transition-all shadow-md shadow-[#14a800]/20 transform hover:-translate-y-0.5">
+        <span class="w-4 h-4 rounded-full bg-white flex items-center justify-center flex-shrink-0 p-0.5 shadow-sm">
           <img src="/upwork_logo.svg" alt="Upwork" class="w-full h-full object-contain" />
         </span>
         <span>Reply on Upwork</span>
-        <svg class="w-3 h-3 text-white/80 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-3 h-3 text-white/90 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
         </svg>
       </a>
 
       <!-- Profile Avatar -->
-      <a href="https://www.upwork.com/freelancers/~01e3cadc4c04e077b1" target="_blank" rel="noopener" title="Sametcan Koksoy Upwork Profile" class="w-8 h-8 rounded-full overflow-hidden border border-white/20 hover:border-emerald-400 transition ml-1 flex-shrink-0">
+      <a href="https://www.upwork.com/freelancers/~01e3cadc4c04e077b1" target="_blank" rel="noopener" title="Sametcan Koksoy Upwork Profile" class="w-8 h-8 rounded-full overflow-hidden border border-gray-300 hover:border-emerald-500 transition ml-1 flex-shrink-0 shadow-sm">
         <img src="/profile_pic.jpg" alt="Sametcan Koksoy" class="w-full h-full object-cover" />
       </a>
     </div>
   </header>
 
   <!-- ==========================================
-       MAIN LOOM 2-COLUMN LAYOUT
+       MAIN LOOM 2-COLUMN LAYOUT (LIGHT THEME)
        ========================================== -->
   <main class="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 flex-1 grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
 
-    <!-- SOL KOLON: Loom Video Oynatıcısı, Kontroller & AI Özeti (2 Kolon) -->
+    <!-- SOL KOLON: Loom Video Oynatıcısı & Kontroller (2 Kolon) -->
     <div class="lg:col-span-2 space-y-5">
       <!-- Video Title & Author Header -->
-      <div class="space-y-2">
-        <h1 class="text-xl sm:text-2xl font-bold text-white tracking-tight" id="loomVideoTitle">
-          Walkthrough: AI engineering consultant to audit how I build software with AI agents
+      <div class="space-y-1.5">
+        <h1 class="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight" id="loomVideoTitle">
+          Walkthrough: Upwork Project Requirements
         </h1>
-        <div class="flex flex-wrap items-center gap-3 text-xs text-zinc-400">
+        <div class="flex flex-wrap items-center gap-3 text-xs text-gray-500">
           <div class="flex items-center gap-2">
-            <a href="https://www.upwork.com/freelancers/~01e3cadc4c04e077b1" target="_blank" rel="noopener" class="w-6 h-6 rounded-full overflow-hidden border border-emerald-400/80 shadow flex-shrink-0">
+            <a href="https://www.upwork.com/freelancers/~01e3cadc4c04e077b1" target="_blank" rel="noopener" class="w-6 h-6 rounded-full overflow-hidden border border-emerald-500 shadow-sm flex-shrink-0">
               <img src="/profile_pic.jpg" alt="Sametcan Koksoy" class="w-full h-full object-cover" />
             </a>
-            <a href="https://www.upwork.com/freelancers/~01e3cadc4c04e077b1" target="_blank" rel="noopener" class="font-medium text-zinc-200 hover:text-white transition">Sametcan Koksoy</a>
+            <a href="https://www.upwork.com/freelancers/~01e3cadc4c04e077b1" target="_blank" rel="noopener" class="font-medium text-gray-800 hover:text-gray-950 transition">Sametcan Koksoy</a>
           </div>
           <span>•</span>
           <span id="loomDate">Today</span>
         </div>
       </div>
 
-      <!-- The Loom Video Player + Floating Emoji Reaction Column -->
-      <div class="relative bg-black rounded-2xl overflow-hidden shadow-2xl border border-loomBorder group">
+      <!-- The Loom Video Player Container -->
+      <div class="relative bg-black rounded-2xl overflow-hidden shadow-2xl border border-gray-200 group">
         
         <!-- Video Element -->
         <div class="relative aspect-video flex items-center justify-center bg-black">
@@ -123,32 +123,32 @@
           </video>
 
           <!-- Big Center Play Overlay (when paused) -->
-          <button id="centerPlayBtn" onclick="togglePlay()" class="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/20 transition">
+          <button id="centerPlayBtn" onclick="togglePlay()" class="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/15 transition">
             <div class="w-16 h-16 rounded-full bg-loomPurple/90 hover:bg-loomPurple flex items-center justify-center text-white shadow-2xl pl-1 transition transform group-hover:scale-105">
               <svg class="w-7 h-7 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
             </div>
           </button>
 
-          <!-- Video End Screen Overlay (Triggers when video finishes) -->
-          <div id="endScreenOverlay" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center text-center p-6 z-30 opacity-0 pointer-events-none transition-all duration-300 transform scale-95">
+          <!-- Video End Screen Overlay -->
+          <div id="endScreenOverlay" class="absolute inset-0 bg-white/95 backdrop-blur-md flex flex-col items-center justify-center text-center p-6 z-30 opacity-0 pointer-events-none transition-all duration-300 transform scale-95">
             <div class="relative mb-3">
-              <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 border-emerald-400 shadow-2xl shadow-emerald-500/30">
+              <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 border-emerald-500 shadow-2xl shadow-emerald-500/20">
                 <img src="/profile_pic.jpg" alt="Sametcan Koksoy" class="w-full h-full object-cover" />
               </div>
-              <div class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center text-xs font-black border-2 border-slate-900 shadow" title="Verified">
+              <div class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-black border-2 border-white shadow" title="Verified">
                 ✓
               </div>
             </div>
 
-            <h3 class="text-lg sm:text-2xl font-extrabold text-white tracking-tight mb-1">
+            <h3 class="text-lg sm:text-2xl font-extrabold text-gray-900 tracking-tight mb-1">
               Want to Discuss Your Project?
             </h3>
-            <p class="text-xs sm:text-sm text-zinc-300 max-w-md mb-5 leading-relaxed">
+            <p class="text-xs sm:text-sm text-gray-600 max-w-md mb-5 leading-relaxed">
               Click below to reply and chat directly on Upwork.
             </p>
 
             <div class="flex flex-wrap items-center justify-center gap-3 w-full max-w-sm">
-              <a id="endScreenCtaBtn" href="#" target="_blank" rel="noopener" class="group flex-1 min-w-[240px] py-3.5 px-5 rounded-xl bg-[#14a800] hover:bg-[#108a00] text-white font-black text-sm sm:text-base text-center transition-all duration-200 shadow-2xl shadow-[#14a800]/50 transform hover:-translate-y-0.5 flex items-center justify-center gap-3 border border-emerald-300/40">
+              <a id="endScreenCtaBtn" href="#" target="_blank" rel="noopener" class="group flex-1 min-w-[240px] py-3.5 px-5 rounded-xl bg-[#14a800] hover:bg-[#108a00] text-white font-extrabold text-sm sm:text-base text-center transition-all duration-200 shadow-xl shadow-[#14a800]/30 transform hover:-translate-y-0.5 flex items-center justify-center gap-3">
                 <span class="w-8 h-8 rounded-full bg-white flex items-center justify-center flex-shrink-0 shadow-md p-1.5 group-hover:scale-105 transition-transform">
                   <img src="/upwork_logo.svg" alt="Upwork" class="w-full h-full object-contain" />
                 </span>
@@ -157,7 +157,7 @@
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
                 </svg>
               </a>
-              <button onclick="replayVideo()" class="py-3 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-zinc-200 text-xs font-bold transition flex items-center gap-1.5 border border-white/10">
+              <button onclick="replayVideo()" class="py-3 px-4 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition flex items-center gap-1.5 border border-gray-200">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                 <span>Replay</span>
               </button>
@@ -166,16 +166,16 @@
 
           <!-- Loom Floating Emoji Reactions (Iconic Loom Feature!) -->
           <div class="absolute right-3.5 bottom-16 flex flex-col gap-2 z-20">
-            <button onclick="sendReaction('👍')" class="reaction-pill w-9 h-9 rounded-full bg-black/60 backdrop-blur border border-white/10 flex items-center justify-center text-sm shadow-lg hover:bg-black/80">
+            <button onclick="sendReaction('👍')" class="reaction-pill w-9 h-9 rounded-full bg-white/90 backdrop-blur border border-gray-200 flex items-center justify-center text-sm shadow-md hover:bg-white">
               👍
             </button>
-            <button onclick="sendReaction('❤️')" class="reaction-pill w-9 h-9 rounded-full bg-black/60 backdrop-blur border border-white/10 flex items-center justify-center text-sm shadow-lg hover:bg-black/80">
+            <button onclick="sendReaction('❤️')" class="reaction-pill w-9 h-9 rounded-full bg-white/90 backdrop-blur border border-gray-200 flex items-center justify-center text-sm shadow-md hover:bg-white">
               ❤️
             </button>
-            <button onclick="sendReaction('🚀')" class="reaction-pill w-9 h-9 rounded-full bg-black/60 backdrop-blur border border-white/10 flex items-center justify-center text-sm shadow-lg hover:bg-black/80">
+            <button onclick="sendReaction('🚀')" class="reaction-pill w-9 h-9 rounded-full bg-white/90 backdrop-blur border border-gray-200 flex items-center justify-center text-sm shadow-md hover:bg-white">
               🚀
             </button>
-            <button onclick="sendReaction('🔥')" class="reaction-pill w-9 h-9 rounded-full bg-black/60 backdrop-blur border border-white/10 flex items-center justify-center text-sm shadow-lg hover:bg-black/80">
+            <button onclick="sendReaction('🔥')" class="reaction-pill w-9 h-9 rounded-full bg-white/90 backdrop-blur border border-gray-200 flex items-center justify-center text-sm shadow-md hover:bg-white">
               🔥
             </button>
           </div>
@@ -197,7 +197,7 @@
                 <svg id="playIcon" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                 <svg id="pauseIcon" class="w-4 h-4 fill-current hidden" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
               </button>
-              <span id="timeDisplay" class="font-mono text-[11px] text-zinc-400">0:00 / 0:15</span>
+              <span id="timeDisplay" class="font-mono text-[11px] text-zinc-400">0:00 / 0:35</span>
             </div>
 
             <div class="flex items-center gap-3">
@@ -214,55 +214,55 @@
         </div>
       </div>
 
-      <!-- Loom Call-to-Action Banner -->
-      <div class="p-4 rounded-xl bg-gradient-to-r from-loomPurple/20 via-loomPurple/10 to-transparent border border-loomPurple/30 flex flex-wrap items-center justify-between gap-4">
+      <!-- Loom Call-to-Action Banner (White Theme) -->
+      <div class="p-5 rounded-2xl bg-white border border-gray-200 flex flex-wrap items-center justify-between gap-4 shadow-sm">
         <div class="space-y-0.5">
-          <div class="text-sm font-bold text-white">Ready to execute this project?</div>
-          <p class="text-xs text-zinc-300">I have reviewed your job post and can discuss details anytime.</p>
+          <div class="text-sm font-bold text-gray-900">Ready to execute this project?</div>
+          <p class="text-xs text-gray-500">I have reviewed your job post and can discuss details anytime.</p>
         </div>
-        <a id="ctaUpworkBtnMain" href="#" target="_blank" rel="noopener" class="group px-4 py-2.5 rounded-xl bg-[#14a800] hover:bg-[#108a00] text-white text-xs font-extrabold transition-all shadow-lg shadow-[#14a800]/25 flex items-center gap-2.5 border border-emerald-400/30 transform hover:-translate-y-0.5">
+        <a id="ctaUpworkBtnMain" href="#" target="_blank" rel="noopener" class="group px-4 py-2.5 rounded-xl bg-[#14a800] hover:bg-[#108a00] text-white text-xs font-bold transition-all shadow-md shadow-[#14a800]/20 flex items-center gap-2.5 transform hover:-translate-y-0.5">
           <span class="w-5 h-5 rounded-full bg-white flex items-center justify-center flex-shrink-0 p-0.5 shadow-sm">
             <img src="/upwork_logo.svg" alt="Upwork" class="w-full h-full object-contain" />
           </span>
           <span class="tracking-wide">Chat on Upwork</span>
-          <svg class="w-3 h-3 text-white/80 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+          <svg class="w-3 h-3 text-white/90 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
         </a>
       </div>
     </div>
 
-    <!-- SAĞ KOLON: UPWORK PROFİL KARTI & DİREKT MESAJ BUTONU (Sticky Sidebar) -->
+    <!-- SAĞ KOLON: UPWORK PROFİL KARTI & DİREKT MESAJ BUTONU (Sticky Sidebar - White Theme) -->
     <aside class="space-y-5 lg:sticky lg:top-20">
       
       <!-- Ana Profil Kartı -->
-      <div class="bg-loomSurface border border-loomBorder rounded-2xl p-6 space-y-5 shadow-xl relative overflow-hidden">
+      <div class="bg-white border border-gray-200 rounded-2xl p-6 space-y-5 shadow-lg relative overflow-hidden">
         <!-- Upwork Top Rated Badge Header -->
-        <div class="flex items-center justify-between border-b border-loomBorder/60 pb-3">
-          <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#1F57C3]/15 border border-[#1F57C3]/40 text-[#60a5fa] shadow-sm">
-            <span class="w-5 h-5 flex items-center justify-center flex-shrink-0">
+        <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#1F57C3]/10 border border-[#1F57C3]/30 text-[#1F57C3] shadow-sm">
+            <span class="w-4 h-4 flex items-center justify-center flex-shrink-0">
               <img src="/top_rated_badge.svg" alt="Top Rated" class="w-full h-full object-contain" />
             </span>
-            <span class="text-white text-xs sm:text-sm font-extrabold tracking-wide">Top Rated Freelancer</span>
+            <span class="text-xs font-bold tracking-wide">Top Rated Freelancer</span>
           </div>
-          <span class="text-[11px] text-zinc-400 font-medium">Top 1% Tier</span>
+          <span class="text-[11px] text-gray-400 font-medium">Top 1% Tier</span>
         </div>
 
         <!-- Profil Foto & Başlık -->
         <div class="flex items-center gap-4 pt-1">
           <div class="relative flex-shrink-0">
-            <a href="https://www.upwork.com/freelancers/~01e3cadc4c04e077b1" target="_blank" rel="noopener" class="block w-16 h-16 rounded-full overflow-hidden border-2 border-emerald-400 shadow-xl hover:scale-105 transition transform">
+            <a href="https://www.upwork.com/freelancers/~01e3cadc4c04e077b1" target="_blank" rel="noopener" class="block w-16 h-16 rounded-full overflow-hidden border-2 border-emerald-500 shadow-md hover:scale-105 transition transform">
               <img src="/profile_pic.jpg" alt="Sametcan Koksoy" class="w-full h-full object-cover" />
             </a>
-            <div class="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center text-[10px] font-bold border-2 border-loomSurface shadow" title="Payment & Identity Verified">
+            <div class="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold border-2 border-white shadow" title="Payment & Identity Verified">
               ✓
             </div>
           </div>
           <div>
-            <a href="https://www.upwork.com/freelancers/~01e3cadc4c04e077b1" target="_blank" rel="noopener" class="text-base font-bold text-white hover:text-emerald-400 transition flex items-center gap-1.5">
+            <a href="https://www.upwork.com/freelancers/~01e3cadc4c04e077b1" target="_blank" rel="noopener" class="text-base font-bold text-gray-900 hover:text-emerald-600 transition flex items-center gap-1.5">
               <span>Sametcan Koksoy</span>
-              <span class="text-xs text-zinc-400">↗</span>
+              <span class="text-xs text-gray-400">↗</span>
             </a>
-            <div class="text-xs text-emerald-400 font-semibold mt-0.5">Fullstack Developer | Python | AI</div>
-            <div class="flex items-center gap-1.5 text-[11px] text-zinc-300 mt-0.5">
+            <div class="text-xs text-emerald-600 font-semibold mt-0.5">Fullstack Developer | Python | AI</div>
+            <div class="flex items-center gap-1.5 text-[11px] text-gray-500 mt-0.5">
               <span class="w-3.5 h-3.5 flex items-center justify-center flex-shrink-0">
                 <img src="/top_rated_badge.svg" alt="Top Rated" class="w-full h-full object-contain" />
               </span>
@@ -273,31 +273,31 @@
 
         <!-- Başarı İstatistikleri Grid -->
         <div class="grid grid-cols-2 gap-2.5 pt-2 text-xs">
-          <div class="p-3 rounded-xl bg-black/40 border border-loomBorder/80">
-            <div class="text-[10px] text-zinc-400 uppercase font-semibold">Job Success</div>
-            <div class="text-base font-extrabold text-emerald-400 mt-0.5">100%</div>
-            <div class="text-[10px] text-zinc-500">Top 1% Tier</div>
+          <div class="p-3 rounded-xl bg-gray-50 border border-gray-100">
+            <div class="text-[10px] text-gray-500 uppercase font-semibold">Job Success</div>
+            <div class="text-base font-extrabold text-emerald-600 mt-0.5">100%</div>
+            <div class="text-[10px] text-gray-400">Top 1% Tier</div>
           </div>
-          <div class="p-3 rounded-xl bg-black/40 border border-loomBorder/80">
-            <div class="text-[10px] text-zinc-400 uppercase font-semibold">Client Rating</div>
-            <div class="text-base font-extrabold text-amber-400 mt-0.5">5.0 ★</div>
-            <div class="text-[10px] text-zinc-500">Perfect Score</div>
+          <div class="p-3 rounded-xl bg-gray-50 border border-gray-100">
+            <div class="text-[10px] text-gray-500 uppercase font-semibold">Client Rating</div>
+            <div class="text-base font-extrabold text-amber-500 mt-0.5">5.0 ★</div>
+            <div class="text-[10px] text-gray-400">Perfect Score</div>
           </div>
-          <div class="p-3 rounded-xl bg-black/40 border border-loomBorder/80">
-            <div class="text-[10px] text-zinc-400 uppercase font-semibold">Response Time</div>
-            <div class="text-base font-extrabold text-sky-400 mt-0.5">&lt; 15 min</div>
-            <div class="text-[10px] text-zinc-500">Fast Async</div>
+          <div class="p-3 rounded-xl bg-gray-50 border border-gray-100">
+            <div class="text-[10px] text-gray-500 uppercase font-semibold">Response Time</div>
+            <div class="text-base font-extrabold text-sky-600 mt-0.5">&lt; 15 min</div>
+            <div class="text-[10px] text-gray-400">Fast Async</div>
           </div>
-          <div class="p-3 rounded-xl bg-black/40 border border-loomBorder/80">
-            <div class="text-[10px] text-zinc-400 uppercase font-semibold">Delivery</div>
-            <div class="text-base font-extrabold text-purple-400 mt-0.5">On-Time</div>
-            <div class="text-[10px] text-zinc-500">100% Guarantee</div>
+          <div class="p-3 rounded-xl bg-gray-50 border border-gray-100">
+            <div class="text-[10px] text-gray-500 uppercase font-semibold">Delivery</div>
+            <div class="text-base font-extrabold text-purple-600 mt-0.5">On-Time</div>
+            <div class="text-[10px] text-gray-400">100% Guarantee</div>
           </div>
         </div>
 
         <!-- BÜYÜK DİREKT MESAJ BUTONU (RESMİ UPWORK YEŞİLİ & LOGOSU) -->
         <div class="pt-2 space-y-2.5">
-          <a id="ctaUpworkSidebarBtn" href="#" target="_blank" rel="noopener" class="group w-full block py-3.5 px-4 rounded-xl bg-[#14a800] hover:bg-[#108a00] text-white font-black text-sm text-center transition-all duration-200 shadow-xl shadow-[#14a800]/40 transform hover:-translate-y-0.5 border border-emerald-300/40 flex items-center justify-center gap-3">
+          <a id="ctaUpworkSidebarBtn" href="#" target="_blank" rel="noopener" class="group w-full block py-3.5 px-4 rounded-xl bg-[#14a800] hover:bg-[#108a00] text-white font-extrabold text-sm text-center transition-all duration-200 shadow-xl shadow-[#14a800]/25 transform hover:-translate-y-0.5 flex items-center justify-center gap-3">
             <span class="w-8 h-8 rounded-full bg-white flex items-center justify-center flex-shrink-0 shadow-md p-1.5 group-hover:scale-105 transition-transform">
               <img src="/upwork_logo.svg" alt="Upwork" class="w-full h-full object-contain" />
             </span>
@@ -306,20 +306,20 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
             </svg>
           </a>
-          <p class="text-[11px] text-center text-zinc-400">
+          <p class="text-[11px] text-center text-gray-500">
             Clicking opens the Upwork chat directly for your job.
           </p>
         </div>
 
         <!-- Yetenek Rozetleri -->
-        <div class="pt-3 border-t border-loomBorder space-y-2">
-          <div class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Specialized Skills</div>
+        <div class="pt-3 border-t border-gray-100 space-y-2">
+          <div class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Specialized Skills</div>
           <div class="flex flex-wrap gap-1.5 text-[11px]">
-            <span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-200 border border-zinc-700 font-medium">AI Agents &amp; LLMs</span>
-            <span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-200 border border-zinc-700 font-medium">Python &amp; FastAPI</span>
-            <span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-200 border border-zinc-700 font-medium">Web Scraping</span>
-            <span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-200 border border-zinc-700 font-medium">Node.js / React</span>
-            <span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-200 border border-zinc-700 font-medium">n8n / Automations</span>
+            <span class="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-800 border border-gray-200 font-medium">AI Agents &amp; LLMs</span>
+            <span class="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-800 border border-gray-200 font-medium">Python &amp; FastAPI</span>
+            <span class="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-800 border border-gray-200 font-medium">Web Scraping</span>
+            <span class="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-800 border border-gray-200 font-medium">Node.js / React</span>
+            <span class="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-800 border border-gray-200 font-medium">n8n / Automations</span>
           </div>
         </div>
       </div>
@@ -370,9 +370,10 @@
       centerPlayBtn.classList.add('hidden');
     }
 
+    // Toggle Play/Pause
     function togglePlay() {
-      hideEndScreen();
       if (video.paused) {
+        hideEndScreen();
         video.play();
         playIcon.classList.add('hidden');
         pauseIcon.classList.remove('hidden');
@@ -385,18 +386,19 @@
       }
     }
 
+    // Format Time mm:ss
+    function formatTime(s) {
+      if (isNaN(s)) return '0:00';
+      const m = Math.floor(s / 60);
+      const sec = Math.floor(s % 60);
+      return `${m}:${sec.toString().padStart(2, '0')}`;
+    }
+
+    // Update Progress
     video.addEventListener('timeupdate', () => {
-      const cur = video.currentTime;
-      const dur = video.duration || 1;
-      const pct = (cur / dur) * 100;
-      progressBar.style.width = pct + '%';
-      
-      const formatTime = (t) => {
-        const m = Math.floor(t / 60);
-        const s = Math.floor(t % 60);
-        return `${m}:${s < 10 ? '0' : ''}${s}`;
-      };
-      timeDisplay.textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
+      const pct = (video.currentTime / video.duration) * 100 || 0;
+      progressBar.style.width = `${pct}%`;
+      timeDisplay.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration || 35)}`;
     });
 
     video.addEventListener('ended', () => {
@@ -405,72 +407,75 @@
       showEndScreen();
     });
 
+    // Seek Click
     function seekVideo(e) {
-      hideEndScreen();
       const rect = e.currentTarget.getBoundingClientRect();
       const pos = (e.clientX - rect.left) / rect.width;
       video.currentTime = pos * video.duration;
     }
 
+    // Speed Cycle
     function cycleSpeed() {
       currentSpeedIdx = (currentSpeedIdx + 1) % speeds.length;
       const s = speeds[currentSpeedIdx];
       video.playbackRate = s;
-      speedBtn.textContent = s + 'x';
+      speedBtn.textContent = `${s}x`;
     }
 
+    // Fullscreen Toggle
     function toggleFullscreen() {
       if (!document.fullscreenElement) {
-        video.requestFullscreen().catch(() => {});
+        video.requestFullscreen().catch(err => console.log(err));
       } else {
-        document.exitFullscreen().catch(() => {});
+        document.exitFullscreen();
       }
     }
 
+    // Floating Reactions Animation
     function sendReaction(emoji) {
-      showToast(`${emoji} Reaction added!`);
+      const el = document.createElement('div');
+      el.textContent = emoji;
+      el.className = 'fixed text-3xl pointer-events-none z-50 animate-bounce transition-all duration-700';
+      el.style.right = '40px';
+      el.style.bottom = '120px';
+      document.body.appendChild(el);
+      setTimeout(() => {
+        el.style.transform = 'translateY(-120px) scale(1.6)';
+        el.style.opacity = '0';
+      }, 50);
+      setTimeout(() => el.remove(), 800);
     }
 
-    function showToast(msg) {
-      const t = document.getElementById('toast');
-      t.textContent = msg;
-      t.style.opacity = '1';
-      setTimeout(() => { t.style.opacity = '0'; }, 2500);
-    }
-
-    // Load Job Data & Video
-    async function loadJob() {
+    // Load Job Details and Video
+    async function initPage() {
       try {
         const res = await fetch(`/api/job/${jobId}`);
         const job = await res.json();
-
-        const title = (job && job.title) ? job.title : 'AI engineering consultant to audit how I build software with AI agents, top to bottom';
-        document.title = `${title} | Loom`;
-        const titleEl = document.getElementById('loomVideoTitle');
-        if (titleEl) {
-          titleEl.textContent = title.toLowerCase().startsWith('walkthrough') ? title : `Walkthrough: ${title}`;
+        
+        if (job.title) {
+          document.getElementById('loomVideoTitle').textContent = `Walkthrough: ${job.title}`;
+          document.getElementById('pageTitle').textContent = `Loom | ${job.title}`;
         }
+        
+        const upworkJobUrl = jobId.startsWith('http')
+          ? jobId
+          : (jobId.startsWith('~') ? `https://www.upwork.com/jobs/${jobId}` : `https://www.upwork.com/jobs/~02${jobId}`);
 
-        const upworkUrl = `https://www.upwork.com/jobs/~02${job.job_id || jobId}`;
-        const topBtn = document.getElementById('ctaUpworkBtnTop');
-        if (topBtn) topBtn.href = upworkUrl;
-        const mainBtn = document.getElementById('ctaUpworkBtnMain');
-        if (mainBtn) mainBtn.href = upworkUrl;
-        const ctaSidebar = document.getElementById('ctaUpworkSidebarBtn');
-        if (ctaSidebar) ctaSidebar.href = upworkUrl;
-        const endBtn = document.getElementById('endScreenCtaBtn');
-        if (endBtn) endBtn.href = upworkUrl;
+        document.getElementById('ctaUpworkBtnTop').href = upworkJobUrl;
+        document.getElementById('ctaUpworkBtnMain').href = upworkJobUrl;
+        document.getElementById('ctaUpworkSidebarBtn').href = upworkJobUrl;
+        document.getElementById('endScreenCtaBtn').href = upworkJobUrl;
 
-        // Set video source
-        const videoSrc = document.getElementById('videoSrc');
-        videoSrc.src = `/videos/${job.job_id || jobId}.mp4`;
+        // Video source
+        const videoSrc = job.video_url || `/videos/${jobId}.mp4`;
+        document.getElementById('videoSrc').src = videoSrc;
         video.load();
       } catch (err) {
-        console.error('Error loading job details:', err);
+        console.error('Failed to load job:', err);
       }
     }
 
-    loadJob();
+    window.addEventListener('DOMContentLoaded', initPage);
   </script>
 </body>
 </html>
