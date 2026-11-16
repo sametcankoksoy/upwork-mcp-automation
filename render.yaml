@@ -1,10 +1,9 @@
 services:
   - type: web
     name: upwork-market-intelligence
-    env: node
+    env: docker
     plan: free
-    buildCommand: npm install
-    startCommand: node src/server.js
+    dockerfilePath: Dockerfile
     envVars:
       - key: NODE_ENV
         value: production

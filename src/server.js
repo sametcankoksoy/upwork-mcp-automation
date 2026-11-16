@@ -12,7 +12,8 @@ const { createAuthorizationUrl, exchangeCodeForTokens, getValidAccessToken } = r
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '100mb' }));
+app.use(express.raw({ type: 'application/octet-stream', limit: '100mb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // Ensure public/videos directory exists and serve statically
@@ -21,6 +22,41 @@ if (!fs.existsSync(videosDir)) {
   fs.mkdirSync(videosDir, { recursive: true });
 }
 app.use('/videos', express.static(videosDir));
+
+// Test endpoint to benchmark and verify headless SeleniumBase + Chrome + FFmpeg video generation on Render
+app.get('/api/test-render-video', (req, res) => {
+  const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+  const scriptPath = path.join(__dirname, '..', 'scripts', 'render_video_generator.py');
+  const startMem = process.memoryUsage();
+  console.log('[Render-Test] Starting test video generation on Render...');
+
+  execFile(pythonCmd, [scriptPath], { timeout: 120000 }, (err, stdout, stderr) => {
+    const endMem = process.memoryUsage();
+    if (err) {
+      console.error('[Render-Test] Error generating video:', err, stderr);
+      return res.status(500).json({
+        success: false,
+        error: err.message,
+        stderr: stderr.slice(-1000),
+        stdout: stdout.slice(-1000),
+        memoryMB: {
+          startRSS: Math.round(startMem.rss / 1024 / 1024),
+          endRSS: Math.round(endMem.rss / 1024 / 1024)
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      stdout: stdout.slice(-1000),
+      memoryMB: {
+        startRSS: Math.round(startMem.rss / 1024 / 1024),
+        endRSS: Math.round(endMem.rss / 1024 / 1024)
+      },
+      videoUrl: '/videos/test_render_engine.mp4'
+    });
+  });
+});
 
 // API: Full Market Intelligence Analytics
 app.get('/api/analytics', async (req, res) => {
