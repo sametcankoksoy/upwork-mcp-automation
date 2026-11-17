@@ -108,35 +108,24 @@
     </div>
 
     <!-- 3. BOOKING CARD ("Book a quick Upwork call") -->
-    <div class="bg-white rounded-3xl p-6 sm:p-10 border border-gray-200/90 shadow-sm mt-4 text-center">
+    <div id="bookingCard" class="bg-white rounded-3xl p-6 sm:p-10 border border-gray-200/90 shadow-sm mt-4 text-center">
       <!-- Avatar -->
       <a href="https://www.upwork.com/freelancers/~01e3cadc4c04e077b1" target="_blank" rel="noopener" class="relative w-20 h-20 mx-auto block hover:opacity-95 transition">
         <img src="/profile_pic.jpg" alt="Author Profile" class="w-20 h-20 rounded-full object-cover border-2 border-white shadow-md mx-auto" />
-        <!-- Top Rated Shield Badge on Avatar -->
-        <span class="absolute -bottom-1 -right-1 w-6 h-6 bg-[#1f57c3] rounded-full border-2 border-white flex items-center justify-center shadow-md" title="Top Rated Freelancer">
-          <svg class="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-          </svg>
+        <!-- Top Rated Hexagon Badge on Avatar -->
+        <span class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white shadow-md flex items-center justify-center overflow-hidden bg-white" title="Top Rated Freelancer">
+          <img src="/icon_top_rated.png" alt="Top Rated" class="w-full h-full object-contain" />
         </span>
       </a>
 
-      <!-- Name & Badges -->
+      <!-- Name & Real Upwork Badges -->
       <a href="https://www.upwork.com/freelancers/~01e3cadc4c04e077b1" target="_blank" rel="noopener" class="inline-block hover:underline">
         <h2 class="text-xl font-extrabold text-gray-900 mt-3" id="authorDisplayName">Sametcan Koksoy</h2>
       </a>
-      <div class="mt-2 flex flex-wrap items-center justify-center gap-2">
-        <span class="inline-flex items-center gap-1.5 bg-[#e8f7ee] text-[#14a800] border border-[#bbf7d0] px-3.5 py-0.5 rounded-full text-xs font-bold tracking-tight shadow-sm">
-          <svg class="w-3.5 h-3.5 text-[#14a800]" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-          </svg>
-          <span>Top Rated</span>
-        </span>
-        <span class="inline-flex items-center gap-1.5 bg-[#e8f7ee] text-[#14a800] border border-[#bbf7d0] px-3.5 py-0.5 rounded-full text-xs font-bold tracking-tight shadow-sm">
-          <svg class="w-3.5 h-3.5 text-[#14a800]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
-          </svg>
-          <span>100% Job Success Score</span>
-        </span>
+      <div class="mt-2.5 flex items-center justify-center gap-3 sm:gap-4">
+        <img src="/badge_top_rated.png" alt="Top Rated" class="h-6 sm:h-7 object-contain" />
+        <span class="text-gray-300 font-light select-none">|</span>
+        <img src="/badge_jss.png" alt="100% Job Success" class="h-6 sm:h-7 object-contain" />
       </div>
 
       <!-- Main Heading -->
