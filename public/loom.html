@@ -99,7 +99,7 @@
       </div>
 
       <!-- Right: Black Pill Button -->
-      <a id="myUpworkProfileBtn" href="#" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-black hover:bg-neutral-800 text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-full transition shadow-sm transform hover:-translate-y-0.5">
+      <a id="myUpworkProfileBtn" href="https://www.upwork.com/freelancers/~01e3cadc4c04e077b1" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-black hover:bg-neutral-800 text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-full transition shadow-sm transform hover:-translate-y-0.5">
         <svg class="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"></path>
         </svg>
@@ -110,13 +110,15 @@
     <!-- 3. BOOKING CARD ("Book a quick Upwork call") -->
     <div class="bg-white rounded-3xl p-6 sm:p-10 border border-gray-200/90 shadow-sm mt-4 text-center">
       <!-- Avatar -->
-      <div class="relative w-20 h-20 mx-auto">
+      <a href="https://www.upwork.com/freelancers/~01e3cadc4c04e077b1" target="_blank" rel="noopener" class="relative w-20 h-20 mx-auto block hover:opacity-95 transition">
         <img src="/profile_pic.jpg" alt="Author Profile" class="w-20 h-20 rounded-full object-cover border-2 border-white shadow-md mx-auto" />
         <span class="absolute bottom-0.5 right-0.5 w-4 h-4 bg-[#14a800] border-2 border-white rounded-full"></span>
-      </div>
+      </a>
 
       <!-- Name & Badge -->
-      <h2 class="text-xl font-extrabold text-gray-900 mt-3" id="authorDisplayName">Sametcan Koksoy</h2>
+      <a href="https://www.upwork.com/freelancers/~01e3cadc4c04e077b1" target="_blank" rel="noopener" class="inline-block hover:underline">
+        <h2 class="text-xl font-extrabold text-gray-900 mt-3" id="authorDisplayName">Sametcan Koksoy</h2>
+      </a>
       <div class="mt-1">
         <span class="inline-block bg-[#e8f7ee] text-[#14a800] px-3.5 py-0.5 rounded-full text-xs font-bold tracking-tight">Top Rated · Upwork</span>
       </div>
@@ -454,8 +456,11 @@
       });
     }
 
+    const freelancerProfileUrl = 'https://www.upwork.com/freelancers/~01e3cadc4c04e077b1';
+    let currentJobUrl = '';
+
     function bookSlot(time) {
-      const targetUrl = document.getElementById('myUpworkProfileBtn').href || `https://www.upwork.com/jobs/~02${jobId}`;
+      const targetUrl = currentJobUrl || freelancerProfileUrl;
       const confirmed = confirm(`Book meeting on Upwork for:\n${document.getElementById('selectedDateLabel').textContent} at ${time}?\n\nClick OK to open Upwork message with proposal!`);
       if (confirmed) {
         window.open(targetUrl, '_blank');
@@ -465,6 +470,7 @@
     // INIT PAGE & LOAD JOB
     async function initPage() {
       renderCalendar();
+      document.getElementById('myUpworkProfileBtn').href = freelancerProfileUrl;
       try {
         const res = await fetch(`/api/job/${jobId}`);
         const job = await res.json();
@@ -473,11 +479,9 @@
           document.getElementById('pageTitle').textContent = `Walkthrough: ${job.title} | Upwork`;
         }
 
-        const upworkJobUrl = jobId.startsWith('http')
+        currentJobUrl = jobId.startsWith('http')
           ? jobId
           : (jobId.startsWith('~') ? `https://www.upwork.com/jobs/${jobId}` : `https://www.upwork.com/jobs/~02${jobId}`);
-
-        document.getElementById('myUpworkProfileBtn').href = upworkJobUrl;
 
         const videoSrc = job.video_url || `/videos/${jobId}.mp4`;
         document.getElementById('videoSrc').src = videoSrc;
