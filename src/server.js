@@ -270,6 +270,7 @@ app.post('/api/generate-loom/:jobId', (req, res) => {
 
 // Route: Loom View Player Page
 app.get('/loom/:jobId', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '..', 'public', 'loom.html'));
 });
 
