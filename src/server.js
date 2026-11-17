@@ -8,6 +8,7 @@ require('dotenv').config();
 const { db, upsertJobAndSnapshot, getSetting } = require('./db');
 const { getFullMarketAnalytics } = require('./analytics');
 const { runTrackerCycle, UPWORK_MCP_URL } = require('./upwork-tracker');
+const { getFlconsoleToken, setFlconsoleToken, runFlconsoleSyncCycle } = require('./flconsole-tracker');
 const { createAuthorizationUrl, exchangeCodeForTokens, getValidAccessToken } = require('./upwork-oauth');
 
 const app = express();
@@ -137,8 +138,34 @@ app.get('/api/jobs/:jobId/snapshots', (req, res) => {
 // API: Trigger Poll / Snapshot Update
 app.post('/api/poll', async (req, res) => {
   try {
+    if (getFlconsoleToken()) {
+      const result = await runFlconsoleSyncCycle();
+      return res.json({ ok: true, engine: 'flconsole', result });
+    }
     const result = await runTrackerCycle({ simulateStep: true });
-    res.json({ ok: true, result });
+    res.json({ ok: true, engine: 'simulation', result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// API: flconsole Status & Configuration
+app.get('/api/flconsole/status', (req, res) => {
+  const token = getFlconsoleToken();
+  const lastRun = db.prepare("SELECT * FROM bot_runs WHERE run_type = 'flconsole_mcp_sync' ORDER BY started_at DESC LIMIT 1").get();
+  res.json({
+    configured: !!token,
+    lastRun: lastRun || null
+  });
+});
+
+app.post('/api/flconsole/token', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: 'Token is required' });
+    setFlconsoleToken(token);
+    const syncRes = await runFlconsoleSyncCycle();
+    res.json({ ok: true, syncResult: syncRes });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -286,15 +313,19 @@ if (require.main === module) {
     console.log(`Upwork Market Intelligence Server running on http://localhost:${PORT}`);
   });
 
-  // Initial sync on startup if connected
+  // Initial flconsole sync on startup if token configured
   setTimeout(() => {
-    runTrackerCycle({ simulateStep: false }).catch(console.error);
+    if (getFlconsoleToken()) {
+      runFlconsoleSyncCycle().catch(console.error);
+    }
   }, 5000);
 
-  // Background polling timer every 8 minutes (rate limit safe & catches fresh jobs)
+  // Background polling timer every 1 minute with flconsole (safe & zero ban risk)
   setInterval(() => {
-    runTrackerCycle({ simulateStep: false }).catch(console.error);
-  }, 8 * 60 * 1000);
+    if (getFlconsoleToken()) {
+      runFlconsoleSyncCycle().catch(console.error);
+    }
+  }, 60 * 1000);
 
   // Self keep-alive ping every 4 minutes
   const externalUrl = process.env.RENDER_EXTERNAL_URL || 'https://upwork-mcp-automation.onrender.com';
