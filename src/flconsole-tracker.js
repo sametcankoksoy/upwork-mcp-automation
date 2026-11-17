@@ -54,24 +54,23 @@ async function callFlconsoleMcp(method, params = {}) {
   }
 }
 
-async function findJobs(query, limit = 30) {
+async function findJobs(limit = 30) {
+  // Use all active saved feeds for automated server-side tracking
   return callFlconsoleMcp('tools/call', {
     name: 'find_jobs',
     arguments: {
-      filters: {
-        q: query,
-        payment_verified: true
-      },
+      all_feeds: true,
       limit: limit
     }
   });
 }
 
-async function getJobDetails(jobId) {
+async function getJobDetails(upworkIds) {
+  const ids = Array.isArray(upworkIds) ? upworkIds : [String(upworkIds)];
   return callFlconsoleMcp('tools/call', {
     name: 'get_job_details',
     arguments: {
-      id: String(jobId)
+      upwork_ids: ids.slice(0, 5)
     }
   });
 }
@@ -83,8 +82,8 @@ function parseMoney(val) {
   return parseFloat(cleaned) || 0;
 }
 
-function mapFlconsoleJobToDb(j, keyword) {
-  const jobId = String(j.id || j.job_id || (j.url ? j.url.split('~02').pop() : Date.now()));
+function mapFlconsoleJobToDb(j, defaultKeyword = 'AI & Automation') {
+  const jobId = String(j.upwork_id || j.id || j.job_id || Date.now());
   const isHourly = (j.job_type || '').toLowerCase().includes('hourly');
 
   let budget = 0;
@@ -92,10 +91,10 @@ function mapFlconsoleJobToDb(j, keyword) {
   let hourlyMax = 0;
 
   if (isHourly) {
-    hourlyMin = parseMoney(j.hourly_rate?.min || j.hourly_min || 0);
-    hourlyMax = parseMoney(j.hourly_rate?.max || j.hourly_max || hourlyMin);
+    hourlyMin = parseMoney(j.hourly_rate_from || j.hourly_rate?.min || 0);
+    hourlyMax = parseMoney(j.hourly_rate_to || j.hourly_rate?.max || hourlyMin);
   } else {
-    budget = parseMoney(j.budget || 0);
+    budget = parseMoney(j.fixed_budget || j.budget || 0);
   }
 
   const client = j.client || {};
@@ -104,15 +103,19 @@ function mapFlconsoleJobToDb(j, keyword) {
   const clientVerified = client.payment_verified === false ? 0 : 1;
   const clientCountry = client.country || 'United States';
 
-  const postedAt = j.published_time || j.created_date || j.posted_at || new Date().toISOString();
+  const postedAt = j.publish_at || j.published_time || new Date().toISOString();
   const title = j.title || 'Untitled Job';
   const desc = (j.description || j.snippet || '').replace(/<\/?untrusted_participant_content>/g, '').trim();
+
+  // Extract skills if available to tag keyword
+  const skills = Array.isArray(j.skills) ? j.skills.join(', ') : '';
+  const keyword = j.skills?.[0] || defaultKeyword;
 
   return {
     job_id: jobId,
     title: title,
     description: desc,
-    keyword_matched: keyword || 'AI & Automation',
+    keyword_matched: keyword,
     job_type: isHourly ? 'Hourly' : 'Fixed',
     budget: budget,
     hourly_min: hourlyMin,
@@ -121,7 +124,7 @@ function mapFlconsoleJobToDb(j, keyword) {
     checked_at: new Date().toISOString(),
     client_country: clientCountry,
     client_total_spent: clientSpent,
-    client_hire_rate: typeof client.hire_rate === 'number' ? client.hire_rate : 75,
+    client_hire_rate: typeof client.hire_rate === 'number' ? client.hire_rate : 80,
     client_total_posted: client.total_posted_jobs || client.jobs_posted || 5,
     client_total_hires: client.total_hires || 3,
     client_payment_verified: clientVerified,
@@ -147,20 +150,22 @@ async function runFlconsoleSyncCycle() {
 
   let newJobsFound = 0;
   let jobsUpdated = 0;
-  let activeKeywords = db.prepare('SELECT keyword FROM tracked_keywords WHERE active = 1').all().map(r => r.keyword);
-
-  if (activeKeywords.length === 0) {
-    activeKeywords = ['Playwright', 'Web Scraping', 'AI Agent', 'Python Automation'];
-  }
 
   try {
-    // Single consolidated search query to minimize API calls and capture maximum relevant gigs
-    const combinedQuery = activeKeywords.slice(0, 6).map(k => `"${k}"`).join(' OR ');
-    const res = await findJobs(combinedQuery, 30);
+    const res = await findJobs(30);
+
+    // Handle rate limiting gracefully
+    if (res?.error?.code === 'too_early') {
+      return {
+        status: 'throttled',
+        retry_after_seconds: res.error.retry_after_seconds || 60
+      };
+    }
+
     const jobs = res?.jobs || (Array.isArray(res) ? res : []);
 
     for (const rawJob of jobs) {
-      const mapped = mapFlconsoleJobToDb(rawJob, activeKeywords[0]);
+      const mapped = mapFlconsoleJobToDb(rawJob);
       const isNew = upsertJobAndSnapshot(mapped);
       if (isNew) newJobsFound++;
       else jobsUpdated++;
@@ -175,14 +180,15 @@ async function runFlconsoleSyncCycle() {
       new Date().toISOString(),
       newJobsFound,
       jobsUpdated,
-      `Polled flconsole for [${combinedQuery}] (${newJobsFound} new, ${jobsUpdated} updated)`
+      `Polled flconsole feeds (${newJobsFound} new, ${jobsUpdated} updated)`
     );
 
     return {
       status: 'success',
       newJobsFound,
       jobsUpdated,
-      totalFetched: jobs.length
+      totalFetched: jobs.length,
+      quota: res?.quota
     };
   } catch (err) {
     db.prepare(`
