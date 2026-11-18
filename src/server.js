@@ -135,6 +135,7 @@ async function detectVisitorTimezone(req) {
 }
 
 function sendPrivatePortalLocked(req, res) {
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
   if (req.path.startsWith('/api/')) {
     return res.status(403).json({ error: 'Access denied. Direct invitation link required.' });
   }
@@ -183,8 +184,6 @@ function extractValidExternalJobId(reqPath) {
 }
 
 app.use((req, res, next) => {
-  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
-
   const isExternal = Boolean(req.headers['cf-connecting-ip']) ||
     (req.hostname && !['localhost', '127.0.0.1'].includes(req.hostname));
 
@@ -566,7 +565,6 @@ app.get(['/share/:jobId', '/loom/:jobId'], (req, res) => {
   const safeVideoUrl = escapeHtml(videoUrl);
   const safePageUrl = escapeHtml(pageUrl);
   const safeOembedUrl = escapeHtml(oembedUrl);
-  const safeToken = escapeHtml(req.params.jobId);
 
   const metaTags = `<title id="pageTitle">${safeTitle} | Loom</title>
   <meta name="description" content="${safeDesc}" />
@@ -598,7 +596,6 @@ app.get(['/share/:jobId', '/loom/:jobId'], (req, res) => {
 
   let html = fs.readFileSync(path.join(__dirname, '..', 'public', 'loom.html'), 'utf8');
   html = html.replace('<title id="pageTitle">Video Message | Upwork</title>', metaTags);
-  html = html.replace('<video id="loomVideo"', `<video id="loomVideo" poster="/thumbnails/${safeToken}.jpg"`);
 
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Content-Type', 'text/html; charset=utf-8');

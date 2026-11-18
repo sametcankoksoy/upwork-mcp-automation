@@ -33,15 +33,10 @@ FPS = 25
 MAX_SCROLL_Y = 520
 
 def save_loom_thumbnail(video_path, thumb_path):
-    """Extract a clean early frame and draw a Loom-style play button and duration pill."""
+    """Extract a clean early frame from the video for link previews."""
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise RuntimeError(f"Could not open video for thumbnail: {video_path}")
-
-    total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
-    vid_fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
-    dur_s = int(round(total_frames / vid_fps)) if total_frames > 0 else 35
-    dur_label = f"{dur_s // 60}:{dur_s % 60:02d}"
 
     cap.set(cv2.CAP_PROP_POS_FRAMES, 20)
     ret, frame = cap.read()
@@ -52,31 +47,6 @@ def save_loom_thumbnail(video_path, thumb_path):
 
     if not ret or frame is None:
         raise RuntimeError(f"Failed to read frame from video: {video_path}")
-
-    h, w = frame.shape[:2]
-    cx, cy = w // 2, h // 2
-
-    # Semi-transparent dark circular backdrop for play button
-    overlay = frame.copy()
-    cv2.circle(overlay, (cx, cy), 72, (15, 15, 15), -1, lineType=cv2.LINE_AA)
-    # Bottom-left duration badge backdrop
-    pad_x, pad_y = 40, h - 76
-    pill_w, pill_h = 112, 44
-    cv2.rectangle(overlay, (pad_x, pad_y), (pad_x + pill_w, pad_y + pill_h), (15, 15, 15), -1)
-    cv2.addWeighted(overlay, 0.68, frame, 0.32, 0, frame)
-
-    # White circle outline + centered play triangle
-    cv2.circle(frame, (cx, cy), 72, (255, 255, 255), 3, lineType=cv2.LINE_AA)
-    pts = np.array([[cx - 20, cy - 32], [cx - 20, cy + 32], [cx + 34, cy]], np.int32)
-    cv2.fillPoly(frame, [pts], (255, 255, 255), lineType=cv2.LINE_AA)
-
-    # Duration text inside bottom-left pill
-    cv2.rectangle(frame, (pad_x, pad_y), (pad_x + pill_w, pad_y + pill_h), (255, 255, 255), 1)
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    text_size = cv2.getTextSize(dur_label, font, 0.9, 2)[0]
-    tx = pad_x + (pill_w - text_size[0]) // 2
-    ty = pad_y + (pill_h + text_size[1]) // 2
-    cv2.putText(frame, dur_label, (tx, ty), font, 0.9, (255, 255, 255), 2, cv2.LINE_AA)
 
     os.makedirs(os.path.dirname(thumb_path), exist_ok=True)
     ok = cv2.imwrite(thumb_path, frame, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
