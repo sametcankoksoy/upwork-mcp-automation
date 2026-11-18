@@ -15,13 +15,103 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '100mb' }));
 app.use(express.raw({ type: 'application/octet-stream', limit: '100mb' }));
-app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // Ensure public/videos directory exists and serve statically
 const videosDir = path.join(__dirname, '..', 'public', 'videos');
 if (!fs.existsSync(videosDir)) {
   fs.mkdirSync(videosDir, { recursive: true });
 }
+
+const ALLOWED_PUBLIC_ASSETS = new Set([
+  '/badge_jss.png',
+  '/badge_top_rated.png',
+  '/icon_top_rated.png',
+  '/profile_pic.jpg',
+  '/top_rated_badge.svg',
+  '/upwork_logo.svg',
+  '/upwork_logo_white.svg',
+  '/favicon.ico'
+]);
+
+function hasValidVideo(jobId) {
+  return Boolean(
+    jobId &&
+    /^[a-zA-Z0-9_~-]+$/.test(jobId) &&
+    fs.existsSync(path.join(videosDir, `${jobId}.mp4`))
+  );
+}
+
+function sendPrivatePortalLocked(req, res) {
+  if (req.path.startsWith('/api/')) {
+    return res.status(403).json({ error: 'Access denied. Direct invitation link required.' });
+  }
+  return res.status(403).send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow, noarchive" />
+  <title>Private Video Portal</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #0b0f19; color: #e5e7eb; font-family: system-ui, -apple-system, sans-serif; }
+    .card { max-width: 420px; padding: 36px 32px; border-radius: 16px; background: #111827; border: 1px solid #1f2937; text-align: center; box-shadow: 0 20px 45px rgba(0,0,0,0.45); }
+    .badge { display: inline-block; padding: 6px 12px; border-radius: 9999px; background: rgba(239,68,68,0.12); color: #f87171; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 16px; }
+    h1 { margin: 0 0 10px; font-size: 22px; color: #f9fafb; }
+    p { margin: 0; font-size: 14px; line-height: 1.6; color: #9ca3af; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">403 Forbidden</div>
+    <h1>Private Video Portal</h1>
+    <p>This portal is restricted. A direct proposal video link is required to view content.</p>
+  </div>
+</body>
+</html>`);
+}
+
+function extractValidExternalJobId(reqPath) {
+  const loomMatch = reqPath.match(/^\/loom\/([^/]+)$/);
+  if (loomMatch) return loomMatch[1];
+
+  const apiMatch = reqPath.match(/^\/api\/job\/([^/]+)$/);
+  if (apiMatch) return apiMatch[1];
+
+  const videoMatch = reqPath.match(/^\/videos\/([^/]+)\.mp4$/);
+  if (videoMatch) return videoMatch[1];
+
+  return null;
+}
+
+app.use((req, res, next) => {
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+
+  const isExternal = Boolean(req.headers['cf-connecting-ip']) ||
+    (req.hostname && !['localhost', '127.0.0.1'].includes(req.hostname));
+
+  if (!isExternal) {
+    return next();
+  }
+
+  if (req.path === '/health') {
+    return next();
+  }
+
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    if (ALLOWED_PUBLIC_ASSETS.has(req.path)) {
+      return next();
+    }
+
+    const jobId = extractValidExternalJobId(req.path);
+    if (jobId && hasValidVideo(jobId)) {
+      return next();
+    }
+  }
+
+  return sendPrivatePortalLocked(req, res);
+});
+
+app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/videos', express.static(videosDir));
 
 // Test endpoint to benchmark and verify headless SeleniumBase + Chrome + FFmpeg video generation on Render
@@ -227,6 +317,9 @@ app.post('/api/bulk-ingest', (req, res) => {
 // API: Single Job Details
 app.get('/api/job/:jobId', (req, res) => {
   try {
+    if (!hasValidVideo(req.params.jobId)) {
+      return sendPrivatePortalLocked(req, res);
+    }
     let job = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(req.params.jobId);
     if (!job && req.params.jobId === '2119487430141316904') {
       job = {
@@ -297,6 +390,9 @@ app.post('/api/generate-loom/:jobId', (req, res) => {
 
 // Route: Loom View Player Page
 app.get('/loom/:jobId', (req, res) => {
+  if (!hasValidVideo(req.params.jobId)) {
+    return sendPrivatePortalLocked(req, res);
+  }
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '..', 'public', 'loom.html'));
 });
