@@ -115,7 +115,7 @@ function isJobEligibleForAutoProposal(job, options = {}) {
   if (job.is_ghost_job) return false;
   if ((job.sniper_score || 0) < 80) return false;
   if (!options.force && isConsultingOrNonBuildJob(job)) return false;
-  if (!options.force && Number(job.client_hire_rate || 0) < 50) return false;
+  if (!options.force && Number(job.client_hire_rate || 0) < 60) return false;
 
   // Enforce strict < 5 proposals rule
   const propsNum = Number(job.current_proposals_numeric || 0);
@@ -282,8 +282,8 @@ async function submitAutoProposalForJob(job, options = {}) {
       return { ok: false, status: 'skipped_consulting_or_non_dev', job_id: job.job_id };
     }
 
-    if (Number(job.client_hire_rate || 0) < 50) {
-      const reason = `Client hire rate is ${job.client_hire_rate}% (< 50% minimum)`;
+    if (Number(job.client_hire_rate || 0) < 60) {
+      const reason = `Client hire rate is ${job.client_hire_rate}% (< 60% minimum)`;
       recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_low_hire_rate', null, reason);
       return { ok: false, status: 'skipped_low_hire_rate', job_id: job.job_id, reason };
     }

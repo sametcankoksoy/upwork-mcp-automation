@@ -239,19 +239,13 @@ function calculateSniperScore(job) {
   let score = 50;
   const text = `${job.title || ''} ${job.description || ''}`.toLowerCase();
 
-  // 1. Client Hire Rate & Track Record
+  // 1. Client Hire Rate & Track Record (strict >= 60% required)
   if (job.client_hire_rate >= 80) {
     score += 25;
   } else if (job.client_hire_rate >= 60) {
     score += 18;
-  } else if (job.client_hire_rate < 35) {
-    if (job.client_total_posted && job.client_total_posted >= 3) {
-      score -= 30; // Habitual ghost client with zero hires
-    } else if (!job.client_payment_verified) {
-      score -= 20; // Unverified zero-history poster
-    } else {
-      score -= 8; // Fresh client with verified payment method
-    }
+  } else {
+    score -= 30;
   }
 
   // 2. Client Lifetime Spend
