@@ -111,6 +111,20 @@ db.exec(`
     client_note TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS auto_proposals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id TEXT UNIQUE NOT NULL,
+    job_title TEXT,
+    share_id TEXT,
+    share_url TEXT,
+    charged_amount REAL,
+    connects_cost INTEGER,
+    status TEXT NOT NULL,
+    preview_id TEXT,
+    details TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 function getSetting(key) {
@@ -124,6 +138,10 @@ function setSetting(key, val) {
     VALUES (?, ?, datetime('now'))
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
   `).run(key, JSON.stringify(val));
+}
+
+if (getSetting('auto_proposer_enabled') === null) {
+  setSetting('auto_proposer_enabled', true);
 }
 
 // Seed user's exact specialized niche stack

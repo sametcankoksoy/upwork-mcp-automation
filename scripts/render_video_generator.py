@@ -76,6 +76,10 @@ def generate_proposal_video(url, out_video_path, proxy=None):
         print(f"Opening URL: {url}...")
         sb.uc_open_with_reconnect(url, reconnect_time=2)
         time.sleep(2)
+
+        page_src = (sb.get_page_source() or "").lower()
+        if "this job is a private listing" in page_src or "job is no longer available" in page_src:
+            raise RuntimeError("PRIVATE_OR_CLOSED_JOB")
         
         # Clean cookie/dark filters and sticky banner popups
         try:

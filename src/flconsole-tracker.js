@@ -1,4 +1,5 @@
 const { db, upsertJobAndSnapshot, getSetting, setSetting } = require('./db');
+const { runAutoProposerCycle } = require('./auto-proposer');
 
 const FLCONSOLE_MCP_URL = process.env.FLCONSOLE_MCP_URL || 'https://mcp.lite.flconsole.com/mcp';
 
@@ -182,6 +183,10 @@ async function runFlconsoleSyncCycle() {
       jobsUpdated,
       `Polled flconsole feeds (${newJobsFound} new, ${jobsUpdated} updated)`
     );
+
+    if (newJobsFound > 0) {
+      runAutoProposerCycle(1).catch(err => console.error('[Auto-Proposer] Cycle error:', err.message));
+    }
 
     return {
       status: 'success',

@@ -2,14 +2,14 @@ const express = require('express');
 const cors = require('cors');
 const path = require('node:path');
 const fs = require('node:fs');
-const crypto = require('node:crypto');
 const { execFile } = require('node:child_process');
 require('dotenv').config();
 
-const { db, upsertJobAndSnapshot, getSetting } = require('./db');
+const { db, upsertJobAndSnapshot, getSetting, setSetting } = require('./db');
 const { getFullMarketAnalytics } = require('./analytics');
 const { runTrackerCycle, UPWORK_MCP_URL } = require('./upwork-tracker');
 const { getFlconsoleToken, setFlconsoleToken, runFlconsoleSyncCycle } = require('./flconsole-tracker');
+const { getShareHash, submitAutoProposalForJob } = require('./auto-proposer');
 const { createAuthorizationUrl, exchangeCodeForTokens, getValidAccessToken } = require('./upwork-oauth');
 
 const app = express();
@@ -45,13 +45,6 @@ const ALLOWED_PUBLIC_ASSETS = new Set([
   '/upwork_logo_white.svg',
   '/favicon.ico'
 ]);
-
-function getShareHash(jobId) {
-  if (String(jobId) === '2122421990107900101') {
-    return '7009c82cd76942468c9320b06e1f4ed4';
-  }
-  return crypto.createHash('md5').update('upwork_loom_' + String(jobId)).digest('hex');
-}
 
 function resolveVideoJobId(idOrToken) {
   if (!idOrToken || !/^[a-zA-Z0-9_~-]+$/.test(idOrToken)) {
@@ -560,6 +553,43 @@ app.get('/api/bookings', (req, res) => {
   try {
     const bookings = db.prepare('SELECT * FROM call_bookings ORDER BY id DESC LIMIT 100').all();
     res.json({ ok: true, bookings });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// API: Auto-Proposer History, Toggle & Manual Trigger (local dashboard only)
+app.get('/api/auto-proposals', (req, res) => {
+  try {
+    const proposals = db.prepare('SELECT * FROM auto_proposals ORDER BY id DESC LIMIT 100').all();
+    res.json({
+      ok: true,
+      enabled: getSetting('auto_proposer_enabled') !== false,
+      proposals
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/auto-proposals/toggle', (req, res) => {
+  try {
+    const enabled = Boolean(req.body?.enabled);
+    setSetting('auto_proposer_enabled', enabled);
+    res.json({ ok: true, enabled });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/auto-proposals/apply/:jobId', async (req, res) => {
+  try {
+    const job = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(req.params.jobId);
+    if (!job) {
+      return res.status(404).json({ ok: false, error: 'Job not found in local database' });
+    }
+    const result = await submitAutoProposalForJob(job, { dryRun: Boolean(req.body?.dryRun) });
+    res.json(result);
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
