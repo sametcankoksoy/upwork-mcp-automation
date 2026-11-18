@@ -125,9 +125,9 @@ function mapFlconsoleJobToDb(j, defaultKeyword = 'AI & Automation') {
     checked_at: new Date().toISOString(),
     client_country: clientCountry,
     client_total_spent: clientSpent,
-    client_hire_rate: typeof client.hire_rate === 'number' ? client.hire_rate : 80,
-    client_total_posted: client.total_posted_jobs || client.jobs_posted || 5,
-    client_total_hires: client.total_hires || 3,
+    client_hire_rate: typeof client.hire_rate === 'number' ? client.hire_rate : 0,
+    client_total_posted: client.posted_jobs_count ?? client.total_posted_jobs ?? client.jobs_posted ?? 0,
+    client_total_hires: client.hires_count ?? client.total_hires ?? 0,
     client_payment_verified: clientVerified,
     client_rating: clientRating || 5.0,
     current_proposals_tier: j.proposals_tier || 'Less than 5',
@@ -164,9 +164,29 @@ async function runFlconsoleSyncCycle() {
     }
 
     const jobs = res?.jobs || (Array.isArray(res) ? res : []);
+    const detailedById = new Map();
+    const newIds = jobs
+      .map(j => String(j.upwork_id || j.id || j.job_id || ''))
+      .filter(id => id && !db.prepare('SELECT 1 FROM jobs WHERE job_id = ?').get(id));
+
+    for (let i = 0; i < newIds.length; i += 5) {
+      try {
+        const detRes = await getJobDetails(newIds.slice(i, i + 5));
+        const detJobs = detRes?.jobs || (Array.isArray(detRes) ? detRes : []);
+        for (const dj of detJobs) {
+          if (dj?.upwork_id) detailedById.set(String(dj.upwork_id), dj);
+        }
+      } catch (e) {
+        console.error('[flconsole] getJobDetails enrich error:', e.message);
+      }
+    }
 
     for (const rawJob of jobs) {
-      const mapped = mapFlconsoleJobToDb(rawJob);
+      const detJob = detailedById.get(String(rawJob.upwork_id || rawJob.id || ''));
+      const fullJob = detJob
+        ? { ...rawJob, ...detJob, client: { ...(rawJob.client || {}), ...(detJob.client || {}) } }
+        : rawJob;
+      const mapped = mapFlconsoleJobToDb(fullJob);
       const isNew = upsertJobAndSnapshot(mapped);
       if (isNew) newJobsFound++;
       else jobsUpdated++;

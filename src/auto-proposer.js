@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 
-const { db, getSetting } = require('./db');
+const { db, getSetting, calculateSniperScore } = require('./db');
 const { getValidAccessToken } = require('./upwork-oauth');
 const { callUpworkMcpTool, getTalentOrgUid } = require('./upwork-tracker');
 
@@ -20,6 +20,8 @@ const TERMINAL_PROPOSAL_STATUSES = new Set([
   'skipped_private_listing',
   'skipped_already_applied',
   'skipped_already_hired',
+  'skipped_consulting_or_non_dev',
+  'skipped_low_hire_rate',
   'error_screening_answers'
 ]);
 
@@ -70,11 +72,50 @@ function toNumericJobRef(jobId) {
   return String(jobId).trim().replace(/^~?02/, '');
 }
 
+const CORE_PORTFOLIO_PROJECT_IDS = [
+  '2078414807222501376', // AI Voice Agent (Vapi,Retell,Twillio)
+  '2070886087321853952', // YouTube Automation Pipeline
+  '1968675768626176000'  // AI Resume Assistant
+];
+
+function selectPortfolioHighlights(job) {
+  const text = `${job?.title || ''}\n${job?.description || ''}`.toLowerCase();
+  let fourthId = '1979016567697829888'; // LeadHunter AI — Smart Lead Discovery
+  if (/\b(scrape|scraper|scraping|crawl|crawler|playwright|selenium|puppeteer|anti-bot|cloudflare|data extraction)\b/i.test(text)) {
+    fourthId = '1947495759757623296'; // Transfermarkt Scraper – Career Stats, Injuries & More
+  } else if (/\b(full-stack|full stack|next\.js|react|e-commerce|ecommerce|dashboard|saas|fastapi)\b/i.test(text)) {
+    fourthId = '2054242712584888320'; // Full-Stack E-Commerce Platform with Payments & Auth
+  }
+  return [...CORE_PORTFOLIO_PROJECT_IDS, fourthId];
+}
+
+function isConsultingOrNonBuildJob(job) {
+  const title = String(job?.title || '').toLowerCase();
+  const desc = String(job?.description || '').toLowerCase();
+  const text = `${title}\n${desc}`;
+
+  // Reject if title indicates consulting, coaching, mentoring, audit, or review
+  if (/\b(consultant|consulting|consultation|advisor|advisory|coach|coaching|mentor|mentoring|mentorship|tutor|tutoring|trainer|training|audit|auditor|code review|architecture review|strategy session|brainstorm|fractional cto|thought partner|teach me|walk me through)\b/i.test(title)) {
+    return true;
+  }
+
+  // Reject if description indicates advisory/coaching/audit-only work instead of hands-on building
+  if (/\b(looking for a consultant|need a consultant|seeking a consultant|consulting call|advisory role|1-on-1 coaching|one-on-one coaching|teach me how|guide me through|no coding required|no development needed|just advice|consulting only|architecture audit|audit how i build|knowledge-transfer engagement|not an outsourced development|private technical mentor|teaching nontechnical|sequence of instruction)\b/i.test(text)) {
+    return true;
+  }
+
+  // Require a clear hands-on development / engineering / building signal
+  const hasBuildSignal = /\b(build|building|develop|developer|development|engineer|engineering|implement|implementation|create|automate|automation|scrape|scraper|scraping|crawler|script|pipeline|integration|integrate|agent|bot|api|backend|full-stack|full stack|workflow|playwright|selenium|python|node\.js|nodejs)\b/i.test(text);
+  return !hasBuildSignal;
+}
+
 function isJobEligibleForAutoProposal(job, options = {}) {
   if (!job || !job.job_id) return false;
   if (job.job_status && job.job_status !== 'open') return false;
   if (job.is_ghost_job) return false;
   if ((job.sniper_score || 0) < 80) return false;
+  if (!options.force && isConsultingOrNonBuildJob(job)) return false;
+  if (!options.force && Number(job.client_hire_rate || 0) < 50) return false;
 
   // Enforce strict < 5 proposals rule
   const propsNum = Number(job.current_proposals_numeric || 0);
@@ -187,6 +228,10 @@ async function submitAutoProposalForJob(job, options = {}) {
     : (Number(job.budget) >= 150 ? Number(job.budget) : 450);
 
   if (!options.force) {
+    if (isConsultingOrNonBuildJob(job)) {
+      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_consulting_or_non_dev', null, 'Consulting, coaching, or non-development listing rejected');
+      return { ok: false, status: 'skipped_consulting_or_non_dev', job_id: job.job_id };
+    }
     const propsNum = Number(job.current_proposals_numeric || 0);
     const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
     if (propsNum >= 5 || !['less than 5', 'fewer than 5'].includes(propsTier)) {
@@ -199,6 +244,55 @@ async function submitAutoProposalForJob(job, options = {}) {
         recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_5_proposals', null, `Posted ${Math.round(minsSincePosted)}m ago (>12m freshness limit)`);
         return { ok: false, status: 'skipped_over_5_proposals', job_id: job.job_id };
       }
+    }
+
+    // Verify live client stats & full untruncated description via flconsole get_job_details
+    let detJob = null;
+    try {
+      const { getJobDetails } = require('./flconsole-tracker');
+      const detRes = await getJobDetails([job.job_id]);
+      detJob = detRes?.jobs?.[0] || null;
+      if (detJob) {
+        job.description = detJob.description || job.description;
+        job.client_hire_rate = typeof detJob.client?.hire_rate === 'number' ? detJob.client.hire_rate : job.client_hire_rate;
+        job.client_total_spent = detJob.client?.total_spent ?? job.client_total_spent;
+        job.client_total_posted = detJob.client?.posted_jobs_count ?? job.client_total_posted;
+        job.client_total_hires = detJob.client?.hires_count ?? job.client_total_hires;
+        job.sniper_score = calculateSniperScore(job);
+        db.prepare(`
+          UPDATE jobs
+          SET description = ?, client_hire_rate = ?, client_total_spent = ?, client_total_posted = ?, client_total_hires = ?, sniper_score = ?
+          WHERE job_id = ?
+        `).run(
+          job.description,
+          job.client_hire_rate,
+          job.client_total_spent,
+          job.client_total_posted,
+          job.client_total_hires,
+          job.sniper_score,
+          job.job_id
+        );
+      }
+    } catch (detErr) {
+      console.warn(`[Auto-Proposer] getJobDetails verification warning for ${job.job_id}: ${detErr.message}`);
+    }
+
+    if (isConsultingOrNonBuildJob(job)) {
+      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_consulting_or_non_dev', null, 'Full job description matched consulting/mentoring/non-development filter');
+      return { ok: false, status: 'skipped_consulting_or_non_dev', job_id: job.job_id };
+    }
+
+    if (Number(job.client_hire_rate || 0) < 50) {
+      const reason = `Client hire rate is ${job.client_hire_rate}% (< 50% minimum)`;
+      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_low_hire_rate', null, reason);
+      return { ok: false, status: 'skipped_low_hire_rate', job_id: job.job_id, reason };
+    }
+
+    const avgHourly = Number(detJob?.client?.avg_hourly_rate || 0);
+    if (avgHourly > 0 && avgHourly < 15 && Number(detJob?.client?.paid_hours || 0) >= 3) {
+      const reason = `Client avg hourly rate paid is $${avgHourly}/hr (< $15/hr minimum)`;
+      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_low_hire_rate', null, reason);
+      return { ok: false, status: 'skipped_low_hire_rate', job_id: job.job_id, reason };
     }
   }
 
@@ -223,7 +317,8 @@ async function submitAutoProposalForJob(job, options = {}) {
   const createParams = {
     job_reference: numericJobRef,
     charged_amount: chargedAmount,
-    cover_letter: coverLetter
+    cover_letter: coverLetter,
+    portfolio_project_ids: selectPortfolioHighlights(job)
   };
 
   if (!isHourly) {
@@ -428,6 +523,8 @@ async function runAutoProposerCycle(maxPerCycle = 3) {
             'skipped_private_listing',
             'skipped_already_applied',
             'skipped_already_hired',
+            'skipped_consulting_or_non_dev',
+            'skipped_low_hire_rate',
             'error_screening_answers'
           )
         )
@@ -513,6 +610,8 @@ module.exports = {
   getShareHash,
   inferClientDeliverable,
   buildRyanCoverLetter,
+  selectPortfolioHighlights,
+  isConsultingOrNonBuildJob,
   isJobEligibleForAutoProposal,
   answerScreeningQuestion,
   ensureVideoGenerated,

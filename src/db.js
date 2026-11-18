@@ -281,6 +281,15 @@ function calculateSniperScore(job) {
     score -= 45;
   }
 
+  // 4c. Consulting, Coaching, Mentoring, Audit-Only & Advisory Penalty (-55)
+  // User strictly wants hands-on development/build projects, NOT consulting or coaching
+  const titleText = String(job.title || '').toLowerCase();
+  const isConsultingJob = /\b(consultant|consulting|consultation|advisor|advisory|coach|coaching|mentor|mentoring|mentorship|tutor|tutoring|trainer|training|auditor|code review|architecture review|strategy session|brainstorm|fractional cto|thought partner|teach me|walk me through)\b/i.test(titleText)
+    || /\b(looking for a consultant|need a consultant|seeking a consultant|consulting call|advisory role|1-on-1 coaching|one-on-one coaching|teach me how|guide me through|no coding required|no development needed|just advice|consulting only|architecture audit|audit how i build|audit our)\b/i.test(text);
+  if (isConsultingJob) {
+    score -= 55;
+  }
+
   // 5. Budget / Rate Alignment (Target: Sametcan $40/hr Top Rated)
   if (job.hourly_max >= 40 || job.budget >= 1500) score += 15;
   else if (job.hourly_max >= 30 || job.budget >= 400) score += 8;
