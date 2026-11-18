@@ -14,7 +14,42 @@ const videosDir = path.join(__dirname, '..', 'public', 'videos');
 const renderScriptPath = path.join(__dirname, '..', 'scripts', 'render_video_generator.py');
 const PUBLIC_BASE_URL = process.env.PUBLIC_LOOM_URL || 'https://loom.sametcankoksoy.com';
 
+const TERMINAL_PROPOSAL_STATUSES = new Set([
+  'submitted',
+  'skipped_over_5_proposals',
+  'skipped_private_listing',
+  'skipped_already_applied',
+  'skipped_already_hired',
+  'error_screening_answers'
+]);
+
+const TRANSIENT_MCP_ERR_RE = /(fetch failed|econnreset|etimedout|socket hang up|\b502\b|\b503\b|\b504\b)/i;
+
 let isProposerRunning = false;
+let onProposalSubmitted = null;
+
+function setProposalNotificationHandler(fn) {
+  onProposalSubmitted = typeof fn === 'function' ? fn : null;
+}
+
+async function callUpworkMcpWithRetry(toolName, args, accessToken, maxAttempts = 3) {
+  let lastErr;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await callUpworkMcpTool(toolName, args, accessToken);
+    } catch (err) {
+      lastErr = err;
+      const msg = String(err?.message || '');
+      if (attempt < maxAttempts && TRANSIENT_MCP_ERR_RE.test(msg)) {
+        console.warn(`[Auto-Proposer] Transient MCP error on ${toolName} (attempt ${attempt}/${maxAttempts}): ${msg}. Retrying in 2s...`);
+        await new Promise(r => setTimeout(r, 2000));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
+}
 
 function getShareHash(jobId) {
   if (String(jobId) === '2122421990107900101') {
@@ -61,8 +96,8 @@ function isJobEligibleForAutoProposal(job, options = {}) {
     if (job.budget > 0 && job.budget < 150) return false;
   }
 
-  const alreadyProcessed = db.prepare('SELECT 1 FROM auto_proposals WHERE job_id = ?').get(job.job_id);
-  if (alreadyProcessed) return false;
+  const existingProp = db.prepare('SELECT status FROM auto_proposals WHERE job_id = ?').get(job.job_id);
+  if (existingProp && TERMINAL_PROPOSAL_STATUSES.has(existingProp.status)) return false;
 
   return true;
 }
@@ -167,33 +202,21 @@ async function submitAutoProposalForJob(job, options = {}) {
     }
   }
 
-  const strictUnder5 = options.strictUnder5 !== false && !options.force;
-  try {
-    await ensureVideoGenerated(job.job_id, strictUnder5);
-  } catch (vidErr) {
-    const errText = String(vidErr.stderr || vidErr.message || '');
-    if (errText.includes('PRIVATE_OR_CLOSED_JOB')) {
-      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_private_listing', null, 'Job is private or no longer available');
-      return { ok: false, status: 'skipped_private_listing', job_id: job.job_id };
-    }
-    if (errText.includes('PROPOSALS_OVER_5')) {
-      const tierMatch = errText.match(/PROPOSALS_OVER_5:([^\r\n]+)/);
-      const liveTier = tierMatch ? tierMatch[1].trim() : '20 to 50';
-      db.prepare('UPDATE jobs SET current_proposals_tier = ?, current_proposals_numeric = 25 WHERE job_id = ?').run(liveTier, job.job_id);
-      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_5_proposals', null, `Live Upwork page showed: ${liveTier}`);
-      return { ok: false, status: 'skipped_over_5_proposals', tier: liveTier, job_id: job.job_id };
-    }
-    recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'error_video_render', null, errText);
-    return { ok: false, status: 'error_video_render', error: errText, job_id: job.job_id };
-  }
-
   const accessToken = await getValidAccessToken();
   if (!accessToken) {
     recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'error_no_oauth', null, 'Official Upwork OAuth token missing or expired');
     return { ok: false, status: 'error_no_oauth', job_id: job.job_id };
   }
 
-  const orgUid = await getTalentOrgUid(accessToken);
+  let orgUid;
+  try {
+    orgUid = await getTalentOrgUid(accessToken);
+  } catch (orgErr) {
+    const msg = String(orgErr?.message || orgErr);
+    recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'error_preview', null, msg);
+    return { ok: false, status: 'error_preview', error: msg, job_id: job.job_id };
+  }
+
   const numericJobRef = toNumericJobRef(job.job_id);
   const coverLetter = buildRyanCoverLetter(job, shareUrl);
 
@@ -208,9 +231,10 @@ async function submitAutoProposalForJob(job, options = {}) {
     createParams.payment_mode = 'by_project';
   }
 
+  // Fast pre-flight preview check before spending 35-45s rendering Playwright video
   let previewRes;
   try {
-    previewRes = await callUpworkMcpTool(
+    previewRes = await callUpworkMcpWithRetry(
       'upwork__manage_proposals',
       {
         action: 'create',
@@ -246,10 +270,10 @@ async function submitAutoProposalForJob(job, options = {}) {
     return { ok: false, status: 'skipped_over_5_proposals', job_id: job.job_id, reason };
   }
 
-  // Handle screening questions if present
+  // Handle screening questions if present before video render
   const rawQuestions = preview.screening_questions || preview.screening_answers || [];
   if (Array.isArray(rawQuestions) && rawQuestions.length > 0) {
-    const answers = rawQuestions.map(q => {
+    createParams.answers = rawQuestions.map(q => {
       const qStr = typeof q === 'string' ? q : (q?.question || String(q));
       const cleanQ = qStr.replace(/<\/?untrusted_participant_content>/gi, '').trim();
       return {
@@ -258,9 +282,8 @@ async function submitAutoProposalForJob(job, options = {}) {
       };
     });
 
-    createParams.answers = answers;
     try {
-      previewRes = await callUpworkMcpTool(
+      previewRes = await callUpworkMcpWithRetry(
         'upwork__manage_proposals',
         {
           action: 'create',
@@ -275,6 +298,27 @@ async function submitAutoProposalForJob(job, options = {}) {
     }
   }
 
+  // Generate custom Loom video + strict live <5 proposals verification
+  const strictUnder5 = options.strictUnder5 !== false && !options.force;
+  try {
+    await ensureVideoGenerated(job.job_id, strictUnder5);
+  } catch (vidErr) {
+    const errText = String(vidErr.stderr || vidErr.message || '');
+    if (errText.includes('PRIVATE_OR_CLOSED_JOB')) {
+      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, connectsCost, 'skipped_private_listing', previewRes.preview_id, 'Job is private or no longer available');
+      return { ok: false, status: 'skipped_private_listing', job_id: job.job_id };
+    }
+    if (errText.includes('PROPOSALS_OVER_5')) {
+      const tierMatch = errText.match(/PROPOSALS_OVER_5:([^\r\n]+)/);
+      const liveTier = tierMatch ? tierMatch[1].trim() : '20 to 50';
+      db.prepare('UPDATE jobs SET current_proposals_tier = ?, current_proposals_numeric = 25 WHERE job_id = ?').run(liveTier, job.job_id);
+      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, connectsCost, 'skipped_over_5_proposals', previewRes.preview_id, `Live Upwork page showed: ${liveTier}`);
+      return { ok: false, status: 'skipped_over_5_proposals', tier: liveTier, job_id: job.job_id };
+    }
+    recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, connectsCost, 'error_video_render', previewRes.preview_id, errText);
+    return { ok: false, status: 'error_video_render', error: errText, job_id: job.job_id };
+  }
+
   if (options.dryRun) {
     return {
       ok: true,
@@ -287,20 +331,43 @@ async function submitAutoProposalForJob(job, options = {}) {
     };
   }
 
-  // Confirm & officially submit proposal via Upwork MCP
+  const confirmProposalPreview = (previewId) => callUpworkMcpWithRetry(
+    'upwork__confirm_preview',
+    {
+      action: 'confirm',
+      org_uid: orgUid,
+      params: {
+        type: 'proposal',
+        preview_id: previewId
+      }
+    },
+    accessToken
+  );
+
+  // Confirm & officially submit proposal via Upwork MCP (refresh once if preview expired during video render)
   try {
-    const confirmRes = await callUpworkMcpTool(
-      'upwork__confirm_preview',
-      {
-        action: 'confirm',
-        org_uid: orgUid,
-        params: {
-          type: 'proposal',
-          preview_id: previewRes.preview_id
-        }
-      },
-      accessToken
-    );
+    let confirmRes;
+    try {
+      confirmRes = await confirmProposalPreview(previewRes.preview_id);
+      if (confirmRes?.status === 'error') {
+        throw new Error(confirmRes.reason || JSON.stringify(confirmRes));
+      }
+    } catch (firstConfirmErr) {
+      if (!/expir|not.?found|invalid.?preview|stale/i.test(String(firstConfirmErr?.message || ''))) {
+        throw firstConfirmErr;
+      }
+      console.warn(`[Auto-Proposer] Preview ${previewRes.preview_id} expired during video render; recreating preview...`);
+      previewRes = await callUpworkMcpWithRetry(
+        'upwork__manage_proposals',
+        {
+          action: 'create',
+          org_uid: orgUid,
+          params: createParams
+        },
+        accessToken
+      );
+      confirmRes = await confirmProposalPreview(previewRes.preview_id);
+    }
 
     const status = confirmRes?.status === 'error' ? 'error_confirm' : 'submitted';
     recordAutoProposalOutcome(
@@ -315,6 +382,11 @@ async function submitAutoProposalForJob(job, options = {}) {
     );
 
     console.log(`[AUTO-PROPOSAL ${status.toUpperCase()}] Job ${job.job_id} (${job.title}) | $${chargedAmount} | ${connectsCost} Connects | ${shareUrl}`);
+
+    if (status === 'submitted' && onProposalSubmitted) {
+      Promise.resolve(onProposalSubmitted({ job, shareUrl, chargedAmount, connectsCost, confirmRes })).catch(() => {});
+    }
+
     return {
       ok: status === 'submitted',
       status,
@@ -332,7 +404,7 @@ async function submitAutoProposalForJob(job, options = {}) {
   }
 }
 
-async function runAutoProposerCycle(maxPerCycle = 1) {
+async function runAutoProposerCycle(maxPerCycle = 3) {
   if (getSetting('auto_proposer_enabled') === false) {
     return { status: 'disabled', processed: 0 };
   }
@@ -348,7 +420,17 @@ async function runAutoProposerCycle(maxPerCycle = 1) {
         AND is_ghost_job = 0
         AND sniper_score >= 80
         AND datetime(posted_at) >= datetime('now', '-6 hours')
-        AND job_id NOT IN (SELECT job_id FROM auto_proposals)
+        AND job_id NOT IN (
+          SELECT job_id FROM auto_proposals
+          WHERE status IN (
+            'submitted',
+            'skipped_over_5_proposals',
+            'skipped_private_listing',
+            'skipped_already_applied',
+            'skipped_already_hired',
+            'error_screening_answers'
+          )
+        )
       ORDER BY posted_at DESC, sniper_score DESC
       LIMIT 10
     `).all();
@@ -416,7 +498,7 @@ function inferClientDeliverable(job) {
 function buildRyanCoverLetter(job, shareUrl) {
   const deliverable = inferClientDeliverable(job);
   return [
-    `made you a quick loom showing exactly how I'd handle this: ${shareUrl}`,
+    `🔥🔥 made you a quick loom showing exactly how I'd handle this: ${shareUrl}`,
     ``,
     `I've done this exact style of project before. I've built similar ${deliverable}, so I can help you get this built and running smoothly.`,
     ``,
@@ -435,5 +517,6 @@ module.exports = {
   answerScreeningQuestion,
   ensureVideoGenerated,
   submitAutoProposalForJob,
-  runAutoProposerCycle
+  runAutoProposerCycle,
+  setProposalNotificationHandler
 };

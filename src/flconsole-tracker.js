@@ -184,9 +184,7 @@ async function runFlconsoleSyncCycle() {
       `Polled flconsole feeds (${newJobsFound} new, ${jobsUpdated} updated)`
     );
 
-    if (newJobsFound > 0) {
-      runAutoProposerCycle(1).catch(err => console.error('[Auto-Proposer] Cycle error:', err.message));
-    }
+    runAutoProposerCycle(3).catch(err => console.error('[Auto-Proposer] Cycle error:', err.message));
 
     return {
       status: 'success',

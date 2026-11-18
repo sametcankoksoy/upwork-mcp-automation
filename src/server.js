@@ -9,7 +9,7 @@ const { db, upsertJobAndSnapshot, getSetting, setSetting } = require('./db');
 const { getFullMarketAnalytics } = require('./analytics');
 const { runTrackerCycle, UPWORK_MCP_URL } = require('./upwork-tracker');
 const { getFlconsoleToken, setFlconsoleToken, runFlconsoleSyncCycle } = require('./flconsole-tracker');
-const { getShareHash, buildRyanCoverLetter, submitAutoProposalForJob } = require('./auto-proposer');
+const { getShareHash, buildRyanCoverLetter, submitAutoProposalForJob, runAutoProposerCycle, setProposalNotificationHandler } = require('./auto-proposer');
 const { createAuthorizationUrl, exchangeCodeForTokens, getValidAccessToken } = require('./upwork-oauth');
 
 const app = express();
@@ -587,8 +587,8 @@ function showWindowsBalloon(title, bodyText) {
   );
 }
 
-function notifyVideoActivity({ title, subtitle, bodyText }) {
-  console.log(`[VIDEO WATCHED] ${title} | ${subtitle} | ${bodyText}`);
+function notifyDesktopAndTelegram({ logTag = 'NOTIFY', title, subtitle, bodyText }) {
+  console.log(`[${logTag}] ${title} | ${subtitle} | ${bodyText}`);
   showWindowsBalloon(title, `${subtitle}\n${bodyText}`);
 
   const tgToken = process.env.TELEGRAM_BOT_TOKEN || getSetting('telegram_bot_token');
@@ -602,6 +602,20 @@ function notifyVideoActivity({ title, subtitle, bodyText }) {
     }).catch(() => {});
   }
 }
+
+function notifyVideoActivity({ title, subtitle, bodyText }) {
+  notifyDesktopAndTelegram({ logTag: 'VIDEO WATCHED', title, subtitle, bodyText });
+}
+
+setProposalNotificationHandler(({ job, shareUrl, chargedAmount, connectsCost }) => {
+  const rateLabel = (job?.job_type || '').toLowerCase() === 'hourly' ? `$${chargedAmount}/hr` : `$${chargedAmount}`;
+  notifyDesktopAndTelegram({
+    logTag: 'AUTO-PROPOSAL SENT',
+    title: '🔥🔥 Yeni Oto-Proposal Gönderildi!',
+    subtitle: job?.title || `Upwork İlanı (${job?.job_id || ''})`,
+    bodyText: `${rateLabel} | ${connectsCost} Connects | ${shareUrl}`
+  });
+});
 
 // API: Real-Time Video Watch Tracking & Notifications
 app.post('/api/track-view/:jobId', async (req, res) => {
@@ -838,19 +852,30 @@ if (require.main === module) {
     console.log(`Upwork Market Intelligence Server running on http://localhost:${PORT}`);
   });
 
-  // Initial flconsole sync on startup if token configured
-  setTimeout(() => {
-    if (getFlconsoleToken()) {
-      runFlconsoleSyncCycle().catch(console.error);
-    }
-  }, 5000);
+  // Adaptive flconsole sync loop (avoids 60s fixed-interval too_early boundary collisions)
+  function scheduleNextFlconsoleSync(delayMs = 2000) {
+    setTimeout(async () => {
+      let nextDelay = 61 * 1000;
+      try {
+        if (getFlconsoleToken()) {
+          const res = await runFlconsoleSyncCycle();
+          if (res?.status === 'throttled') {
+            nextDelay = Math.max(5, Number(res.retry_after_seconds || 30) + 1) * 1000;
+          }
+        }
+      } catch (err) {
+        console.error('[flconsole-sync] Cycle error:', err);
+      }
+      scheduleNextFlconsoleSync(nextDelay);
+    }, delayMs);
+  }
 
-  // Background polling timer every 1 minute with flconsole (safe & zero ban risk)
+  scheduleNextFlconsoleSync(2000);
+
+  // High-priority realtime proposal watcher every 15 seconds
   setInterval(() => {
-    if (getFlconsoleToken()) {
-      runFlconsoleSyncCycle().catch(console.error);
-    }
-  }, 60 * 1000);
+    runAutoProposerCycle(3).catch(err => console.error('[Auto-Proposer] Loop error:', err));
+  }, 15 * 1000);
 
   // Self keep-alive ping every 4 minutes
   const externalUrl = process.env.RENDER_EXTERNAL_URL || 'https://upwork-mcp-automation.onrender.com';
