@@ -78,15 +78,16 @@ const CORE_PORTFOLIO_PROJECT_IDS = [
   '1968675768626176000'  // AI Resume Assistant
 ];
 
-function selectPortfolioHighlights(job) {
-  const text = `${job?.title || ''}\n${job?.description || ''}`.toLowerCase();
-  let fourthId = '1979016567697829888'; // LeadHunter AI — Smart Lead Discovery
-  if (/\b(scrape|scraper|scraping|crawl|crawler|playwright|selenium|puppeteer|anti-bot|cloudflare|data extraction)\b/i.test(text)) {
-    fourthId = '1947495759757623296'; // Transfermarkt Scraper – Career Stats, Injuries & More
-  } else if (/\b(full-stack|full stack|next\.js|react|e-commerce|ecommerce|dashboard|saas|fastapi)\b/i.test(text)) {
-    fourthId = '2054242712584888320'; // Full-Stack E-Commerce Platform with Payments & Auth
-  }
-  return [...CORE_PORTFOLIO_PROJECT_IDS, fourthId];
+const CORE_CERTIFICATE_IDS = [
+  '1976429951647964461'  // Machine Learning Specialization
+];
+
+function selectPortfolioHighlights() {
+  return [...CORE_PORTFOLIO_PROJECT_IDS];
+}
+
+function selectCertificateHighlights() {
+  return [...CORE_CERTIFICATE_IDS];
 }
 
 function isConsultingOrNonBuildJob(job) {
@@ -318,7 +319,8 @@ async function submitAutoProposalForJob(job, options = {}) {
     job_reference: numericJobRef,
     charged_amount: chargedAmount,
     cover_letter: coverLetter,
-    portfolio_project_ids: selectPortfolioHighlights(job)
+    portfolio_project_ids: selectPortfolioHighlights(),
+    certificate_ids: selectCertificateHighlights()
   };
 
   if (!isHourly) {
@@ -611,6 +613,7 @@ module.exports = {
   inferClientDeliverable,
   buildRyanCoverLetter,
   selectPortfolioHighlights,
+  selectCertificateHighlights,
   isConsultingOrNonBuildJob,
   isJobEligibleForAutoProposal,
   answerScreeningQuestion,
