@@ -416,7 +416,7 @@ function inferClientDeliverable(job) {
 function buildRyanCoverLetter(job, shareUrl) {
   const deliverable = inferClientDeliverable(job);
   return [
-    `Hey there, made you a quick loom showing exactly how I'd handle this: ${shareUrl}`,
+    `made you a quick loom showing exactly how I'd handle this: ${shareUrl}`,
     ``,
     `I've done this exact style of project before. I've built similar ${deliverable}, so I can help you get this built and running smoothly.`,
     ``,
