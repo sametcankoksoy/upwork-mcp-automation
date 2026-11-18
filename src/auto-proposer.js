@@ -154,21 +154,7 @@ async function submitAutoProposalForJob(job, options = {}) {
 
   const orgUid = await getTalentOrgUid(accessToken);
   const numericJobRef = toNumericJobRef(job.job_id);
-  const cleanTopic = String(job.title || 'your project')
-    .replace(/[^a-zA-Z0-9\s,.-]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-
-  const coverLetter = [
-    `hey there, made you a quick loom video showing exactly how i'd handle this:`,
-    ``,
-    shareUrl,
-    ``,
-    `i've built production systems very similar to ${cleanTopic} (Top Rated on Upwork, 100% Job Success Score, #7 in Turkey in Data Extraction).`,
-    ``,
-    `P.S: i've never had a bad review and only 5 stars on upwork so you're in safe hands`
-  ].join('\n');
+  const coverLetter = buildRyanCoverLetter(job, shareUrl);
 
   const createParams = {
     job_reference: numericJobRef,
@@ -338,8 +324,65 @@ async function runAutoProposerCycle(maxPerCycle = 1) {
   }
 }
 
+function inferClientDeliverable(job) {
+  const title = String(job?.title || '');
+  const desc = String(job?.description || '');
+  const text = `${title}\n${desc}`.toLowerCase();
+
+  const rules = [
+    {
+      test: /\b(scrape|scraper|scraping|crawl|crawler|playwright|selenium|puppeteer|anti-bot|cloudflare|data extraction|amazon reviews|product reviews|price tracker)\b/i,
+      deliverable: 'resilient web scrapers and browser automation pipelines with Playwright and Python'
+    },
+    {
+      test: /(e-commerce|ecommerce|shopify|woocommerce|shopping assistant)/i,
+      deliverable: 'AI-powered e-commerce shopping assistants, semantic search pipelines, and custom integrations'
+    },
+    {
+      test: /(recruit|candidate matching|outreach|crm automation|lead gen)/i,
+      deliverable: 'AI matching systems, automated outreach workflows, and custom API pipelines'
+    },
+    {
+      test: /(\bmcp\b|\brag\b|evals|clinic|referral|receipt processing|expense management|document automation|pdf extraction)/i,
+      deliverable: 'production AI agents with Claude, MCP servers, RAG pipelines, and automated document workflows'
+    },
+    {
+      test: /(business workflow|workflow automation|\bn8n\b|zapier|make\.com)/i,
+      deliverable: 'AI workflow automations and custom API integrations with Python and Node.js'
+    },
+    {
+      test: /(dashboard|react|next\.js|saas|platform|full-stack|full stack)/i,
+      deliverable: 'production AI agents and full-stack React, Python, and Node.js applications'
+    }
+  ];
+
+  for (const rule of rules) {
+    if (rule.test.test(text)) {
+      return rule.deliverable;
+    }
+  }
+
+  return 'custom AI agents, automation workflows, and full-stack Python and Node.js systems';
+}
+
+function buildRyanCoverLetter(job, shareUrl) {
+  const deliverable = inferClientDeliverable(job);
+  return [
+    `Hey there, made you a quick loom showing exactly how I'd handle this: ${shareUrl}`,
+    ``,
+    `I've done this exact style of project before. I've built similar ${deliverable}, so I can help you get this built and running smoothly.`,
+    ``,
+    `P.S. I've never had a bad review and only five stars on Upwork. So you're in safe hands.`,
+    ``,
+    `Speak soon,`,
+    `Sametcan`
+  ].join('\n');
+}
+
 module.exports = {
   getShareHash,
+  inferClientDeliverable,
+  buildRyanCoverLetter,
   isJobEligibleForAutoProposal,
   answerScreeningQuestion,
   ensureVideoGenerated,

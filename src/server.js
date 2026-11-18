@@ -9,7 +9,7 @@ const { db, upsertJobAndSnapshot, getSetting, setSetting } = require('./db');
 const { getFullMarketAnalytics } = require('./analytics');
 const { runTrackerCycle, UPWORK_MCP_URL } = require('./upwork-tracker');
 const { getFlconsoleToken, setFlconsoleToken, runFlconsoleSyncCycle } = require('./flconsole-tracker');
-const { getShareHash, submitAutoProposalForJob } = require('./auto-proposer');
+const { getShareHash, buildRyanCoverLetter, submitAutoProposalForJob } = require('./auto-proposer');
 const { createAuthorizationUrl, exchangeCodeForTokens, getValidAccessToken } = require('./upwork-oauth');
 
 const app = express();
@@ -619,13 +619,11 @@ app.post('/api/generate-loom/:jobId', (req, res) => {
     const shareId = getShareHash(jobId);
     const videoFile = `/videos/${shareId}.mp4`;
     const loomPage = `/share/${shareId}`;
-    const job = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(jobId);
-    const title = job?.title || 'your project';
+    const job = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(jobId) || { job_id: jobId, title: 'your project', description: '' };
     const host = req.get('host') || `localhost:${PORT}`;
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
     const baseUrl = `${protocol}://${host}`;
-    const cleanTopic = title.replace(/[^a-zA-Z0-9\s,.-]/g, '').trim().toLowerCase();
-    const proposalText = `hey there, made you a quick loom video showing exactly how i'd handle this:\n\n${baseUrl}/share/${shareId}\n\ni've done this exact style of project before, i've built ${cleanTopic}\n\nP.S: i've never had a bad review and only 5 stars on upwork so you're in safe hands`;
+    const proposalText = buildRyanCoverLetter(job, `${baseUrl}/share/${shareId}`);
 
     res.json({
       ok: true,
