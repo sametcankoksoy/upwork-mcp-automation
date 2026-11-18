@@ -510,7 +510,11 @@ app.post('/api/generate-loom/:jobId', (req, res) => {
   const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
   const upworkUrl = jobId.startsWith('http')
     ? jobId
-    : (jobId.startsWith('~') ? `https://www.upwork.com/jobs/${jobId}` : `https://www.upwork.com/jobs/~02${jobId}`);
+    : (jobId.startsWith('~')
+      ? `https://www.upwork.com/jobs/${jobId}`
+      : (jobId.startsWith('02') && jobId.length >= 20
+        ? `https://www.upwork.com/jobs/~${jobId}`
+        : `https://www.upwork.com/jobs/~02${jobId}`));
   const outPath = path.join(videosDir, `${jobId}.mp4`);
 
   console.log(`[Video-Gen] Generating video for ${jobId} -> ${upworkUrl}...`);
