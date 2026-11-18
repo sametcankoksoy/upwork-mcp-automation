@@ -465,12 +465,67 @@
     const freelancerProfileUrl = 'https://www.upwork.com/freelancers/~01e3cadc4c04e077b1';
     let currentJobUrl = '';
 
-    function bookSlot(time) {
+    async function bookSlot(time) {
       const targetUrl = currentJobUrl || freelancerProfileUrl;
-      const confirmed = confirm(`Book meeting on Upwork for:\n${document.getElementById('selectedDateLabel').textContent} at ${time}?\n\nClick OK to open Upwork message with proposal!`);
-      if (confirmed) {
-        window.open(targetUrl, '_blank');
+      const selectedDate = document.getElementById('selectedDateLabel').textContent;
+      const visitorTimezone = document.getElementById('userTimezone').textContent;
+
+      try {
+        await fetch(`/api/book-call/${encodeURIComponent(jobId)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            selected_date: selectedDate,
+            selected_time: time,
+            visitor_timezone: visitorTimezone
+          })
+        });
+      } catch (err) {
+        // Non-blocking fallback so user still sees confirmation UI
       }
+
+      const container = document.getElementById('timeSlotsContainer');
+      container.innerHTML = '';
+
+      const card = document.createElement('div');
+      card.className = 'p-4 rounded-2xl bg-[#e8f7ee] border border-[#bbf7d0] text-center space-y-2.5';
+
+      const badge = document.createElement('div');
+      badge.className = 'inline-flex items-center gap-1.5 text-[#14a800] font-extrabold text-xs uppercase tracking-wide';
+      badge.textContent = '✓ Time Slot Reserved!';
+
+      const whenEl = document.createElement('div');
+      whenEl.className = 'text-gray-900 font-bold text-xs sm:text-sm';
+      whenEl.textContent = `${selectedDate} · ${time}`;
+
+      const tzEl = document.createElement('div');
+      tzEl.className = 'text-[11px] text-gray-600';
+      tzEl.textContent = visitorTimezone;
+
+      const msgEl = document.createElement('p');
+      msgEl.className = 'text-[11px] text-gray-700 leading-relaxed pt-1';
+      msgEl.textContent = 'Sametcan has been notified. Click below to message on Upwork:';
+
+      const ctaLink = document.createElement('a');
+      ctaLink.href = targetUrl;
+      ctaLink.target = '_blank';
+      ctaLink.rel = 'noopener';
+      ctaLink.className = 'block w-full py-2.5 px-3 rounded-xl bg-[#14a800] hover:bg-[#108a00] text-white text-xs font-bold transition text-center shadow-sm';
+      ctaLink.textContent = 'Open Upwork & Message Sametcan';
+
+      const changeBtn = document.createElement('button');
+      changeBtn.type = 'button';
+      changeBtn.className = 'text-[11px] font-semibold text-gray-500 hover:text-gray-800 underline pt-1';
+      changeBtn.textContent = 'Change time';
+      changeBtn.onclick = () => renderTimeSlots();
+
+      card.appendChild(badge);
+      card.appendChild(whenEl);
+      card.appendChild(tzEl);
+      card.appendChild(msgEl);
+      card.appendChild(ctaLink);
+      card.appendChild(changeBtn);
+      container.appendChild(card);
     }
 
     // INIT PAGE & LOAD JOB

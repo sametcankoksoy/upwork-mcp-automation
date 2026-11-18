@@ -98,6 +98,19 @@ db.exec(`
     value TEXT NOT NULL,
     updated_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS call_bookings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id TEXT NOT NULL,
+    share_id TEXT,
+    job_title TEXT,
+    selected_date TEXT NOT NULL,
+    selected_time TEXT NOT NULL,
+    visitor_timezone TEXT,
+    visitor_ip TEXT,
+    client_note TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 function getSetting(key) {

@@ -174,6 +174,9 @@ function extractValidExternalJobId(reqPath) {
   const apiMatch = reqPath.match(/^\/api\/job\/([^/]+)$/);
   if (apiMatch) return apiMatch[1];
 
+  const bookMatch = reqPath.match(/^\/api\/book-call\/([^/]+)$/);
+  if (bookMatch) return bookMatch[1];
+
   const videoMatch = reqPath.match(/^\/videos\/([^/]+)\.mp4$/);
   if (videoMatch) return videoMatch[1];
 
@@ -200,6 +203,13 @@ app.use((req, res, next) => {
       return next();
     }
 
+    const jobId = extractValidExternalJobId(req.path);
+    if (jobId && hasValidVideo(jobId)) {
+      return next();
+    }
+  }
+
+  if (req.method === 'POST' && req.path.startsWith('/api/book-call/')) {
     const jobId = extractValidExternalJobId(req.path);
     if (jobId && hasValidVideo(jobId)) {
       return next();
@@ -500,6 +510,58 @@ app.get('/api/job/:jobId', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// API: Record Client Call Booking (ToS-compliant, zero email/form required)
+app.post('/api/book-call/:jobId', (req, res) => {
+  try {
+    const realJobId = resolveVideoJobId(req.params.jobId);
+    if (!realJobId) {
+      return sendPrivatePortalLocked(req, res);
+    }
+
+    const { selected_date, selected_time, visitor_timezone, client_note } = req.body || {};
+    if (!selected_date || !selected_time) {
+      return res.status(400).json({ ok: false, error: 'selected_date and selected_time are required' });
+    }
+
+    const job = db.prepare('SELECT title FROM jobs WHERE job_id = ?').get(realJobId);
+    const jobTitle = job?.title || 'Upwork Project';
+    const shareId = getShareHash(realJobId);
+    const visitorIp = req.headers['cf-connecting-ip'] ||
+      (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : '') ||
+      req.socket?.remoteAddress ||
+      '';
+
+    const info = db.prepare(`
+      INSERT INTO call_bookings (job_id, share_id, job_title, selected_date, selected_time, visitor_timezone, visitor_ip, client_note)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      realJobId,
+      shareId,
+      jobTitle,
+      String(selected_date).slice(0, 80),
+      String(selected_time).slice(0, 40),
+      String(visitor_timezone || '').slice(0, 120),
+      String(visitorIp).slice(0, 80),
+      String(client_note || '').slice(0, 500)
+    );
+
+    console.log(`[CALL BOOKED] #${info.lastInsertRowid} | Job: ${realJobId} (${jobTitle}) | ${selected_date} at ${selected_time} | ${visitor_timezone || 'N/A'} | IP: ${visitorIp}`);
+    res.json({ ok: true, booking_id: Number(info.lastInsertRowid), job_id: realJobId });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// API: List Recent Client Bookings (local dashboard only)
+app.get('/api/bookings', (req, res) => {
+  try {
+    const bookings = db.prepare('SELECT * FROM call_bookings ORDER BY id DESC LIMIT 100').all();
+    res.json({ ok: true, bookings });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 
