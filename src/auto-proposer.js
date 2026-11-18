@@ -106,6 +106,13 @@ function isConsultingOrNonBuildJob(job) {
     return true;
   }
 
+  // Reject QA Testing, Bug Finding, SDET, and E2E Test Suite Writing jobs
+  // (We use Playwright/Selenium for Web Scraping & Browser/Workflow Automation, NOT QA bug hunting)
+  if (/\b(qa engineer|qa tester|qa automation|qa specialist|quality assurance|software tester|manual testing|bug hunter|bug finder|find bugs|bug hunting|bug testing|bug report|test cases|test plan|regression testing|write unit tests|e2e test(s|ing)?|end-to-end test(s|ing)?|test automation engineer|sdet|penetration test(ing|er)?|pentest|usability testing|user testing)\b/i.test(text)
+    && !/\b(web scraping|scraper|data extraction|crawl|crawler)\b/i.test(title)) {
+    return true;
+  }
+
   // Reject if description indicates advisory/coaching/audit-only work instead of hands-on building
   if (/\b(looking for a consultant|need a consultant|seeking a consultant|consulting call|advisory role|1-on-1 coaching|one-on-one coaching|teach me how|guide me through|no coding required|no development needed|just advice|consulting only|architecture audit|audit how i build|knowledge-transfer engagement|not an outsourced development|private technical mentor|teaching nontechnical|sequence of instruction)\b/i.test(text)) {
     return true;

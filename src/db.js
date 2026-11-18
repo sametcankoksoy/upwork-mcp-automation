@@ -254,11 +254,11 @@ function calculateSniperScore(job) {
   else if (job.client_total_spent >= 1000) score += 5;
   else if (job.client_total_spent === 0 && !job.client_payment_verified) score -= 20;
 
-  // 3. User Stack Alignment Boost (+20)
+  // 3. User Stack Alignment Boost (+22)
   // Target: Automation, AI Agent, Website Scraping, Playwright, Selenium, Browser Automation, Python, Node.js, Automation Script
-  const isHighFitStack = /(playwright|selenium|browser automation|puppeteer|anti-bot|cloudflare|stealth|crawler|web scraping|scrape|website scraper|ai agent|agentic|llm|claude|langchain|llamaindex|automation script|python automation|python script|node\.js|full-stack|full stack)/i.test(text);
+  const isHighFitStack = /(playwright|selenium|browser automation|puppeteer|anti-bot|cloudflare|stealth|crawler|web scraping|scrape|website scraper|data extraction|ai agent|agentic|llm|claude|langchain|llamaindex|automation script|python automation|python script|workflow automation|api automation|\bn8n\b|node\.js|full-stack|full stack)/i.test(text);
   if (isHighFitStack) {
-    score += 20;
+    score += 22;
   }
 
   // 4. Low-Quality Lead Scraping Penalty (-40)
@@ -302,6 +302,13 @@ function calculateSniperScore(job) {
   // 4d. Game Development, Native Mobile & Off-Stack Hard Cap (<= 20)
   const isGameOrOffStack = /(?:^|[^\w])(c\+\+|c#|\.net)(?!\w)|\b(game developer|game development|mobile games?|android games?|ios games?|3d games?|2d games?|video games?|playable|game engine|unity|unreal engine|unreal|godot|roblox|fivem|minecraft|gameplay|android developer|ios developer|kotlin|swift|objective-c|xcode|android studio|flutter|react native|dotnet|wordpress|wix|squarespace|drupal|magento|laravel|ruby on rails|salesforce|embedded|firmware|arduino|blender|maya)\b/i.test(text);
   if (isGameOrOffStack) {
+    score = Math.min(score - 85, 20);
+  }
+
+  // 4e. QA Testing, Bug-Finder & E2E Test Suite Hard Cap (<= 20)
+  const isQaOrBugTesting = /\b(qa engineer|qa tester|qa automation|qa specialist|quality assurance|software tester|manual testing|bug hunter|bug finder|find bugs|bug hunting|bug testing|bug report|test cases|test plan|regression testing|write unit tests|e2e test(s|ing)?|end-to-end test(s|ing)?|test automation engineer|sdet|penetration test(ing|er)?|pentest|usability testing|user testing)\b/i.test(text)
+    && !/\b(web scraping|scraper|data extraction|crawl|crawler)\b/i.test(titleText);
+  if (isQaOrBugTesting) {
     score = Math.min(score - 85, 20);
   }
 
