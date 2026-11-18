@@ -17,10 +17,22 @@ app.use(cors());
 app.use(express.json({ limit: '100mb' }));
 app.use(express.raw({ type: 'application/octet-stream', limit: '100mb' }));
 
-// Ensure public/videos directory exists and serve statically
+// Ensure public/videos and public/thumbnails directories exist
 const videosDir = path.join(__dirname, '..', 'public', 'videos');
 if (!fs.existsSync(videosDir)) {
   fs.mkdirSync(videosDir, { recursive: true });
+}
+const thumbsDir = path.join(__dirname, '..', 'public', 'thumbnails');
+if (!fs.existsSync(thumbsDir)) {
+  fs.mkdirSync(thumbsDir, { recursive: true });
+}
+
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 const ALLOWED_PUBLIC_ASSETS = new Set([
@@ -164,6 +176,9 @@ function extractValidExternalJobId(reqPath) {
   const videoMatch = reqPath.match(/^\/videos\/([^/]+)\.mp4$/);
   if (videoMatch) return videoMatch[1];
 
+  const thumbMatch = reqPath.match(/^\/thumbnails\/([^/]+)\.jpg$/);
+  if (thumbMatch) return thumbMatch[1];
+
   return null;
 }
 
@@ -182,7 +197,7 @@ app.use((req, res, next) => {
   }
 
   if (req.method === 'GET' || req.method === 'HEAD') {
-    if (ALLOWED_PUBLIC_ASSETS.has(req.path)) {
+    if (req.path === '/oembed' || ALLOWED_PUBLIC_ASSETS.has(req.path)) {
       return next();
     }
 
@@ -195,12 +210,57 @@ app.use((req, res, next) => {
   return sendPrivatePortalLocked(req, res);
 });
 
-app.use(express.static(path.join(__dirname, '..', 'public')));
 app.get('/videos/:idOrToken.mp4', (req, res) => {
   const realJobId = resolveVideoJobId(req.params.idOrToken);
   if (!realJobId) return sendPrivatePortalLocked(req, res);
   res.sendFile(path.join(videosDir, `${realJobId}.mp4`));
 });
+
+app.get('/thumbnails/:idOrToken.jpg', (req, res) => {
+  const realJobId = resolveVideoJobId(req.params.idOrToken);
+  if (!realJobId) return sendPrivatePortalLocked(req, res);
+  const specificThumb = path.join(thumbsDir, `${realJobId}.jpg`);
+  const fallbackThumb = path.join(thumbsDir, '2122421990107900101.jpg');
+  const thumbFile = fs.existsSync(specificThumb) ? specificThumb : fallbackThumb;
+  if (!fs.existsSync(thumbFile)) {
+    return res.status(404).end();
+  }
+  res.setHeader('Content-Type', 'image/jpeg');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.sendFile(thumbFile);
+});
+
+app.get('/oembed', (req, res) => {
+  const rawUrl = String(req.query.url || '');
+  const cleanPath = rawUrl.split('?')[0].split('/').filter(Boolean).pop() || '';
+  const matchedId = resolveVideoJobId(cleanPath);
+  const realJobId = matchedId || '2122421990107900101';
+  const outToken = matchedId ? cleanPath : getShareHash(realJobId);
+
+  const job = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(realJobId);
+  const protocol = req.headers['x-forwarded-proto'] || (req.headers['cf-connecting-ip'] ? 'https' : req.protocol) || 'https';
+  const baseUrl = `${protocol}://${req.get('host')}`;
+  const title = job?.title ? `Walkthrough: ${job.title}` : 'Quick Video Walkthrough for Your Project';
+  const thumbUrl = `${baseUrl}/thumbnails/${outToken}.jpg`;
+
+  res.json({
+    version: '1.0',
+    type: 'video',
+    provider_name: 'Loom',
+    provider_url: baseUrl,
+    title,
+    author_name: 'Sametcan Koksoy',
+    author_url: 'https://www.upwork.com/freelancers/~01e3cadc4c04e077b1',
+    thumbnail_url: thumbUrl,
+    thumbnail_width: 1728,
+    thumbnail_height: 1080,
+    width: 1728,
+    height: 1080,
+    html: `<iframe src="${baseUrl}/share/${outToken}" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen width="1728" height="1080"></iframe>`
+  });
+});
+
+app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/videos', express.static(videosDir));
 
 // Test endpoint to benchmark and verify headless SeleniumBase + Chrome + FFmpeg video generation on Render
@@ -485,11 +545,64 @@ app.post('/api/generate-loom/:jobId', (req, res) => {
 
 // Route: Loom View Player Page (/share/<32-char-hex> and legacy /loom/:jobId)
 app.get(['/share/:jobId', '/loom/:jobId'], (req, res) => {
-  if (!hasValidVideo(req.params.jobId)) {
+  const realJobId = resolveVideoJobId(req.params.jobId);
+  if (!realJobId) {
     return sendPrivatePortalLocked(req, res);
   }
+
+  const job = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(realJobId);
+  const protocol = req.headers['x-forwarded-proto'] || (req.headers['cf-connecting-ip'] ? 'https' : req.protocol) || 'https';
+  const baseUrl = `${protocol}://${req.get('host')}`;
+  const rawTitle = job?.title ? `Walkthrough: ${job.title}` : 'Quick Video Walkthrough for Your Project';
+  const rawDesc = '35 sec video recorded by Sametcan Koksoy (Top Rated · 100% Job Success) · Click to watch full walkthrough';
+  const thumbUrl = `${baseUrl}/thumbnails/${req.params.jobId}.jpg`;
+  const videoUrl = `${baseUrl}/videos/${req.params.jobId}.mp4`;
+  const pageUrl = `${baseUrl}${req.originalUrl}`;
+  const oembedUrl = `${baseUrl}/oembed?url=${encodeURIComponent(pageUrl)}&format=json`;
+
+  const safeTitle = escapeHtml(rawTitle);
+  const safeDesc = escapeHtml(rawDesc);
+  const safeThumbUrl = escapeHtml(thumbUrl);
+  const safeVideoUrl = escapeHtml(videoUrl);
+  const safePageUrl = escapeHtml(pageUrl);
+  const safeOembedUrl = escapeHtml(oembedUrl);
+  const safeToken = escapeHtml(req.params.jobId);
+
+  const metaTags = `<title id="pageTitle">${safeTitle} | Loom</title>
+  <meta name="description" content="${safeDesc}" />
+  <meta property="og:site_name" content="Loom" />
+  <meta property="og:type" content="video.other" />
+  <meta property="og:title" content="${safeTitle}" />
+  <meta property="og:description" content="${safeDesc}" />
+  <meta property="og:url" content="${safePageUrl}" />
+  <meta property="og:image" content="${safeThumbUrl}" />
+  <meta property="og:image:secure_url" content="${safeThumbUrl}" />
+  <meta property="og:image:type" content="image/jpeg" />
+  <meta property="og:image:width" content="1728" />
+  <meta property="og:image:height" content="1080" />
+  <meta property="og:video" content="${safeVideoUrl}" />
+  <meta property="og:video:secure_url" content="${safeVideoUrl}" />
+  <meta property="og:video:type" content="video/mp4" />
+  <meta property="og:video:width" content="1728" />
+  <meta property="og:video:height" content="1080" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${safeTitle}" />
+  <meta name="twitter:description" content="${safeDesc}" />
+  <meta name="twitter:image" content="${safeThumbUrl}" />
+  <meta name="twitter:player" content="${safePageUrl}" />
+  <meta name="twitter:player:width" content="1728" />
+  <meta name="twitter:player:height" content="1080" />
+  <meta name="twitter:player:stream" content="${safeVideoUrl}" />
+  <meta name="twitter:player:stream:content_type" content="video/mp4" />
+  <link rel="alternate" type="application/json+oembed" href="${safeOembedUrl}" title="${safeTitle}" />`;
+
+  let html = fs.readFileSync(path.join(__dirname, '..', 'public', 'loom.html'), 'utf8');
+  html = html.replace('<title id="pageTitle">Video Message | Upwork</title>', metaTags);
+  html = html.replace('<video id="loomVideo"', `<video id="loomVideo" poster="/thumbnails/${safeToken}.jpg"`);
+
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.sendFile(path.join(__dirname, '..', 'public', 'loom.html'));
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(html);
 });
 
 const PORT = process.env.PORT || 3050;
