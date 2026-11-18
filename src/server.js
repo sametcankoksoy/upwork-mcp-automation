@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('node:path');
 const fs = require('node:fs');
+const crypto = require('node:crypto');
 const { execFile } = require('node:child_process');
 require('dotenv').config();
 
@@ -33,12 +34,92 @@ const ALLOWED_PUBLIC_ASSETS = new Set([
   '/favicon.ico'
 ]);
 
-function hasValidVideo(jobId) {
-  return Boolean(
-    jobId &&
-    /^[a-zA-Z0-9_~-]+$/.test(jobId) &&
-    fs.existsSync(path.join(videosDir, `${jobId}.mp4`))
-  );
+function getShareHash(jobId) {
+  if (String(jobId) === '2122421990107900101') {
+    return '7009c82cd76942468c9320b06e1f4ed4';
+  }
+  return crypto.createHash('md5').update('upwork_loom_' + String(jobId)).digest('hex');
+}
+
+function resolveVideoJobId(idOrToken) {
+  if (!idOrToken || !/^[a-zA-Z0-9_~-]+$/.test(idOrToken)) {
+    return null;
+  }
+  if (fs.existsSync(path.join(videosDir, `${idOrToken}.mp4`))) {
+    return idOrToken;
+  }
+  const normalized = idOrToken.toLowerCase();
+  const files = fs.readdirSync(videosDir);
+  for (const file of files) {
+    if (!file.endsWith('.mp4')) continue;
+    const base = file.slice(0, -4);
+    if (getShareHash(base) === normalized || (base === '2122421990107900101' && normalized === '7009c82cd76942468c9320b06e1f4ed4')) {
+      return base;
+    }
+  }
+  return null;
+}
+
+function hasValidVideo(idOrToken) {
+  return Boolean(resolveVideoJobId(idOrToken));
+}
+
+const ipGeoCache = new Map();
+
+function formatUtcOffset(offsetSeconds) {
+  const sign = offsetSeconds >= 0 ? '+' : '-';
+  const abs = Math.abs(offsetSeconds);
+  const hours = Math.floor(abs / 3600);
+  const mins = Math.floor((abs % 3600) / 60);
+  return mins > 0 ? `UTC${sign}${hours}:${String(mins).padStart(2, '0')}` : `UTC${sign}${hours}`;
+}
+
+async function detectVisitorTimezone(req) {
+  try {
+    const rawIp = req.headers['cf-connecting-ip'] ||
+      (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : '') ||
+      req.socket?.remoteAddress ||
+      '';
+    const cleanIp = String(rawIp).replace(/^::ffff:/, '').trim();
+    const isPrivateOrLocal = !cleanIp ||
+      cleanIp === '127.0.0.1' ||
+      cleanIp === '::1' ||
+      cleanIp.startsWith('192.168.') ||
+      cleanIp.startsWith('10.') ||
+      cleanIp.startsWith('172.');
+    const isPublicIp = !isPrivateOrLocal;
+    const cacheKey = isPublicIp ? cleanIp : 'LOCAL_PUBLIC_IP';
+
+    if (ipGeoCache.has(cacheKey)) {
+      return ipGeoCache.get(cacheKey);
+    }
+
+    const url = `http://ip-api.com/json/${isPublicIp ? encodeURIComponent(cleanIp) : ''}?fields=status,country,regionName,city,timezone,offset`;
+    const geoRes = await fetch(url, { signal: AbortSignal.timeout(2000) });
+    if (!geoRes.ok) return null;
+
+    const data = await geoRes.json();
+    if (data.status === 'success' && data.timezone) {
+      const utcOffset = formatUtcOffset(data.offset || 0);
+      const locationName = data.regionName || data.city || data.country || '';
+      const label = locationName
+        ? `Times in ${locationName} · ${data.timezone} (${utcOffset})`
+        : `Times in ${data.timezone} (${utcOffset})`;
+      const result = {
+        timezone: data.timezone,
+        utc_offset: utcOffset,
+        city: data.city,
+        region: data.regionName,
+        country: data.country,
+        label
+      };
+      ipGeoCache.set(cacheKey, result);
+      return result;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function sendPrivatePortalLocked(req, res) {
@@ -71,6 +152,9 @@ function sendPrivatePortalLocked(req, res) {
 }
 
 function extractValidExternalJobId(reqPath) {
+  const shareMatch = reqPath.match(/^\/share\/([^/]+)$/);
+  if (shareMatch) return shareMatch[1];
+
   const loomMatch = reqPath.match(/^\/loom\/([^/]+)$/);
   if (loomMatch) return loomMatch[1];
 
@@ -112,6 +196,11 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
+app.get('/videos/:idOrToken.mp4', (req, res) => {
+  const realJobId = resolveVideoJobId(req.params.idOrToken);
+  if (!realJobId) return sendPrivatePortalLocked(req, res);
+  res.sendFile(path.join(videosDir, `${realJobId}.mp4`));
+});
 app.use('/videos', express.static(videosDir));
 
 // Test endpoint to benchmark and verify headless SeleniumBase + Chrome + FFmpeg video generation on Render
@@ -315,13 +404,14 @@ app.post('/api/bulk-ingest', (req, res) => {
 });
 
 // API: Single Job Details
-app.get('/api/job/:jobId', (req, res) => {
+app.get('/api/job/:jobId', async (req, res) => {
   try {
-    if (!hasValidVideo(req.params.jobId)) {
+    const realJobId = resolveVideoJobId(req.params.jobId);
+    if (!realJobId) {
       return sendPrivatePortalLocked(req, res);
     }
-    let job = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(req.params.jobId);
-    if (!job && req.params.jobId === '2119487430141316904') {
+    let job = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(realJobId);
+    if (!job && realJobId === '2119487430141316904') {
       job = {
         job_id: '2119487430141316904',
         title: 'AI engineering consultant to audit how I build software with AI agents, top to bottom',
@@ -335,16 +425,19 @@ app.get('/api/job/:jobId', (req, res) => {
     }
     if (!job) {
       job = {
-        job_id: req.params.jobId,
+        job_id: realJobId,
         title: 'Software & Automation Requirements',
         client_country: 'United States',
         client_hire_rate: 100
       };
     }
-    const videoExists = fs.existsSync(path.join(videosDir, `${req.params.jobId}.mp4`));
+    const visitorTz = await detectVisitorTimezone(req);
     res.json({
       ...job,
-      video_url: videoExists ? `/videos/${req.params.jobId}.mp4` : null
+      job_id: realJobId,
+      share_id: getShareHash(realJobId),
+      video_url: `/videos/${req.params.jobId}.mp4`,
+      visitor_tz: visitorTz
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -368,19 +461,21 @@ app.post('/api/generate-loom/:jobId', (req, res) => {
       console.error('[Video-Gen] Error:', stderr || err.message);
       return res.status(500).json({ ok: false, error: stderr || err.message });
     }
-    const videoFile = `/videos/${jobId}.mp4`;
-    const loomPage = `/loom/${jobId}`;
+    const shareId = getShareHash(jobId);
+    const videoFile = `/videos/${shareId}.mp4`;
+    const loomPage = `/share/${shareId}`;
     const job = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(jobId);
     const title = job?.title || 'your project';
     const host = req.get('host') || `localhost:${PORT}`;
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
     const baseUrl = `${protocol}://${host}`;
     const cleanTopic = title.replace(/[^a-zA-Z0-9\s,.-]/g, '').trim().toLowerCase();
-    const proposalText = `hey there, made you a quick loom video showing exactly how i'd handle this:\n\n${baseUrl}/loom/${jobId}\n\ni've done this exact style of project before, i've built ${cleanTopic}\n\nP.S: i've never had a bad review and only 5 stars on upwork so you're in safe hands`;
+    const proposalText = `hey there, made you a quick loom video showing exactly how i'd handle this:\n\n${baseUrl}/share/${shareId}\n\ni've done this exact style of project before, i've built ${cleanTopic}\n\nP.S: i've never had a bad review and only 5 stars on upwork so you're in safe hands`;
 
     res.json({
       ok: true,
       job_id: jobId,
+      share_id: shareId,
       video_url: videoFile,
       loom_url: loomPage,
       proposal_text: proposalText
@@ -388,8 +483,8 @@ app.post('/api/generate-loom/:jobId', (req, res) => {
   });
 });
 
-// Route: Loom View Player Page
-app.get('/loom/:jobId', (req, res) => {
+// Route: Loom View Player Page (/share/<32-char-hex> and legacy /loom/:jobId)
+app.get(['/share/:jobId', '/loom/:jobId'], (req, res) => {
   if (!hasValidVideo(req.params.jobId)) {
     return sendPrivatePortalLocked(req, res);
   }

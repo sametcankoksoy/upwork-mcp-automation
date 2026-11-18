@@ -182,7 +182,7 @@
         <div class="w-full md:w-60 border-t md:border-t-0 md:border-l border-gray-100 pt-4 md:pt-0 md:pl-6 flex flex-col">
           <div class="mb-3">
             <h4 class="font-extrabold text-gray-900 text-xs sm:text-sm" id="selectedDateLabel">Monday, November 17</h4>
-            <p class="text-[11px] text-gray-500 underline decoration-dotted mt-0.5" id="userTimezone">Times in Asia/Shanghai</p>
+            <p class="text-[11px] text-gray-500 underline decoration-dotted mt-0.5" id="userTimezone">Detecting local timezone...</p>
           </div>
           <div id="timeSlotsContainer" class="space-y-2 flex-1 overflow-y-auto max-h-56 custom-scroll pr-1">
             <!-- Time slots injected by JavaScript -->
@@ -288,7 +288,7 @@
 
   <!-- Interactive Logic -->
   <script>
-    const pathParts = window.location.pathname.split('/');
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
     const jobId = pathParts[pathParts.length - 1] || '2122421990107900101';
 
     const video = document.getElementById('loomVideo');
@@ -368,10 +368,21 @@
     let selectedMonth = curDate.getMonth();
     let selectedYear = curDate.getFullYear();
 
-    try {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (tz) document.getElementById('userTimezone').textContent = `Times in ${tz}`;
-    } catch (e) {}
+    function getBrowserTimezoneLabel() {
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const offsetMins = -new Date().getTimezoneOffset();
+        const sign = offsetMins >= 0 ? '+' : '-';
+        const abs = Math.abs(offsetMins);
+        const h = Math.floor(abs / 60);
+        const m = abs % 60;
+        const utcStr = m > 0 ? `UTC${sign}${h}:${String(m).padStart(2, '0')}` : `UTC${sign}${h}`;
+        return tz ? `Times in ${tz} (${utcStr})` : `Times in ${utcStr}`;
+      } catch (e) {
+        return 'Times in local timezone';
+      }
+    }
+    document.getElementById('userTimezone').textContent = getBrowserTimezoneLabel();
 
     function renderCalendar() {
       document.getElementById('calendarMonthHeader').textContent = `${monthNames[selectedMonth]} ${selectedYear}`;
@@ -474,9 +485,14 @@
           document.getElementById('pageTitle').textContent = `Walkthrough: ${job.title} | Upwork`;
         }
 
-        currentJobUrl = jobId.startsWith('http')
-          ? jobId
-          : (jobId.startsWith('~') ? `https://www.upwork.com/jobs/${jobId}` : `https://www.upwork.com/jobs/~02${jobId}`);
+        if (job.visitor_tz && job.visitor_tz.label) {
+          document.getElementById('userTimezone').textContent = job.visitor_tz.label;
+        }
+
+        const realJobId = String(job.job_id || jobId);
+        currentJobUrl = realJobId.startsWith('http')
+          ? realJobId
+          : (realJobId.startsWith('~') ? `https://www.upwork.com/jobs/${realJobId}` : `https://www.upwork.com/jobs/~02${realJobId}`);
 
         const videoSrc = job.video_url || `/videos/${jobId}.mp4`;
         document.getElementById('videoSrc').src = videoSrc;
