@@ -275,15 +275,6 @@ function calculateSniperScore(job) {
     score -= 45;
   }
 
-  // 4c. Consulting, Coaching, Mentoring, Audit-Only & Advisory Penalty (-55)
-  // User strictly wants hands-on development/build projects, NOT consulting or coaching
-  const titleText = String(job.title || '').toLowerCase();
-  const isConsultingJob = /\b(consultant|consulting|consultation|advisor|advisory|coach|coaching|mentor|mentoring|mentorship|tutor|tutoring|trainer|training|auditor|code review|architecture review|strategy session|brainstorm|fractional cto|thought partner|teach me|walk me through)\b/i.test(titleText)
-    || /\b(looking for a consultant|need a consultant|seeking a consultant|consulting call|advisory role|1-on-1 coaching|one-on-one coaching|teach me how|guide me through|no coding required|no development needed|just advice|consulting only|architecture audit|audit how i build|audit our)\b/i.test(text);
-  if (isConsultingJob) {
-    score -= 55;
-  }
-
   // 5. Budget / Rate Alignment (Target: Sametcan $40/hr Top Rated)
   if (job.hourly_max >= 40 || job.budget >= 1500) score += 15;
   else if (job.hourly_max >= 30 || job.budget >= 400) score += 8;
@@ -298,6 +289,21 @@ function calculateSniperScore(job) {
 
   // 7. Ghost Job Penalty
   if (job.is_ghost_job) score -= 40;
+
+  // 4c. Consulting, Coaching, Mentoring, Audit-Only & Advisory Hard Cap (<= 30)
+  // User strictly wants hands-on development/build projects, NOT consulting or coaching
+  const titleText = String(job.title || '').toLowerCase();
+  const isConsultingJob = /\b(consultant|consulting|consultation|advisor|advisory|coach|coaching|mentor|mentoring|mentorship|tutor|tutoring|trainer|training|auditor|code review|architecture review|strategy session|brainstorm|fractional cto|thought partner|teach me|walk me through)\b/i.test(titleText)
+    || /\b(looking for a consultant|need a consultant|seeking a consultant|consulting call|advisory role|1-on-1 coaching|one-on-one coaching|teach me how|guide me through|no coding required|no development needed|just advice|consulting only|architecture audit|audit how i build|audit our)\b/i.test(text);
+  if (isConsultingJob) {
+    score = Math.min(score - 70, 30);
+  }
+
+  // 4d. Game Development, Native Mobile & Off-Stack Hard Cap (<= 20)
+  const isGameOrOffStack = /(?:^|[^\w])(c\+\+|c#|\.net)(?!\w)|\b(game developer|game development|mobile games?|android games?|ios games?|3d games?|2d games?|video games?|playable|game engine|unity|unreal engine|unreal|godot|roblox|fivem|minecraft|gameplay|android developer|ios developer|kotlin|swift|objective-c|xcode|android studio|flutter|react native|dotnet|wordpress|wix|squarespace|drupal|magento|laravel|ruby on rails|salesforce|embedded|firmware|arduino|blender|maya)\b/i.test(text);
+  if (isGameOrOffStack) {
+    score = Math.min(score - 85, 20);
+  }
 
   return Math.max(0, Math.min(100, Math.round(score)));
 }

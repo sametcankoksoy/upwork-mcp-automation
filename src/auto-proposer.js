@@ -95,8 +95,14 @@ function isConsultingOrNonBuildJob(job) {
   const desc = String(job?.description || '').toLowerCase();
   const text = `${title}\n${desc}`;
 
-  // Reject if title indicates consulting, coaching, mentoring, audit, or review
-  if (/\b(consultant|consulting|consultation|advisor|advisory|coach|coaching|mentor|mentoring|mentorship|tutor|tutoring|trainer|training|audit|auditor|code review|architecture review|strategy session|brainstorm|fractional cto|thought partner|teach me|walk me through)\b/i.test(title)) {
+  // Reject if title indicates consulting, coaching, mentoring, or pure audit/review
+  if (/\b(consultant|consulting|consultation|advisor|advisory|coach|coaching|mentor|mentoring|mentorship|tutor|tutoring|trainer|training|auditor|code review|architecture review|strategy session|brainstorm|fractional cto|thought partner|teach me|walk me through)\b/i.test(title)
+    || (/\baudit\b/i.test(title) && !/\b(build|develop|engineer|development|automation|scraper|platform)\b/i.test(title))) {
+    return true;
+  }
+
+  // Reject Game Development, Native Mobile Apps (Kotlin/Swift/Flutter), and Off-Stack Languages
+  if (/(?:^|[^\w])(c\+\+|c#|\.net)(?!\w)|\b(game developer|game development|mobile games?|android games?|ios games?|3d games?|2d games?|video games?|playable|game engine|unity|unreal engine|unreal|godot|roblox|fivem|minecraft|phaser|pygame|gameplay|android developer|ios developer|kotlin|swift|objective-c|xcode|android studio|flutter|react native|dotnet|xamarin|maui|wordpress|woocommerce|wix|squarespace|shopify theme|drupal|magento|laravel|symfony|ruby on rails|salesforce|abap|embedded|firmware|arduino|fpga|verilog|autocad|solidworks|blender|maya|3ds max)\b/i.test(text)) {
     return true;
   }
 
