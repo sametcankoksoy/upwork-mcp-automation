@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import time
 import platform
 import subprocess
@@ -54,7 +55,7 @@ def save_loom_thumbnail(video_path, thumb_path):
         raise RuntimeError(f"Failed to write thumbnail: {thumb_path}")
     return thumb_path
 
-def generate_proposal_video(url, out_video_path, proxy=None):
+def generate_proposal_video(url, out_video_path, proxy=None, strict_under_5=False):
     t0 = time.time()
     width, height = 1728, 1080
     total_frames = int(round(TRANSITION_SEC * FPS)) # 204 frames
@@ -80,6 +81,12 @@ def generate_proposal_video(url, out_video_path, proxy=None):
         page_src = (sb.get_page_source() or "").lower()
         if "this job is a private listing" in page_src or "job is no longer available" in page_src:
             raise RuntimeError("PRIVATE_OR_CLOSED_JOB")
+
+        if strict_under_5:
+            body_text = sb.get_text("body") or ""
+            m_prop = re.search(r"Proposals[\s:\r\n]+(5 to 10|10 to 15|15 to 20|20 to 50|50\+)", body_text, re.I)
+            if m_prop:
+                raise RuntimeError(f"PROPOSALS_OVER_5:{m_prop.group(1)}")
         
         # Clean cookie/dark filters and sticky banner popups
         try:
@@ -218,7 +225,9 @@ def generate_proposal_video(url, out_video_path, proxy=None):
     }
 
 if __name__ == "__main__":
-    test_url = sys.argv[1] if len(sys.argv) > 1 else "https://www.upwork.com/jobs/~022121736800735949407"
-    out_file = sys.argv[2] if len(sys.argv) > 2 else os.path.join(PUBLIC_VIDEOS_DIR, "test_render_engine.mp4")
-    res = generate_proposal_video(test_url, out_file)
+    strict_flag = "--strict-under-5" in sys.argv
+    pos_args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    test_url = pos_args[0] if len(pos_args) > 0 else "https://www.upwork.com/jobs/~022121736800735949407"
+    out_file = pos_args[1] if len(pos_args) > 1 else os.path.join(PUBLIC_VIDEOS_DIR, "test_render_engine.mp4")
+    res = generate_proposal_video(test_url, out_file, strict_under_5=strict_flag)
     print("Result:", res)

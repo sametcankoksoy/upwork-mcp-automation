@@ -170,6 +170,9 @@ function extractValidExternalJobId(reqPath) {
   const bookMatch = reqPath.match(/^\/api\/book-call\/([^/]+)$/);
   if (bookMatch) return bookMatch[1];
 
+  const trackViewMatch = reqPath.match(/^\/api\/track-view\/([^/]+)$/);
+  if (trackViewMatch) return trackViewMatch[1];
+
   const videoMatch = reqPath.match(/^\/videos\/([^/]+)\.mp4$/);
   if (videoMatch) return videoMatch[1];
 
@@ -202,7 +205,7 @@ app.use((req, res, next) => {
     }
   }
 
-  if (req.method === 'POST' && req.path.startsWith('/api/book-call/')) {
+  if (req.method === 'POST' && (req.path.startsWith('/api/book-call/') || req.path.startsWith('/api/track-view/'))) {
     const jobId = extractValidExternalJobId(req.path);
     if (jobId && hasValidVideo(jobId)) {
       return next();
@@ -542,7 +545,131 @@ app.post('/api/book-call/:jobId', (req, res) => {
     );
 
     console.log(`[CALL BOOKED] #${info.lastInsertRowid} | Job: ${realJobId} (${jobTitle}) | ${selected_date} at ${selected_time} | ${visitor_timezone || 'N/A'} | IP: ${visitorIp}`);
+    notifyVideoActivity({
+      title: 'Upwork Görüşme Talebi!',
+      subtitle: `${jobTitle}`,
+      bodyText: `${selected_date} saat ${selected_time} | ${visitor_timezone || visitorIp}`
+    });
     res.json({ ok: true, booking_id: Number(info.lastInsertRowid), job_id: realJobId });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+function showWindowsBalloon(title, bodyText) {
+  if (process.platform !== 'win32') return;
+  const psScript = `
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+    $n = New-Object System.Windows.Forms.NotifyIcon
+    $n.Icon = [System.Drawing.SystemIcons]::Information
+    $n.BalloonTipIcon = 'Info'
+    $n.BalloonTipTitle = $env:LOOM_NOTIF_TITLE
+    $n.BalloonTipText = $env:LOOM_NOTIF_BODY
+    $n.Visible = $true
+    $n.ShowBalloonTip(7000)
+    Start-Sleep -Milliseconds 1500
+    $n.Dispose()
+  `;
+  execFile(
+    'powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', psScript],
+    {
+      windowsHide: true,
+      timeout: 8000,
+      env: {
+        ...process.env,
+        LOOM_NOTIF_TITLE: String(title || 'Upwork Video Bildirimi').slice(0, 63),
+        LOOM_NOTIF_BODY: String(bodyText || '').slice(0, 250)
+      }
+    },
+    () => {}
+  );
+}
+
+function notifyVideoActivity({ title, subtitle, bodyText }) {
+  console.log(`[VIDEO WATCHED] ${title} | ${subtitle} | ${bodyText}`);
+  showWindowsBalloon(title, `${subtitle}\n${bodyText}`);
+
+  const tgToken = process.env.TELEGRAM_BOT_TOKEN || getSetting('telegram_bot_token');
+  const tgChatId = process.env.TELEGRAM_CHAT_ID || getSetting('telegram_chat_id');
+  if (tgToken && tgChatId) {
+    const msg = `${title}\n${subtitle}\n${bodyText}`;
+    fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: tgChatId, text: msg })
+    }).catch(() => {});
+  }
+}
+
+// API: Real-Time Video Watch Tracking & Notifications
+app.post('/api/track-view/:jobId', async (req, res) => {
+  try {
+    const userAgent = String(req.headers['user-agent'] || '');
+    if (/(TelegramBot|Slackbot|Discordbot|Twitterbot|facebookexternalhit|LinkedInBot|WhatsApp)/i.test(userAgent)) {
+      return res.json({ ok: true, ignored: 'bot' });
+    }
+
+    const realJobId = resolveVideoJobId(req.params.jobId);
+    if (!realJobId) {
+      return sendPrivatePortalLocked(req, res);
+    }
+
+    const allowedEvents = new Set(['page_open', 'video_play', 'video_50pct', 'video_completed']);
+    const eventType = allowedEvents.has(req.body?.event_type) ? req.body.event_type : 'page_open';
+    const watchSeconds = Math.max(0, Math.round(Number(req.body?.watch_seconds || 0)));
+
+    const job = db.prepare('SELECT title FROM jobs WHERE job_id = ?').get(realJobId);
+    const jobTitle = job?.title || `Upwork İlanı (${realJobId})`;
+    const shareId = getShareHash(realJobId);
+    const visitorIp = req.headers['cf-connecting-ip'] ||
+      (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : '') ||
+      req.socket?.remoteAddress ||
+      '';
+    const tzInfo = await detectVisitorTimezone(req);
+    const visitorLocation = [tzInfo?.city, tzInfo?.region, tzInfo?.country].filter(Boolean).join(', ') || 'Bilinmeyen Konum';
+    const visitorTimezone = tzInfo?.label || '';
+
+    const info = db.prepare(`
+      INSERT INTO video_views (job_id, share_id, job_title, event_type, watch_seconds, visitor_location, visitor_timezone, visitor_ip, user_agent)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      realJobId,
+      shareId,
+      jobTitle,
+      eventType,
+      watchSeconds,
+      visitorLocation,
+      visitorTimezone,
+      String(visitorIp).slice(0, 80),
+      userAgent.slice(0, 300)
+    );
+
+    const eventLabels = {
+      page_open: 'Sayfayı Açtı',
+      video_play: 'Videoyu Oynatmaya Başladı',
+      video_50pct: 'Videonun Yarısını İzledi',
+      video_completed: 'Videonun Tamamını İzledi'
+    };
+
+    notifyVideoActivity({
+      title: `Müşteri ${eventLabels[eventType]}`,
+      subtitle: jobTitle,
+      bodyText: `${visitorLocation}${tzInfo?.utc_offset ? ` (${tzInfo.utc_offset})` : ''} | Süre: ${watchSeconds}sn`
+    });
+
+    res.json({ ok: true, view_id: Number(info.lastInsertRowid), event_type: eventType });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// API: List Video Watch Events (local dashboard only)
+app.get('/api/video-views', (req, res) => {
+  try {
+    const views = db.prepare('SELECT * FROM video_views ORDER BY id DESC LIMIT 100').all();
+    res.json({ ok: true, views });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -588,7 +715,10 @@ app.post('/api/auto-proposals/apply/:jobId', async (req, res) => {
     if (!job) {
       return res.status(404).json({ ok: false, error: 'Job not found in local database' });
     }
-    const result = await submitAutoProposalForJob(job, { dryRun: Boolean(req.body?.dryRun) });
+    const result = await submitAutoProposalForJob(job, {
+      dryRun: Boolean(req.body?.dryRun),
+      force: Boolean(req.body?.force)
+    });
     res.json(result);
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });

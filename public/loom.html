@@ -302,6 +302,22 @@
 
     const speeds = [1, 1.25, 1.5, 2];
     let currentSpeedIdx = 0;
+    let hasTrackedOpen = false;
+    let hasTrackedPlay = false;
+    let hasTracked50Pct = false;
+    let hasTrackedCompleted = false;
+
+    function sendViewEvent(eventType, watchSeconds = 0) {
+      fetch(`/api/track-view/${encodeURIComponent(jobId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        keepalive: true,
+        body: JSON.stringify({
+          event_type: eventType,
+          watch_seconds: Math.round(Number(watchSeconds) || 0)
+        })
+      }).catch(() => {});
+    }
 
     function togglePlay() {
       if (video.paused || video.ended) {
@@ -326,16 +342,31 @@
       return `${m}:${s < 10 ? '0' : ''}${s}`;
     }
 
+    video.addEventListener('play', () => {
+      if (!hasTrackedPlay) {
+        hasTrackedPlay = true;
+        sendViewEvent('video_play', video.currentTime || 0);
+      }
+    });
+
     video.addEventListener('timeupdate', () => {
       const pct = (video.currentTime / video.duration) * 100 || 0;
       progressBar.style.width = `${pct}%`;
       timeDisplay.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration || 35)}`;
+      if (!hasTracked50Pct && video.duration && video.currentTime >= video.duration * 0.5) {
+        hasTracked50Pct = true;
+        sendViewEvent('video_50pct', video.currentTime);
+      }
     });
 
     video.addEventListener('ended', () => {
       playIcon.classList.remove('hidden');
       pauseIcon.classList.add('hidden');
       centerPlayBtn.classList.remove('hidden');
+      if (!hasTrackedCompleted) {
+        hasTrackedCompleted = true;
+        sendViewEvent('video_completed', video.duration || video.currentTime || 35);
+      }
     });
 
     function seekVideo(e) {
@@ -532,6 +563,10 @@
     async function initPage() {
       renderCalendar();
       document.getElementById('myUpworkProfileBtn').href = freelancerProfileUrl;
+      if (!hasTrackedOpen) {
+        hasTrackedOpen = true;
+        sendViewEvent('page_open', 0);
+      }
       try {
         const res = await fetch(`/api/job/${jobId}`);
         const job = await res.json();

@@ -35,11 +35,24 @@ function toNumericJobRef(jobId) {
   return String(jobId).trim().replace(/^~?02/, '');
 }
 
-function isJobEligibleForAutoProposal(job) {
+function isJobEligibleForAutoProposal(job, options = {}) {
   if (!job || !job.job_id) return false;
   if (job.job_status && job.job_status !== 'open') return false;
   if (job.is_ghost_job) return false;
   if ((job.sniper_score || 0) < 80) return false;
+
+  // Enforce strict < 5 proposals rule
+  const propsNum = Number(job.current_proposals_numeric || 0);
+  const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
+  if (propsNum >= 5 || !['less than 5', 'fewer than 5'].includes(propsTier)) {
+    return false;
+  }
+
+  // Enforce freshness window (<= 12 minutes since posted) unless forced manually
+  if (!options.force && job.posted_at) {
+    const minsSincePosted = (Date.now() - new Date(job.posted_at).getTime()) / 60000;
+    if (minsSincePosted > 12) return false;
+  }
 
   const isHourly = (job.job_type || '').toLowerCase() === 'hourly';
   if (isHourly) {
@@ -79,7 +92,7 @@ function answerScreeningQuestion(questionText, jobTitle = '') {
   return 'I am a Top Rated Upwork Engineer (100% Job Success Score, 5.0 rating, #7 in Turkey in Data Extraction) specializing in production AI agents, resilient Playwright/Python browser automation, and full-stack Node.js/FastAPI platforms with automated monitoring and recovery.';
 }
 
-async function ensureVideoGenerated(jobId) {
+async function ensureVideoGenerated(jobId, strictUnder5 = true) {
   if (!fs.existsSync(videosDir)) {
     fs.mkdirSync(videosDir, { recursive: true });
   }
@@ -90,9 +103,13 @@ async function ensureVideoGenerated(jobId) {
 
   const upworkUrl = buildUpworkJobUrl(jobId);
   const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+  const args = [renderScriptPath, upworkUrl, outPath];
+  if (strictUnder5) {
+    args.push('--strict-under-5');
+  }
 
-  console.log(`[Auto-Proposer] Rendering custom Loom video for ${jobId} -> ${upworkUrl}`);
-  await execFileAsync(pythonCmd, [renderScriptPath, upworkUrl, outPath], {
+  console.log(`[Auto-Proposer] Rendering custom Loom video for ${jobId} -> ${upworkUrl} (strictUnder5=${strictUnder5})`);
+  await execFileAsync(pythonCmd, args, {
     maxBuffer: 1024 * 1024 * 20,
     timeout: 150000
   });
@@ -134,13 +151,37 @@ async function submitAutoProposalForJob(job, options = {}) {
     ? Math.min(50, Math.max(35, Number(job.hourly_max) || 45))
     : (Number(job.budget) >= 150 ? Number(job.budget) : 450);
 
+  if (!options.force) {
+    const propsNum = Number(job.current_proposals_numeric || 0);
+    const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
+    if (propsNum >= 5 || !['less than 5', 'fewer than 5'].includes(propsTier)) {
+      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_5_proposals', null, `DB tier=${job.current_proposals_tier} (${propsNum})`);
+      return { ok: false, status: 'skipped_over_5_proposals', job_id: job.job_id };
+    }
+    if (job.posted_at) {
+      const minsSincePosted = (Date.now() - new Date(job.posted_at).getTime()) / 60000;
+      if (minsSincePosted > 12) {
+        recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_5_proposals', null, `Posted ${Math.round(minsSincePosted)}m ago (>12m freshness limit)`);
+        return { ok: false, status: 'skipped_over_5_proposals', job_id: job.job_id };
+      }
+    }
+  }
+
+  const strictUnder5 = options.strictUnder5 !== false && !options.force;
   try {
-    await ensureVideoGenerated(job.job_id);
+    await ensureVideoGenerated(job.job_id, strictUnder5);
   } catch (vidErr) {
     const errText = String(vidErr.stderr || vidErr.message || '');
     if (errText.includes('PRIVATE_OR_CLOSED_JOB')) {
       recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_private_listing', null, 'Job is private or no longer available');
       return { ok: false, status: 'skipped_private_listing', job_id: job.job_id };
+    }
+    if (errText.includes('PROPOSALS_OVER_5')) {
+      const tierMatch = errText.match(/PROPOSALS_OVER_5:([^\r\n]+)/);
+      const liveTier = tierMatch ? tierMatch[1].trim() : '20 to 50';
+      db.prepare('UPDATE jobs SET current_proposals_tier = ?, current_proposals_numeric = 25 WHERE job_id = ?').run(liveTier, job.job_id);
+      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_5_proposals', null, `Live Upwork page showed: ${liveTier}`);
+      return { ok: false, status: 'skipped_over_5_proposals', tier: liveTier, job_id: job.job_id };
     }
     recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'error_video_render', null, errText);
     return { ok: false, status: 'error_video_render', error: errText, job_id: job.job_id };
@@ -191,11 +232,18 @@ async function submitAutoProposalForJob(job, options = {}) {
   const preview = previewRes?.preview || {};
   const connectsCost = Number(preview.connects_cost || 0);
   const rationale = String(preview.boost?.rationale || '').toLowerCase();
+  const topBids = preview.boost?.current_top_bids || [];
 
   if (preview.can_apply === false || rationale.includes('already hired')) {
     const reason = preview.can_apply === false ? 'can_apply=false' : preview.boost.rationale;
     recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, connectsCost, 'skipped_already_hired', previewRes.preview_id, reason);
     return { ok: false, status: 'skipped_already_hired', job_id: job.job_id, reason };
+  }
+
+  if (!options.force && topBids.length >= 4) {
+    const reason = `Boost slots already full (${topBids.length} top bids: ${JSON.stringify(topBids)}), likely 5+ proposals`;
+    recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, connectsCost, 'skipped_over_5_proposals', previewRes.preview_id, reason);
+    return { ok: false, status: 'skipped_over_5_proposals', job_id: job.job_id, reason };
   }
 
   // Handle screening questions if present

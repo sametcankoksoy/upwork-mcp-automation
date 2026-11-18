@@ -125,6 +125,20 @@ db.exec(`
     details TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS video_views (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id TEXT NOT NULL,
+    share_id TEXT,
+    job_title TEXT,
+    event_type TEXT NOT NULL,
+    watch_seconds INTEGER DEFAULT 0,
+    visitor_location TEXT,
+    visitor_timezone TEXT,
+    visitor_ip TEXT,
+    user_agent TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 function getSetting(key) {
