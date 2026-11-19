@@ -283,7 +283,7 @@ function isClientGeoAndHistoryEligible(job) {
 
 const LEAD_ENRICHMENT_RE = /\b(lead enrichment|enrich lead|enrich leads|b2b leads?|lead list|email list|contact list|cold email|apollo\.io|clay\.com|clayagent|linkedin leads?|yellow pages|skip tracing|extract contact information)\b/i;
 
-const STRICT_CORE_NICHE_RE = /\b(automate|automation|automated|workflow automation|business automation|ai automation|n8n|make\.com|zapier|ai agents?|agentic|\bmcp\b|chatbots?|chat bot|whatsapp bot|telegram bot|discord bot|slack bot|conversational ai|rag agent|rag pipeline|voice agent|voice ai|ai voice|vapi|retell|bland ai|twilio|elevenlabs|pipecat|livekit|phone agent|ai caller|ai receptionist|call automation|scrape|scraper|scrapers|scraping|web scraping|data scraping|data extraction|extract data|crawl|crawler|crawling|playwright|selenium|puppeteer|browser automation|cloudflare bypass|anti-bot|python script|automation script|custom script|script developer|bot developer|bot development|python bot|python automation)\b/i;
+const STRICT_CORE_NICHE_RE = /\b(automate|automation|automated|workflow|workflows|n8n|make\.com|zapier|ai agents?|agentic|\bmcp\b|chatbots?|chat bot|whatsapp bot|telegram bot|discord bot|slack bot|voice bot|phone bot|ai bot|custom bot|conversational ai|rag agent|rag pipeline|voice agent|voice ai|ai voice|vapi|retell|bland ai|twilio|elevenlabs|pipecat|livekit|phone agent|ai caller|ai receptionist|call automation|scrape|scraper|scrapers|scraping|web scraping|data scraping|data extraction|extract data|extracting|crawl|crawler|crawlers|crawling|playwright|selenium|puppeteer|cheerio|beautifulsoup|scrapy|browser automation|cloudflare bypass|anti-bot|python script|automation script|custom script|script developer|bot developer|bot development|python bot|python automation|api integration|webhook)\b/i;
 
 function calculateSniperScore(job) {
   let score = 50;
@@ -320,7 +320,7 @@ function calculateSniperScore(job) {
   // 3. User Stack Alignment Boost (+25)
   // Target: Automation, Chatbot, Voice Agent, Script, Data Scraping, Playwright, Selenium, AI Agent
   const isHighFitStack = /(playwright|selenium|browser automation|puppeteer|anti-bot|cloudflare|stealth|crawl|crawler|crawling|web scraping|data scraping|scrape|scrapers|scraping|website scraper|data extraction|extract data|voice agent|voice ai|vapi|retell|twilio|elevenlabs|pipecat|livekit|chatbot|whatsapp bot|telegram bot|discord bot|conversational ai|ai agent|agentic|llm|claude|openai|rag|\bmcp\b|langchain|llamaindex|automation script|python automation|python script|workflow automation|api automation|bot development|\bn8n\b|make\.com|zapier|node\.js|full-stack|full stack)/i.test(text);
-  if (isHighFitStack) {
+  if (isHighFitStack || STRICT_CORE_NICHE_RE.test(text)) {
     score += 25;
   }
 
@@ -330,9 +330,9 @@ function calculateSniperScore(job) {
     score -= 60;
   }
 
-  // 4b. Unrelated Non-Dev Tasks Penalty (-45) (e.g. SEO, Social Media, Translation, Speakers, Voice Recording, Video Editors, Accounting)
+  // 4b. Unrelated Non-Dev Tasks Penalty (-45) (exempt if matching user's 5 core niches even in another industry/category)
   const isUnrelatedNonDev = /(seo, ads|marketing agency|social media|funnels|video edit(ing|ors?)|cold calling|sales rep|virtual assistant|copywriter|content writer|appointment setter|trading mentor|speakers?|voice actor|voice over|transcription|translator|translation|audio collection|survey respondent|data labeling|data annotation|annotate|accountant|accounting|bookkeep(er|ing)|tax preparer)/i.test(text)
-    && !/(playwright|selenium|scraping|crawler|puppeteer|browser automation|python|node\.js|full-stack|full stack|voice agent|chatbot)/i.test(text);
+    && !STRICT_CORE_NICHE_RE.test(text);
   if (isUnrelatedNonDev) {
     score -= 45;
   }

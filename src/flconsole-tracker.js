@@ -55,7 +55,7 @@ async function callFlconsoleMcp(method, params = {}) {
   }
 }
 
-async function findJobs(limit = 30) {
+async function findJobs(limit = 50) {
   // Use all active saved feeds for automated server-side tracking
   return callFlconsoleMcp('tools/call', {
     name: 'find_jobs',
@@ -153,7 +153,7 @@ async function runFlconsoleSyncCycle() {
   let jobsUpdated = 0;
 
   try {
-    const res = await findJobs(30);
+    const res = await findJobs(50);
 
     // Handle rate limiting gracefully
     if (res?.error?.code === 'too_early') {
