@@ -50,6 +50,13 @@
         </svg>
       </button>
 
+      <!-- Preparing Video Banner (shown only if client opens within seconds of instant proposal) -->
+      <div id="videoPreparingBanner" class="hidden absolute inset-0 bg-black/80 backdrop-blur-sm z-25 flex flex-col items-center justify-center text-white px-6 text-center">
+        <div class="w-10 h-10 border-4 border-white/25 border-t-[#14a800] rounded-full animate-spin mb-3"></div>
+        <p class="text-sm sm:text-base font-bold tracking-tight">Preparing HD Video Walkthrough...</p>
+        <p class="text-xs text-white/75 mt-1">Auto-starting in a few seconds</p>
+      </div>
+
       <!-- Video Control Bar (Overlay at bottom) -->
       <div id="videoControls" class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-4 sm:px-6 py-4 flex flex-col gap-2 z-30 transition-opacity duration-300">
         <!-- Scrubber Progress Bar -->
@@ -589,8 +596,34 @@
               : `https://www.upwork.com/jobs/~02${realJobId}`));
 
         const videoSrc = job.video_url || `/videos/${jobId}.mp4`;
-        document.getElementById('videoSrc').src = videoSrc;
-        video.load();
+        const prepBanner = document.getElementById('videoPreparingBanner');
+
+        if (job.video_ready === false) {
+          prepBanner.classList.remove('hidden');
+          centerPlayBtn.classList.add('hidden');
+          const pollTimer = setInterval(async () => {
+            try {
+              const r = await fetch(`/api/job/${encodeURIComponent(jobId)}`);
+              const updated = await r.json();
+              if (updated.video_ready) {
+                clearInterval(pollTimer);
+                prepBanner.classList.add('hidden');
+                centerPlayBtn.classList.remove('hidden');
+                document.getElementById('videoSrc').src = updated.video_url || videoSrc;
+                video.load();
+                video.play().then(() => {
+                  playIcon.classList.add('hidden');
+                  pauseIcon.classList.remove('hidden');
+                  centerPlayBtn.classList.add('hidden');
+                }).catch(() => {});
+              }
+            } catch (e) {}
+          }, 3000);
+        } else {
+          prepBanner.classList.add('hidden');
+          document.getElementById('videoSrc').src = videoSrc;
+          video.load();
+        }
       } catch (err) {
         // Fallback
         document.getElementById('videoSrc').src = `/videos/${jobId}.mp4`;

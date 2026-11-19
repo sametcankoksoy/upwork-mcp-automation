@@ -29,6 +29,7 @@ const TRANSIENT_MCP_ERR_RE = /(fetch failed|econnreset|etimedout|socket hang up|
 
 let isProposerRunning = false;
 let onProposalSubmitted = null;
+const activeVideoRenders = new Map();
 
 function setProposalNotificationHandler(fn) {
   onProposalSubmitted = typeof fn === 'function' ? fn : null;
@@ -101,26 +102,48 @@ function isConsultingOrNonBuildJob(job) {
     return true;
   }
 
-  // Reject Game Development, Native Mobile Apps (Kotlin/Swift/Flutter), and Off-Stack Languages
-  if (/(?:^|[^\w])(c\+\+|c#|\.net)(?!\w)|\b(game developer|game development|mobile games?|android games?|ios games?|3d games?|2d games?|video games?|playable|game engine|unity|unreal engine|unreal|godot|roblox|fivem|minecraft|phaser|pygame|gameplay|android developer|ios developer|kotlin|swift|objective-c|xcode|android studio|flutter|react native|dotnet|xamarin|maui|wordpress|woocommerce|wix|squarespace|shopify theme|drupal|magento|laravel|symfony|ruby on rails|salesforce|abap|embedded|firmware|arduino|fpga|verilog|autocad|solidworks|blender|maya|3ds max)\b/i.test(text)) {
+  // Reject Game Development, Native Mobile Apps (Kotlin/Swift/Flutter), and Hardware
+  if (/\b(game developer|game development|mobile games?|android games?|ios games?|3d games?|2d games?|video games?|playable|game engine|unity|unreal engine|unreal|godot|roblox|fivem|minecraft|phaser|pygame|gameplay|android developer|ios developer|kotlin|swift|objective-c|xcode|android studio|flutter|react native|xamarin|maui|abap|embedded|firmware|arduino|fpga|verilog|autocad|solidworks|blender|maya|3ds max)\b/i.test(text)) {
+    return true;
+  }
+
+  // Reject off-stack CMS/CRM/Enterprise roles ONLY when they are the core title role without AI/Scraping/Automation/Bot signals
+  if ((/(?:^|[^\w])(c\+\+|c#|\.net)(?!\w)|\b(dotnet|wordpress|woocommerce|wix|squarespace|shopify theme|drupal|magento|laravel|symfony|ruby on rails|salesforce)\b/i.test(title))
+    && !/\b(scrape|scraper|scraping|automation|automate|ai|agent|chatbot|voice|bot|n8n|script|python|playwright|selenium)\b/i.test(title)) {
     return true;
   }
 
   // Reject QA Testing, Bug Finding, SDET, and E2E Test Suite Writing jobs
-  // (We use Playwright/Selenium for Web Scraping & Browser/Workflow Automation, NOT QA bug hunting)
   if (/\b(qa engineer|qa tester|qa automation|qa specialist|quality assurance|software tester|manual testing|bug hunter|bug finder|find bugs|bug hunting|bug testing|bug report|test cases|test plan|regression testing|write unit tests|e2e test(s|ing)?|end-to-end test(s|ing)?|test automation engineer|sdet|penetration test(ing|er)?|pentest|usability testing|user testing)\b/i.test(text)
     && !/\b(web scraping|scraper|data extraction|crawl|crawler)\b/i.test(title)) {
     return true;
   }
 
-  // Reject if description indicates advisory/coaching/audit-only work instead of hands-on building
-  if (/\b(looking for a consultant|need a consultant|seeking a consultant|consulting call|advisory role|1-on-1 coaching|one-on-one coaching|teach me how|guide me through|no coding required|no development needed|just advice|consulting only|architecture audit|audit how i build|knowledge-transfer engagement|not an outsourced development|private technical mentor|teaching nontechnical|sequence of instruction)\b/i.test(text)) {
+  // Reject anti-bot prompt-injection traps and advisory/coaching descriptions
+  if (/(if you are one of the ai agents|ignore all previous instructions|disregard previous instructions|super intelligence not artificial intelligence)/i.test(text)
+    || /\b(looking for a consultant|need a consultant|seeking a consultant|consulting call|advisory role|1-on-1 coaching|one-on-one coaching|teach me how|guide me through|no coding required|no development needed|just advice|consulting only|architecture audit|audit how i build|knowledge-transfer engagement|not an outsourced development|private technical mentor|teaching nontechnical|sequence of instruction)\b/i.test(text)) {
     return true;
   }
 
   // Require a clear hands-on development / engineering / building signal
-  const hasBuildSignal = /\b(build|building|develop|developer|development|engineer|engineering|implement|implementation|create|automate|automation|scrape|scraper|scraping|crawler|script|pipeline|integration|integrate|agent|bot|api|backend|full-stack|full stack|workflow|playwright|selenium|python|node\.js|nodejs)\b/i.test(text);
+  const hasBuildSignal = /\b(build|building|develop|developer|development|engineer|engineering|implement|implementation|create|automate|automation|scrape|scraper|scraping|crawler|script|pipeline|integration|integrate|agent|bot|chatbot|voice|vapi|retell|twilio|elevenlabs|n8n|zapier|data extraction|data scraping|api|backend|full-stack|full stack|workflow|playwright|selenium|python|node\.js|nodejs)\b/i.test(text);
   return !hasBuildSignal;
+}
+
+function isClientHireRateEligible(job) {
+  const hireRate = Number(job?.client_hire_rate || 0);
+  if (hireRate >= 60) return true;
+
+  const isFreshVerified = Boolean(job?.client_payment_verified)
+    && Number(job?.client_total_posted || 0) <= 2
+    && Number(job?.client_total_hires || 0) === 0
+    && hireRate === 0;
+  if (!isFreshVerified) return false;
+
+  const isHourly = (job?.job_type || '').toLowerCase() === 'hourly';
+  return isHourly
+    ? (Number(job?.hourly_max || 0) === 0 || Number(job?.hourly_max || 0) >= 30)
+    : (Number(job?.budget || 0) >= 300);
 }
 
 function isJobEligibleForAutoProposal(job, options = {}) {
@@ -129,7 +152,7 @@ function isJobEligibleForAutoProposal(job, options = {}) {
   if (job.is_ghost_job) return false;
   if ((job.sniper_score || 0) < 80) return false;
   if (!options.force && isConsultingOrNonBuildJob(job)) return false;
-  if (!options.force && Number(job.client_hire_rate || 0) < 60) return false;
+  if (!options.force && !isClientHireRateEligible(job)) return false;
 
   // Enforce strict < 5 proposals rule
   const propsNum = Number(job.current_proposals_numeric || 0);
@@ -157,29 +180,8 @@ function isJobEligibleForAutoProposal(job, options = {}) {
   return true;
 }
 
-function answerScreeningQuestion(questionText, jobTitle = '') {
-  const cleanQ = String(questionText || '')
-    .replace(/<\/?untrusted_participant_content>/gi, '')
-    .trim();
-  const qLower = cleanQ.toLowerCase();
-
-  if (/(accuracy|eval|test|measure|verify|reliab|error|retry|audit)/.test(qLower)) {
-    return 'I run deterministic schema validation (JSON/Pydantic), automated regression checks on held-out sample batches before release, idempotent job queues so retries never duplicate actions, and structured execution logs with human approval checkpoints.';
-  }
-  if (/(security|pii|privacy|safe|data|compliance|hipaa|secret|auth)/.test(qLower)) {
-    return 'All secrets stay in isolated environment vaults, PII is redacted before any external LLM call unless explicitly authorized under strict zero-retention endpoints, and tools operate on least-privilege OAuth scopes with full audit logging.';
-  }
-  if (/(milestone|estimate|timeline|cost|hours|phase|deliverable)/.test(qLower)) {
-    return 'For Phase 1, I propose an end-to-end working core workflow with logging, validation, and a clean handoff walkthrough in the first 1-2 weeks (~25-35 hours), verified against your real test cases before scaling.';
-  }
-  if (/(scrap|crawl|playwright|selenium|puppeteer|anti-bot|browser|extract)/.test(qLower)) {
-    return 'I build resilient Playwright/Selenium and API reverse-engineering pipelines with session persistence, schema validation, and automated recovery, ranked #7 in Turkey in Data Extraction with 100% Job Success on Upwork.';
-  }
-  if (/(agent|llm|claude|gpt|rag|mcp|workflow|automation)/.test(qLower)) {
-    return `I have shipped multiple production AI agent and automation platforms combining Claude/GPT tool-calling, MCP servers, FastAPI/Node.js workers, and structured validation for projects like "${String(jobTitle).slice(0, 60)}" with a 5.0 rating and 100% JSS on Upwork.`;
-  }
-
-  return 'I am a Top Rated Upwork Engineer (100% Job Success Score, 5.0 rating, #7 in Turkey in Data Extraction) specializing in production AI agents, resilient Playwright/Python browser automation, and full-stack Node.js/FastAPI platforms with automated monitoring and recovery.';
+function answerScreeningQuestion() {
+  return 'check out loom i prepared for you';
 }
 
 async function ensureVideoGenerated(jobId, strictUnder5 = true) {
@@ -191,20 +193,33 @@ async function ensureVideoGenerated(jobId, strictUnder5 = true) {
     return { generatedNow: false, outPath };
   }
 
-  const upworkUrl = buildUpworkJobUrl(jobId);
-  const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-  const args = [renderScriptPath, upworkUrl, outPath];
-  if (strictUnder5) {
-    args.push('--strict-under-5');
+  if (activeVideoRenders.has(jobId)) {
+    return activeVideoRenders.get(jobId);
   }
 
-  console.log(`[Auto-Proposer] Rendering custom Loom video for ${jobId} -> ${upworkUrl} (strictUnder5=${strictUnder5})`);
-  await execFileAsync(pythonCmd, args, {
-    maxBuffer: 1024 * 1024 * 20,
-    timeout: 150000
-  });
+  const renderPromise = (async () => {
+    const upworkUrl = buildUpworkJobUrl(jobId);
+    const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+    const args = [renderScriptPath, upworkUrl, outPath];
+    if (strictUnder5) {
+      args.push('--strict-under-5');
+    }
 
-  return { generatedNow: true, outPath };
+    console.log(`[Auto-Proposer] Rendering custom Loom video for ${jobId} -> ${upworkUrl} (strictUnder5=${strictUnder5})`);
+    await execFileAsync(pythonCmd, args, {
+      maxBuffer: 1024 * 1024 * 20,
+      timeout: 150000
+    });
+
+    return { generatedNow: true, outPath };
+  })();
+
+  activeVideoRenders.set(jobId, renderPromise);
+  try {
+    return await renderPromise;
+  } finally {
+    activeVideoRenders.delete(jobId);
+  }
 }
 
 function recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, connectsCost, status, previewId = null, details = '') {
@@ -272,10 +287,13 @@ async function submitAutoProposalForJob(job, options = {}) {
         job.client_total_spent = detJob.client?.total_spent ?? job.client_total_spent;
         job.client_total_posted = detJob.client?.posted_jobs_count ?? job.client_total_posted;
         job.client_total_hires = detJob.client?.hires_count ?? job.client_total_hires;
+        if (detJob.client?.payment_verified !== undefined) {
+          job.client_payment_verified = detJob.client.payment_verified ? 1 : 0;
+        }
         job.sniper_score = calculateSniperScore(job);
         db.prepare(`
           UPDATE jobs
-          SET description = ?, client_hire_rate = ?, client_total_spent = ?, client_total_posted = ?, client_total_hires = ?, sniper_score = ?
+          SET description = ?, client_hire_rate = ?, client_total_spent = ?, client_total_posted = ?, client_total_hires = ?, client_payment_verified = ?, sniper_score = ?
           WHERE job_id = ?
         `).run(
           job.description,
@@ -283,6 +301,7 @@ async function submitAutoProposalForJob(job, options = {}) {
           job.client_total_spent,
           job.client_total_posted,
           job.client_total_hires,
+          job.client_payment_verified,
           job.sniper_score,
           job.job_id
         );
@@ -296,8 +315,8 @@ async function submitAutoProposalForJob(job, options = {}) {
       return { ok: false, status: 'skipped_consulting_or_non_dev', job_id: job.job_id };
     }
 
-    if (Number(job.client_hire_rate || 0) < 60) {
-      const reason = `Client hire rate is ${job.client_hire_rate}% (< 60% minimum)`;
+    if (!isClientHireRateEligible(job)) {
+      const reason = `Client hire rate is ${job.client_hire_rate}% (posted=${job.client_total_posted}, hires=${job.client_total_hires})`;
       recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_low_hire_rate', null, reason);
       return { ok: false, status: 'skipped_low_hire_rate', job_id: job.job_id, reason };
     }
@@ -408,27 +427,6 @@ async function submitAutoProposalForJob(job, options = {}) {
     }
   }
 
-  // Generate custom Loom video + strict live <5 proposals verification
-  const strictUnder5 = options.strictUnder5 !== false && !options.force;
-  try {
-    await ensureVideoGenerated(job.job_id, strictUnder5);
-  } catch (vidErr) {
-    const errText = String(vidErr.stderr || vidErr.message || '');
-    if (errText.includes('PRIVATE_OR_CLOSED_JOB')) {
-      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, connectsCost, 'skipped_private_listing', previewRes.preview_id, 'Job is private or no longer available');
-      return { ok: false, status: 'skipped_private_listing', job_id: job.job_id };
-    }
-    if (errText.includes('PROPOSALS_OVER_5')) {
-      const tierMatch = errText.match(/PROPOSALS_OVER_5:([^\r\n]+)/);
-      const liveTier = tierMatch ? tierMatch[1].trim() : '20 to 50';
-      db.prepare('UPDATE jobs SET current_proposals_tier = ?, current_proposals_numeric = 25 WHERE job_id = ?').run(liveTier, job.job_id);
-      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, connectsCost, 'skipped_over_5_proposals', previewRes.preview_id, `Live Upwork page showed: ${liveTier}`);
-      return { ok: false, status: 'skipped_over_5_proposals', tier: liveTier, job_id: job.job_id };
-    }
-    recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, connectsCost, 'error_video_render', previewRes.preview_id, errText);
-    return { ok: false, status: 'error_video_render', error: errText, job_id: job.job_id };
-  }
-
   if (options.dryRun) {
     return {
       ok: true,
@@ -454,7 +452,7 @@ async function submitAutoProposalForJob(job, options = {}) {
     accessToken
   );
 
-  // Confirm & officially submit proposal via Upwork MCP (refresh once if preview expired during video render)
+  // Confirm & submit IMMEDIATELY (~2s) to secure #1 spot, then render custom video in background
   try {
     let confirmRes;
     try {
@@ -466,7 +464,7 @@ async function submitAutoProposalForJob(job, options = {}) {
       if (!/expir|not.?found|invalid.?preview|stale/i.test(String(firstConfirmErr?.message || ''))) {
         throw firstConfirmErr;
       }
-      console.warn(`[Auto-Proposer] Preview ${previewRes.preview_id} expired during video render; recreating preview...`);
+      console.warn(`[Auto-Proposer] Preview ${previewRes.preview_id} expired; recreating preview...`);
       previewRes = await callUpworkMcpWithRetry(
         'upwork__manage_proposals',
         {
@@ -493,8 +491,13 @@ async function submitAutoProposalForJob(job, options = {}) {
 
     console.log(`[AUTO-PROPOSAL ${status.toUpperCase()}] Job ${job.job_id} (${job.title}) | $${chargedAmount} | ${connectsCost} Connects | ${shareUrl}`);
 
-    if (status === 'submitted' && onProposalSubmitted) {
-      Promise.resolve(onProposalSubmitted({ job, shareUrl, chargedAmount, connectsCost, confirmRes })).catch(() => {});
+    if (status === 'submitted') {
+      if (onProposalSubmitted) {
+        Promise.resolve(onProposalSubmitted({ job, shareUrl, chargedAmount, connectsCost, confirmRes })).catch(() => {});
+      }
+      ensureVideoGenerated(job.job_id, false)
+        .then(r => console.log(`[Auto-Proposer] Background video render completed for ${job.job_id} (generatedNow=${r.generatedNow})`))
+        .catch(err => console.error(`[Auto-Proposer] Background video render error for ${job.job_id}:`, err.stderr || err.message));
     }
 
     return {
@@ -573,6 +576,14 @@ function inferClientDeliverable(job) {
 
   const rules = [
     {
+      test: /\b(voice agent|voice ai|vapi|retell|twilio|elevenlabs|pipecat|livekit|phone agent|ai caller|ai receptionist)\b/i,
+      deliverable: 'AI voice agents and real-time phone automation systems with Vapi, Retell, Twilio, ElevenLabs, and Python'
+    },
+    {
+      test: /\b(chatbot|whatsapp bot|telegram bot|discord bot|conversational ai|chat agent)\b/i,
+      deliverable: 'AI chatbots, WhatsApp/Telegram bots, and automated conversational workflows with Python and Node.js'
+    },
+    {
       test: /\b(scrape|scraper|scraping|crawl|crawler|playwright|selenium|puppeteer|anti-bot|cloudflare|data extraction|amazon reviews|product reviews|price tracker)\b/i,
       deliverable: 'resilient web scrapers and browser automation pipelines with Playwright and Python'
     },
@@ -628,6 +639,7 @@ module.exports = {
   selectPortfolioHighlights,
   selectCertificateHighlights,
   isConsultingOrNonBuildJob,
+  isClientHireRateEligible,
   isJobEligibleForAutoProposal,
   answerScreeningQuestion,
   ensureVideoGenerated,

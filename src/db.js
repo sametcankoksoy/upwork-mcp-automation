@@ -237,13 +237,21 @@ function tierToNumeric(tier) {
 
 function calculateSniperScore(job) {
   let score = 50;
+  const titleText = String(job.title || '').toLowerCase();
   const text = `${job.title || ''} ${job.description || ''}`.toLowerCase();
 
-  // 1. Client Hire Rate & Track Record (strict >= 60% required)
+  // 1. Client Hire Rate & Track Record (>= 60% or fresh payment-verified 1st/2nd job)
+  const isFreshVerifiedPoster = Boolean(job.client_payment_verified)
+    && Number(job.client_total_posted || 0) <= 2
+    && Number(job.client_total_hires || 0) === 0
+    && Number(job.client_hire_rate || 0) === 0;
+
   if (job.client_hire_rate >= 80) {
     score += 25;
   } else if (job.client_hire_rate >= 60) {
     score += 18;
+  } else if (isFreshVerifiedPoster) {
+    score += 12; // Verified payment client on their 1st/2nd job posting
   } else {
     score -= 30;
   }
@@ -255,22 +263,23 @@ function calculateSniperScore(job) {
   else if (job.client_total_spent === 0 && !job.client_payment_verified) score -= 20;
 
   // 3. User Stack Alignment Boost (+22)
-  // Target: Automation, AI Agent, Website Scraping, Playwright, Selenium, Browser Automation, Python, Node.js, Automation Script
-  const isHighFitStack = /(playwright|selenium|browser automation|puppeteer|anti-bot|cloudflare|stealth|crawler|web scraping|scrape|website scraper|data extraction|ai agent|agentic|llm|claude|langchain|llamaindex|automation script|python automation|python script|workflow automation|api automation|\bn8n\b|node\.js|full-stack|full stack)/i.test(text);
+  // Target: Automation, Chatbot, Voice Agent, Script, Data Scraping, Playwright, Selenium, AI Agent
+  const isHighFitStack = /(playwright|selenium|browser automation|puppeteer|anti-bot|cloudflare|stealth|crawler|web scraping|data scraping|scrape|website scraper|data extraction|voice agent|voice ai|vapi|retell|twilio|elevenlabs|pipecat|livekit|chatbot|whatsapp bot|telegram bot|discord bot|conversational ai|ai agent|agentic|llm|claude|openai|rag|\bmcp\b|langchain|llamaindex|automation script|python automation|python script|workflow automation|api automation|\bn8n\b|make\.com|zapier|node\.js|full-stack|full stack)/i.test(text);
   if (isHighFitStack) {
     score += 22;
   }
 
   // 4. Low-Quality Lead Scraping Penalty (-40)
-  // User explicitly wants website scraping, NOT generic sales lead lists / cold email databases
-  const isGenericLeadGen = /(b2b lead|lead gen|lead generation|email list|cold email|email outreach|apollo\.io|apollo|linkedin lead|yellow pages|google maps lead|contact list|lead scraper|data entry|virtual assistant|skip tracing)/i.test(text);
+  // Do NOT penalize developer jobs asking to BUILD an AI agent, scraper script, or automation platform
+  const isGenericLeadGen = /(b2b lead|email list|cold email|apollo\.io|yellow pages|contact list|data entry|virtual assistant|skip tracing)/i.test(text)
+    && !/\b(build|develop|developer|engineer|playwright|selenium|python|n8n|ai agent|voice agent|chatbot|scraper|script)\b/i.test(titleText);
   if (isGenericLeadGen) {
     score -= 40;
   }
 
-  // 4b. Unrelated Non-Dev Tasks Penalty (-40) (e.g. SEO, Social Media, Translation, Speakers, Voice Recording, Video Editors, Accounting)
+  // 4b. Unrelated Non-Dev Tasks Penalty (-45) (e.g. SEO, Social Media, Translation, Speakers, Voice Recording, Video Editors, Accounting)
   const isUnrelatedNonDev = /(seo, ads|marketing agency|social media|funnels|video edit(ing|ors?)|cold calling|sales rep|virtual assistant|copywriter|content writer|appointment setter|trading mentor|speakers?|voice actor|voice over|transcription|translator|translation|audio collection|survey respondent|data labeling|data annotation|annotate|accountant|accounting|bookkeep(er|ing)|tax preparer)/i.test(text)
-    && !/(playwright|selenium|scraping|crawler|puppeteer|browser automation|python|node\.js|full-stack|full stack)/i.test(text);
+    && !/(playwright|selenium|scraping|crawler|puppeteer|browser automation|python|node\.js|full-stack|full stack|voice agent|chatbot)/i.test(text);
   if (isUnrelatedNonDev) {
     score -= 45;
   }
@@ -278,6 +287,7 @@ function calculateSniperScore(job) {
   // 5. Budget / Rate Alignment (Target: Sametcan $40/hr Top Rated)
   if (job.hourly_max >= 40 || job.budget >= 1500) score += 15;
   else if (job.hourly_max >= 30 || job.budget >= 400) score += 8;
+  else if ((job.job_type || '').toLowerCase() === 'hourly' && Number(job.hourly_max || 0) === 0) score += 10;
   else if (job.budget > 0 && job.budget < 100) score -= 25;
   else if (job.hourly_max > 0 && job.hourly_max < 20) score -= 20;
 
@@ -292,7 +302,6 @@ function calculateSniperScore(job) {
 
   // 4c. Consulting, Coaching, Mentoring, Audit-Only & Advisory Hard Cap (<= 30)
   // User strictly wants hands-on development/build projects, NOT consulting or coaching
-  const titleText = String(job.title || '').toLowerCase();
   const isConsultingJob = /\b(consultant|consulting|consultation|advisor|advisory|coach|coaching|mentor|mentoring|mentorship|tutor|tutoring|trainer|training|auditor|code review|architecture review|strategy session|brainstorm|fractional cto|thought partner|teach me|walk me through)\b/i.test(titleText)
     || /\b(looking for a consultant|need a consultant|seeking a consultant|consulting call|advisory role|1-on-1 coaching|one-on-one coaching|teach me how|guide me through|no coding required|no development needed|just advice|consulting only|architecture audit|audit how i build|audit our)\b/i.test(text);
   if (isConsultingJob) {
@@ -300,8 +309,11 @@ function calculateSniperScore(job) {
   }
 
   // 4d. Game Development, Native Mobile & Off-Stack Hard Cap (<= 20)
-  const isGameOrOffStack = /(?:^|[^\w])(c\+\+|c#|\.net)(?!\w)|\b(game developer|game development|mobile games?|android games?|ios games?|3d games?|2d games?|video games?|playable|game engine|unity|unreal engine|unreal|godot|roblox|fivem|minecraft|gameplay|android developer|ios developer|kotlin|swift|objective-c|xcode|android studio|flutter|react native|dotnet|wordpress|wix|squarespace|drupal|magento|laravel|ruby on rails|salesforce|embedded|firmware|arduino|blender|maya)\b/i.test(text);
-  if (isGameOrOffStack) {
+  // Only reject off-stack CMS/CRM names (WordPress, Salesforce, etc.) when they are the primary role in titleText without AI/Automation/Scraping signals
+  const isGameOrMobileHardware = /\b(game developer|game development|mobile games?|android games?|ios games?|3d games?|2d games?|video games?|playable|game engine|unity|unreal engine|unreal|godot|roblox|fivem|minecraft|gameplay|android developer|ios developer|kotlin|swift|objective-c|xcode|android studio|flutter|react native|embedded|firmware|arduino|blender|maya)\b/i.test(text);
+  const isOffStackTitleRole = /(?:^|[^\w])(c\+\+|c#|\.net)(?!\w)|\b(dotnet|wordpress|wix|squarespace|drupal|magento|laravel|ruby on rails|salesforce)\b/i.test(titleText)
+    && !/\b(scrape|scraper|scraping|automation|automate|ai|agent|chatbot|voice|bot|n8n|script|python|playwright|selenium)\b/i.test(titleText);
+  if (isGameOrMobileHardware || isOffStackTitleRole) {
     score = Math.min(score - 85, 20);
   }
 

@@ -9,7 +9,7 @@ const { db, upsertJobAndSnapshot, getSetting, setSetting } = require('./db');
 const { getFullMarketAnalytics } = require('./analytics');
 const { runTrackerCycle, UPWORK_MCP_URL } = require('./upwork-tracker');
 const { getFlconsoleToken, setFlconsoleToken, runFlconsoleSyncCycle } = require('./flconsole-tracker');
-const { getShareHash, buildRyanCoverLetter, submitAutoProposalForJob, runAutoProposerCycle, setProposalNotificationHandler } = require('./auto-proposer');
+const { getShareHash, buildRyanCoverLetter, submitAutoProposalForJob, runAutoProposerCycle, setProposalNotificationHandler, ensureVideoGenerated } = require('./auto-proposer');
 const { createAuthorizationUrl, exchangeCodeForTokens, getValidAccessToken } = require('./upwork-oauth');
 
 const app = express();
@@ -61,6 +61,10 @@ function resolveVideoJobId(idOrToken) {
     if (getShareHash(base) === normalized || (base === '2122421990107900101' && normalized === '7009c82cd76942468c9320b06e1f4ed4')) {
       return base;
     }
+  }
+  const propRow = db.prepare('SELECT job_id FROM auto_proposals WHERE LOWER(share_id) = ? OR job_id = ?').get(normalized, idOrToken);
+  if (propRow?.job_id) {
+    return propRow.job_id;
   }
   return null;
 }
@@ -218,7 +222,11 @@ app.use((req, res, next) => {
 app.get('/videos/:idOrToken.mp4', (req, res) => {
   const realJobId = resolveVideoJobId(req.params.idOrToken);
   if (!realJobId) return sendPrivatePortalLocked(req, res);
-  res.sendFile(path.join(videosDir, `${realJobId}.mp4`));
+  const videoFile = path.join(videosDir, `${realJobId}.mp4`);
+  if (!fs.existsSync(videoFile)) {
+    return res.status(404).end();
+  }
+  res.sendFile(videoFile);
 });
 
 app.get('/thumbnails/:idOrToken.jpg', (req, res) => {
@@ -496,12 +504,17 @@ app.get('/api/job/:jobId', async (req, res) => {
         client_hire_rate: 100
       };
     }
+    const videoReady = fs.existsSync(path.join(videosDir, `${realJobId}.mp4`));
+    if (!videoReady) {
+      ensureVideoGenerated(realJobId, false).catch(() => {});
+    }
     const visitorTz = await detectVisitorTimezone(req);
     res.json({
       ...job,
       job_id: realJobId,
       share_id: getShareHash(realJobId),
       video_url: `/videos/${req.params.jobId}.mp4`,
+      video_ready: videoReady,
       visitor_tz: visitorTz
     });
   } catch (err) {
