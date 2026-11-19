@@ -315,11 +315,11 @@ function calculateSniperScore(job) {
   else if (job.client_total_spent >= 1000) score += 5;
   else if (job.client_total_spent === 0 && !job.client_payment_verified && !isUsFirstPost) score -= 20;
 
-  // 3. User Stack Alignment Boost (+22)
+  // 3. User Stack Alignment Boost (+25)
   // Target: Automation, Chatbot, Voice Agent, Script, Data Scraping, Playwright, Selenium, AI Agent
-  const isHighFitStack = /(playwright|selenium|browser automation|puppeteer|anti-bot|cloudflare|stealth|crawler|web scraping|data scraping|scrape|website scraper|data extraction|voice agent|voice ai|vapi|retell|twilio|elevenlabs|pipecat|livekit|chatbot|whatsapp bot|telegram bot|discord bot|conversational ai|ai agent|agentic|llm|claude|openai|rag|\bmcp\b|langchain|llamaindex|automation script|python automation|python script|workflow automation|api automation|\bn8n\b|make\.com|zapier|node\.js|full-stack|full stack)/i.test(text);
+  const isHighFitStack = /(playwright|selenium|browser automation|puppeteer|anti-bot|cloudflare|stealth|crawl|crawler|crawling|web scraping|data scraping|scrape|scrapers|scraping|website scraper|data extraction|extract data|voice agent|voice ai|vapi|retell|twilio|elevenlabs|pipecat|livekit|chatbot|whatsapp bot|telegram bot|discord bot|conversational ai|ai agent|agentic|llm|claude|openai|rag|\bmcp\b|langchain|llamaindex|automation script|python automation|python script|workflow automation|api automation|bot development|\bn8n\b|make\.com|zapier|node\.js|full-stack|full stack)/i.test(text);
   if (isHighFitStack) {
-    score += 22;
+    score += 25;
   }
 
   // 4. Low-Quality Lead Scraping Penalty (-40)

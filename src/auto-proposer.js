@@ -139,7 +139,7 @@ function isConsultingOrNonBuildJob(job) {
   }
 
   // Require a clear hands-on development / engineering / building signal
-  const hasBuildSignal = /\b(build|building|develop|developer|development|engineer|engineering|create|implement|automate|scrape|scraper|script|bot|agent|pipeline|integration|playwright|selenium|n8n)\b/i.test(text);
+  const hasBuildSignal = /\b(build|building|develop|developer|development|engineer|engineering|create|implement|automate|automation|automated|workflow|scrape|scraper|scrapers|scraping|extract|extraction|crawl|crawler|crawling|script|scripts|bot|bots|chatbot|chatbots|voice|vapi|retell|twilio|elevenlabs|agent|agents|pipeline|integration|integrate|playwright|selenium|puppeteer|n8n|zapier|make\.com|python|node\.js|nodejs|api)\b/i.test(text);
   return !hasBuildSignal;
 }
 
@@ -587,8 +587,8 @@ function inferClientDeliverable(job) {
       deliverable: 'AI chatbots, WhatsApp/Telegram bots, and automated conversational workflows with Python and Node.js'
     },
     {
-      test: /\b(scrape|scraper|scraping|crawl|crawler|playwright|selenium|puppeteer|anti-bot|cloudflare|data extraction|amazon reviews|product reviews|price tracker)\b/i,
-      deliverable: 'resilient web scrapers and browser automation pipelines with Playwright and Python'
+      test: /\b(scrape|scraper|scrapers|scraping|web scraping|data scraping|crawl|crawler|crawling|playwright|selenium|puppeteer|browser automation|anti-bot|cloudflare|data extraction|extract data|amazon reviews|product reviews|price tracker)\b/i,
+      deliverable: 'resilient web scrapers, data extraction pipelines, and browser automation systems with Playwright, Selenium, and Python'
     },
     {
       test: /(e-commerce|ecommerce|shopify|woocommerce|shopping assistant)/i,
