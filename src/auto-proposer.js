@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 
-const { db, getSetting, calculateSniperScore, STRICT_CORE_NICHE_RE, isClientGeoAndHistoryEligible, isBlockedClientCountry } = require('./db');
+const { db, getSetting, calculateSniperScore, LEAD_ENRICHMENT_RE, STRICT_CORE_NICHE_RE, isClientGeoAndHistoryEligible, isBlockedClientCountry } = require('./db');
 const { getValidAccessToken } = require('./upwork-oauth');
 const { callUpworkMcpTool, getTalentOrgUid } = require('./upwork-tracker');
 
@@ -128,6 +128,11 @@ function isConsultingOrNonBuildJob(job) {
   // Reject non-builder / coordinator / assistant / manager roles
   if (/\b(solutions specialist|technical specialist|operations assistant|executive assistant|virtual assistant|project manager|product manager|delivery manager|program manager|scrum master|business analyst|system administrator|client success|customer success|account manager|sales rep|copywriter|content writer)\b/i.test(title)
     || /\b(advising clients|evaluate technical proposals|coordinate with software engineers to clarify|review ai generated emails)\b/i.test(text)) {
+    return true;
+  }
+
+  // Reject Lead Enrichment, Contact List Building, Email Lists & B2B Lead List jobs
+  if (LEAD_ENRICHMENT_RE.test(text)) {
     return true;
   }
 

@@ -281,6 +281,8 @@ function isClientGeoAndHistoryEligible(job) {
   return hireRate >= 60;
 }
 
+const LEAD_ENRICHMENT_RE = /\b(lead enrichment|enrich lead|enrich leads|b2b leads?|lead list|email list|contact list|cold email|apollo\.io|clay\.com|clayagent|linkedin leads?|yellow pages|skip tracing|extract contact information)\b/i;
+
 const STRICT_CORE_NICHE_RE = /\b(automate|automation|automated|workflow automation|business automation|ai automation|n8n|make\.com|zapier|ai agents?|agentic|\bmcp\b|chatbots?|chat bot|whatsapp bot|telegram bot|discord bot|slack bot|conversational ai|rag agent|rag pipeline|voice agent|voice ai|ai voice|vapi|retell|bland ai|twilio|elevenlabs|pipecat|livekit|phone agent|ai caller|ai receptionist|call automation|scrape|scraper|scrapers|scraping|web scraping|data scraping|data extraction|extract data|crawl|crawler|crawling|playwright|selenium|puppeteer|browser automation|cloudflare bypass|anti-bot|python script|automation script|custom script|script developer|bot developer|bot development|python bot|python automation)\b/i;
 
 function calculateSniperScore(job) {
@@ -322,12 +324,10 @@ function calculateSniperScore(job) {
     score += 25;
   }
 
-  // 4. Low-Quality Lead Scraping Penalty (-40)
-  // Do NOT penalize developer jobs asking to BUILD an AI agent, scraper script, or automation platform
-  const isGenericLeadGen = /(b2b lead|email list|cold email|apollo\.io|yellow pages|contact list|data entry|virtual assistant|skip tracing)/i.test(text)
-    && !/\b(build|develop|developer|engineer|playwright|selenium|python|n8n|ai agent|voice agent|chatbot|scraper|script)\b/i.test(titleText);
-  if (isGenericLeadGen) {
-    score -= 40;
+  // 4. Lead Enrichment, B2B Lead Lists & Manual Data Entry Penalty (-60)
+  const isLeadEnrichmentOrList = LEAD_ENRICHMENT_RE.test(text) || /\b(data entry|virtual assistant)\b/i.test(text);
+  if (isLeadEnrichmentOrList) {
+    score -= 60;
   }
 
   // 4b. Unrelated Non-Dev Tasks Penalty (-45) (e.g. SEO, Social Media, Translation, Speakers, Voice Recording, Video Editors, Accounting)
@@ -386,6 +386,11 @@ function calculateSniperScore(job) {
 
   // 4g. Blocked Countries / Ghost / Unverified Non-US Hard Cap (<= 25)
   if (isBlockedClientCountry(job.client_country) || !isClientGeoAndHistoryEligible(job)) {
+    score = Math.min(score - 60, 25);
+  }
+
+  // 4h. Lead Enrichment / Contact List Hard Cap (<= 25)
+  if (isLeadEnrichmentOrList) {
     score = Math.min(score - 60, 25);
   }
 
@@ -610,6 +615,7 @@ module.exports = {
   upsertJobAndSnapshot,
   tierToNumeric,
   calculateSniperScore,
+  LEAD_ENRICHMENT_RE,
   STRICT_CORE_NICHE_RE,
   isBlockedClientCountry,
   isUsClientCountry,
