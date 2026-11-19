@@ -235,6 +235,52 @@ function tierToNumeric(tier) {
   return parseInt(tier, 10) || 3;
 }
 
+const BLOCKED_COUNTRIES_RE = /\b(india|pakistan|bangladesh|sri lanka|nepal|nigeria|kenya|ghana|egypt|morocco|algeria|tunisia|uganda|tanzania|ethiopia|zimbabwe|zambia|cameroon|senegal|south africa|ivory coast|rwanda|botswana|namibia|mozambique|angola|sudan|somalia|libya|mali|niger|burkina faso|madagascar|malawi|benin|togo|sierra leone|liberia|congo|gabon|mauritius|philippines|vietnam|indonesia)\b/i;
+const US_COUNTRY_RE = /^(usa|us|united states|united states of america)$/i;
+const WESTERN_COUNTRIES_RE = /^(usa|us|united states|united states of america|uk|united kingdom|great britain|england|canada|australia|new zealand|germany|switzerland|netherlands|france|sweden|norway|denmark|finland|ireland|austria|belgium|luxembourg|spain|italy)$/i;
+
+function isBlockedClientCountry(country) {
+  return BLOCKED_COUNTRIES_RE.test(String(country || '').trim());
+}
+
+function isUsClientCountry(country) {
+  return US_COUNTRY_RE.test(String(country || '').trim());
+}
+
+function isWesternClientCountry(country) {
+  return WESTERN_COUNTRIES_RE.test(String(country || '').trim());
+}
+
+function isClientGeoAndHistoryEligible(job) {
+  const country = String(job?.client_country || '').trim();
+  if (isBlockedClientCountry(country)) return false;
+
+  const isUs = isUsClientCountry(country);
+  const isWestern = isWesternClientCountry(country);
+  const verified = Boolean(job?.client_payment_verified);
+  const posted = Number(job?.client_total_posted || 0);
+  const hires = Number(job?.client_total_hires || 0);
+  const hireRate = Number(job?.client_hire_rate || 0);
+
+  // Rule 1: US-only 1st job (verified or unverified allowed, strictly only if posted <= 1)
+  if (isUs && posted <= 1 && hires === 0 && hireRate === 0) {
+    return true;
+  }
+
+  // All other cases strictly require payment_verified
+  if (!verified) return false;
+
+  // Rule 2: Western payment-verified client who is NOT a habitual ghost-job poster
+  if (isWestern) {
+    if (posted <= 1 && hires === 0 && hireRate === 0) return true;
+    if (posted === 2 && hires >= 1) return true;
+    return hireRate >= 50;
+  }
+
+  // Rule 3: Non-Western, non-blocked countries require verified + >= 60% hire rate
+  return hireRate >= 60;
+}
+
 const STRICT_CORE_NICHE_RE = /\b(automate|automation|automated|workflow automation|business automation|ai automation|n8n|make\.com|zapier|ai agents?|agentic|\bmcp\b|chatbots?|chat bot|whatsapp bot|telegram bot|discord bot|slack bot|conversational ai|rag agent|rag pipeline|voice agent|voice ai|ai voice|vapi|retell|bland ai|twilio|elevenlabs|pipecat|livekit|phone agent|ai caller|ai receptionist|call automation|scrape|scraper|scrapers|scraping|web scraping|data scraping|data extraction|extract data|crawl|crawler|crawling|playwright|selenium|puppeteer|browser automation|cloudflare bypass|anti-bot|python script|automation script|custom script|script developer|bot developer|bot development|python bot|python automation)\b/i;
 
 function calculateSniperScore(job) {
@@ -242,18 +288,23 @@ function calculateSniperScore(job) {
   const titleText = String(job.title || '').toLowerCase();
   const text = `${job.title || ''} ${job.description || ''}`.toLowerCase();
 
-  // 1. Client Hire Rate & Track Record (>= 60% or fresh payment-verified 1st/2nd job)
-  const isFreshVerifiedPoster = Boolean(job.client_payment_verified)
-    && Number(job.client_total_posted || 0) <= 2
+  // 1. Client Geo, Hire Rate & Non-Ghost Rules
+  const isUsFirstPost = isUsClientCountry(job.client_country)
+    && Number(job.client_total_posted || 0) <= 1
     && Number(job.client_total_hires || 0) === 0
     && Number(job.client_hire_rate || 0) === 0;
+  const isWesternVerifiedEligible = isWesternClientCountry(job.client_country)
+    && Boolean(job.client_payment_verified)
+    && isClientGeoAndHistoryEligible(job);
 
-  if (job.client_hire_rate >= 80) {
+  if (job.client_hire_rate >= 80 && isClientGeoAndHistoryEligible(job)) {
     score += 25;
-  } else if (job.client_hire_rate >= 60) {
+  } else if (isWesternVerifiedEligible) {
+    score += 20;
+  } else if (isUsFirstPost) {
     score += 18;
-  } else if (isFreshVerifiedPoster) {
-    score += 12; // Verified payment client on their 1st/2nd job posting
+  } else if (job.client_hire_rate >= 60 && isClientGeoAndHistoryEligible(job)) {
+    score += 18;
   } else {
     score -= 30;
   }
@@ -262,7 +313,7 @@ function calculateSniperScore(job) {
   if (job.client_total_spent >= 50000) score += 15;
   else if (job.client_total_spent >= 10000) score += 10;
   else if (job.client_total_spent >= 1000) score += 5;
-  else if (job.client_total_spent === 0 && !job.client_payment_verified) score -= 20;
+  else if (job.client_total_spent === 0 && !job.client_payment_verified && !isUsFirstPost) score -= 20;
 
   // 3. User Stack Alignment Boost (+22)
   // Target: Automation, Chatbot, Voice Agent, Script, Data Scraping, Playwright, Selenium, AI Agent
@@ -331,6 +382,11 @@ function calculateSniperScore(job) {
   const isNonBuilderRole = /\b(solutions specialist|technical specialist|operations assistant|executive assistant|virtual assistant|project manager|product manager|delivery manager|program manager|scrum master|business analyst|system administrator|client success|customer success|account manager|sales rep|copywriter|content writer)\b/i.test(titleText);
   if (isNonBuilderRole || !STRICT_CORE_NICHE_RE.test(leadSummary)) {
     score = Math.min(score - 50, 35);
+  }
+
+  // 4g. Blocked Countries / Ghost / Unverified Non-US Hard Cap (<= 25)
+  if (isBlockedClientCountry(job.client_country) || !isClientGeoAndHistoryEligible(job)) {
+    score = Math.min(score - 60, 25);
   }
 
   return Math.max(0, Math.min(100, Math.round(score)));
@@ -555,6 +611,10 @@ module.exports = {
   tierToNumeric,
   calculateSniperScore,
   STRICT_CORE_NICHE_RE,
+  isBlockedClientCountry,
+  isUsClientCountry,
+  isWesternClientCountry,
+  isClientGeoAndHistoryEligible,
   getSetting,
   setSetting
 };

@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 
-const { db, getSetting, calculateSniperScore, STRICT_CORE_NICHE_RE } = require('./db');
+const { db, getSetting, calculateSniperScore, STRICT_CORE_NICHE_RE, isClientGeoAndHistoryEligible, isBlockedClientCountry } = require('./db');
 const { getValidAccessToken } = require('./upwork-oauth');
 const { callUpworkMcpTool, getTalentOrgUid } = require('./upwork-tracker');
 
@@ -144,19 +144,7 @@ function isConsultingOrNonBuildJob(job) {
 }
 
 function isClientHireRateEligible(job) {
-  const hireRate = Number(job?.client_hire_rate || 0);
-  if (hireRate >= 60) return true;
-
-  const isFreshVerified = Boolean(job?.client_payment_verified)
-    && Number(job?.client_total_posted || 0) <= 2
-    && Number(job?.client_total_hires || 0) === 0
-    && hireRate === 0;
-  if (!isFreshVerified) return false;
-
-  const isHourly = (job?.job_type || '').toLowerCase() === 'hourly';
-  return isHourly
-    ? (Number(job?.hourly_max || 0) === 0 || Number(job?.hourly_max || 0) >= 30)
-    : (Number(job?.budget || 0) >= 300);
+  return isClientGeoAndHistoryEligible(job);
 }
 
 function isJobEligibleForAutoProposal(job, options = {}) {
@@ -296,6 +284,7 @@ async function submitAutoProposalForJob(job, options = {}) {
       detJob = detRes?.jobs?.[0] || null;
       if (detJob) {
         job.description = detJob.description || job.description;
+        job.client_country = detJob.client?.country || job.client_country;
         job.client_hire_rate = typeof detJob.client?.hire_rate === 'number' ? detJob.client.hire_rate : job.client_hire_rate;
         job.client_total_spent = detJob.client?.total_spent ?? job.client_total_spent;
         job.client_total_posted = detJob.client?.posted_jobs_count ?? job.client_total_posted;
@@ -306,10 +295,11 @@ async function submitAutoProposalForJob(job, options = {}) {
         job.sniper_score = calculateSniperScore(job);
         db.prepare(`
           UPDATE jobs
-          SET description = ?, client_hire_rate = ?, client_total_spent = ?, client_total_posted = ?, client_total_hires = ?, client_payment_verified = ?, sniper_score = ?
+          SET description = ?, client_country = ?, client_hire_rate = ?, client_total_spent = ?, client_total_posted = ?, client_total_hires = ?, client_payment_verified = ?, sniper_score = ?
           WHERE job_id = ?
         `).run(
           job.description,
+          job.client_country,
           job.client_hire_rate,
           job.client_total_spent,
           job.client_total_posted,
@@ -328,8 +318,8 @@ async function submitAutoProposalForJob(job, options = {}) {
       return { ok: false, status: 'skipped_consulting_or_non_dev', job_id: job.job_id };
     }
 
-    if (!isClientHireRateEligible(job)) {
-      const reason = `Client hire rate is ${job.client_hire_rate}% (posted=${job.client_total_posted}, hires=${job.client_total_hires})`;
+    if (isBlockedClientCountry(job.client_country) || !isClientHireRateEligible(job)) {
+      const reason = `Client blocked or ineligible: country=${job.client_country}, verified=${job.client_payment_verified}, hireRate=${job.client_hire_rate}% (posted=${job.client_total_posted}, hires=${job.client_total_hires})`;
       recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_low_hire_rate', null, reason);
       return { ok: false, status: 'skipped_low_hire_rate', job_id: job.job_id, reason };
     }

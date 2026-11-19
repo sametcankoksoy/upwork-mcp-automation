@@ -101,8 +101,8 @@ function mapFlconsoleJobToDb(j, defaultKeyword = 'AI & Automation') {
   const client = j.client || {};
   const clientSpent = parseMoney(client.total_spent || client.spend_total || 0);
   const clientRating = typeof client.rating === 'number' ? client.rating : parseMoney(client.rating || 0);
-  const clientVerified = client.payment_verified === false ? 0 : 1;
-  const clientCountry = client.country || 'United States';
+  const clientVerified = client.payment_verified === true ? 1 : 0;
+  const clientCountry = client.country || '';
 
   const postedAt = j.publish_at || j.published_time || new Date().toISOString();
   const title = j.title || 'Untitled Job';
