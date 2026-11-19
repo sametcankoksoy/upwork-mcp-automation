@@ -235,6 +235,8 @@ function tierToNumeric(tier) {
   return parseInt(tier, 10) || 3;
 }
 
+const STRICT_CORE_NICHE_RE = /\b(automate|automation|automated|workflow automation|business automation|ai automation|n8n|make\.com|zapier|ai agents?|agentic|\bmcp\b|chatbots?|chat bot|whatsapp bot|telegram bot|discord bot|slack bot|conversational ai|rag agent|rag pipeline|voice agent|voice ai|ai voice|vapi|retell|bland ai|twilio|elevenlabs|pipecat|livekit|phone agent|ai caller|ai receptionist|call automation|scrape|scraper|scrapers|scraping|web scraping|data scraping|data extraction|extract data|crawl|crawler|crawling|playwright|selenium|puppeteer|browser automation|cloudflare bypass|anti-bot|python script|automation script|custom script|script developer|bot developer|bot development|python bot|python automation)\b/i;
+
 function calculateSniperScore(job) {
   let score = 50;
   const titleText = String(job.title || '').toLowerCase();
@@ -322,6 +324,13 @@ function calculateSniperScore(job) {
     && !/\b(web scraping|scraper|data extraction|crawl|crawler)\b/i.test(titleText);
   if (isQaOrBugTesting) {
     score = Math.min(score - 85, 20);
+  }
+
+  // 4f. Strict 5-Niche Core Gate (Automation, Chatbot, Voice Agent, Script, Data Scraping ONLY; cap <= 35 otherwise)
+  const leadSummary = `${titleText}\n${String(job.description || '').slice(0, 280).toLowerCase()}`;
+  const isNonBuilderRole = /\b(solutions specialist|technical specialist|operations assistant|executive assistant|virtual assistant|project manager|product manager|delivery manager|program manager|scrum master|business analyst|system administrator|client success|customer success|account manager|sales rep|copywriter|content writer)\b/i.test(titleText);
+  if (isNonBuilderRole || !STRICT_CORE_NICHE_RE.test(leadSummary)) {
+    score = Math.min(score - 50, 35);
   }
 
   return Math.max(0, Math.min(100, Math.round(score)));
@@ -545,6 +554,7 @@ module.exports = {
   upsertJobAndSnapshot,
   tierToNumeric,
   calculateSniperScore,
+  STRICT_CORE_NICHE_RE,
   getSetting,
   setSetting
 };

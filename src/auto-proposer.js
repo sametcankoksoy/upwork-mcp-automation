@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 
-const { db, getSetting, calculateSniperScore } = require('./db');
+const { db, getSetting, calculateSniperScore, STRICT_CORE_NICHE_RE } = require('./db');
 const { getValidAccessToken } = require('./upwork-oauth');
 const { callUpworkMcpTool, getTalentOrgUid } = require('./upwork-tracker');
 
@@ -125,8 +125,21 @@ function isConsultingOrNonBuildJob(job) {
     return true;
   }
 
+  // Reject non-builder / coordinator / assistant / manager roles
+  if (/\b(solutions specialist|technical specialist|operations assistant|executive assistant|virtual assistant|project manager|product manager|delivery manager|program manager|scrum master|business analyst|system administrator|client success|customer success|account manager|sales rep|copywriter|content writer)\b/i.test(title)
+    || /\b(advising clients|evaluate technical proposals|coordinate with software engineers to clarify|review ai generated emails)\b/i.test(text)) {
+    return true;
+  }
+
+  // Require an explicit match in title or opening 280 chars for our 5 core niches:
+  // Automation, Chatbot, Voice Agent, Script, Data Scraping
+  const leadSummary = `${title}\n${desc.slice(0, 280)}`;
+  if (!STRICT_CORE_NICHE_RE.test(leadSummary)) {
+    return true;
+  }
+
   // Require a clear hands-on development / engineering / building signal
-  const hasBuildSignal = /\b(build|building|develop|developer|development|engineer|engineering|implement|implementation|create|automate|automation|scrape|scraper|scraping|crawler|script|pipeline|integration|integrate|agent|bot|chatbot|voice|vapi|retell|twilio|elevenlabs|n8n|zapier|data extraction|data scraping|api|backend|full-stack|full stack|workflow|playwright|selenium|python|node\.js|nodejs)\b/i.test(text);
+  const hasBuildSignal = /\b(build|building|develop|developer|development|engineer|engineering|create|implement|automate|scrape|scraper|script|bot|agent|pipeline|integration|playwright|selenium|n8n)\b/i.test(text);
   return !hasBuildSignal;
 }
 
