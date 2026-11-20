@@ -867,16 +867,16 @@ if (require.main === module) {
     console.log(`Upwork Market Intelligence Server running on http://localhost:${PORT}`);
   });
 
-  // Primary Real-time Upwork MCP Radar loop (every 36 seconds)
-  function scheduleNextUpworkMcpRadar(delayMs = 3000) {
+  // Primary Real-time Upwork MCP Radar loop (every 20 seconds for instant job interception)
+  function scheduleNextUpworkMcpRadar(delayMs = 1000) {
     setTimeout(async () => {
-      let nextDelay = 36 * 1000;
+      let nextDelay = 20 * 1000;
       try {
         const token = await getValidAccessToken();
         if (token) {
           const res = await runUpworkMcpRadarCycle();
           if (res?.newJobsFound > 0) {
-            // Instantly trigger proposal check for newly caught fresh jobs!
+            // Instantly trigger proposal check for newly caught fresh jobs without waiting!
             runAutoProposerCycle(3).catch(err => console.error('[Auto-Proposer] Trigger error:', err));
           }
         }
@@ -887,7 +887,7 @@ if (require.main === module) {
     }, delayMs);
   }
 
-  scheduleNextUpworkMcpRadar(3000);
+  scheduleNextUpworkMcpRadar(1000);
 
   // Secondary adaptive flconsole sync loop (fallback stream ~61s)
   function scheduleNextFlconsoleSync(delayMs = 2000) {
@@ -909,10 +909,10 @@ if (require.main === module) {
 
   scheduleNextFlconsoleSync(2000);
 
-  // High-priority realtime proposal watcher every 15 seconds
+  // High-priority realtime proposal watcher every 10 seconds
   setInterval(() => {
     runAutoProposerCycle(3).catch(err => console.error('[Auto-Proposer] Loop error:', err));
-  }, 15 * 1000);
+  }, 10 * 1000);
 
   // Self keep-alive ping every 4 minutes
   const externalUrl = process.env.RENDER_EXTERNAL_URL || 'https://upwork-mcp-automation.onrender.com';

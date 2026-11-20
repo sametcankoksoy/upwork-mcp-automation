@@ -437,21 +437,34 @@ async function submitAutoProposalForJob(job, options = {}) {
   }
 
   const preview = previewRes?.preview || {};
-  const connectsCost = Number(preview.connects_cost || 0);
+  const baseConnectsCost = Number(preview.connects_cost || 0);
   const rationale = String(preview.boost?.rationale || '').toLowerCase();
   const topBids = preview.boost?.current_top_bids || [];
+  const hasBoostBids = Array.isArray(topBids) && topBids.length > 0 && topBids.some(b => Number(b) > 0);
+  const isBoostAvailable = preview.boost?.available !== false;
+  const maxBoost = Number(preview.boost?.max_boost_connects || 0);
+  const minBoost = Number(preview.boost?.min_boost_connects || 1);
 
   if (preview.can_apply === false || rationale.includes('already hired')) {
-    const reason = preview.can_apply === false ? 'can_apply=false' : preview.boost.rationale;
-    recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, connectsCost, 'skipped_already_hired', previewRes.preview_id, reason);
+    const reason = preview.can_apply === false ? 'can_apply=false' : (preview.boost?.rationale || 'cannot_apply');
+    recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, baseConnectsCost, 'skipped_already_hired', previewRes.preview_id, reason);
     return { ok: false, status: 'skipped_already_hired', job_id: job.job_id, reason };
   }
 
-
+  // If no one has boosted yet, bid 30 connects to secure Slot #1 instantly
+  let appliedBoost = 0;
+  if (!hasBoostBids && isBoostAvailable && maxBoost >= minBoost) {
+    appliedBoost = Math.min(30, maxBoost);
+    if (appliedBoost >= minBoost) {
+      createParams.boost_connects = appliedBoost;
+      console.log(`[Auto-Proposer] No competing boost bids on ${job.job_id}. Bidding ${appliedBoost} connects for Slot #1`);
+    }
+  }
 
   // Handle screening questions if present before video render
   const rawQuestions = preview.screening_questions || preview.screening_answers || [];
-  if (Array.isArray(rawQuestions) && rawQuestions.length > 0) {
+  const hasQuestions = Array.isArray(rawQuestions) && rawQuestions.length > 0;
+  if (hasQuestions) {
     createParams.answers = rawQuestions.map(q => {
       const qStr = typeof q === 'string' ? q : (q?.question || String(q));
       const cleanQ = qStr.replace(/<\/?untrusted_participant_content>/gi, '').trim();
@@ -460,7 +473,10 @@ async function submitAutoProposalForJob(job, options = {}) {
         answer: answerScreeningQuestion(cleanQ, job.title, shareUrl)
       };
     });
+  }
 
+  // If answers or boost was added, regenerate preview to commit parameters before confirm
+  if (hasQuestions || createParams.boost_connects) {
     try {
       previewRes = await callUpworkMcpWithRetry(
         'upwork__manage_proposals',
@@ -471,11 +487,34 @@ async function submitAutoProposalForJob(job, options = {}) {
         },
         accessToken
       );
-    } catch (qErr) {
-      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, connectsCost, 'error_screening_answers', null, qErr.message);
-      return { ok: false, status: 'error_screening_answers', error: qErr.message, job_id: job.job_id };
+    } catch (createErr2) {
+      // If boost failed (e.g. outbid in flight), fallback to standard proposal without boost
+      if (createParams.boost_connects) {
+        console.warn(`[Auto-Proposer] Boost bid failed for ${job.job_id} (${createErr2.message}). Retrying without boost...`);
+        delete createParams.boost_connects;
+        appliedBoost = 0;
+        try {
+          previewRes = await callUpworkMcpWithRetry(
+            'upwork__manage_proposals',
+            {
+              action: 'create',
+              org_uid: orgUid,
+              params: createParams
+            },
+            accessToken
+          );
+        } catch (retryErr) {
+          recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, baseConnectsCost, 'error_preview', null, retryErr.message);
+          return { ok: false, status: 'error_preview', error: retryErr.message, job_id: job.job_id };
+        }
+      } else {
+        recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, baseConnectsCost, 'error_screening_answers', null, createErr2.message);
+        return { ok: false, status: 'error_screening_answers', error: createErr2.message, job_id: job.job_id };
+      }
     }
   }
+
+  const connectsCost = baseConnectsCost + appliedBoost;
 
   if (options.dryRun) {
     return {
@@ -511,10 +550,16 @@ async function submitAutoProposalForJob(job, options = {}) {
         throw new Error(confirmRes.reason || JSON.stringify(confirmRes));
       }
     } catch (firstConfirmErr) {
-      if (!/expir|not.?found|invalid.?preview|stale/i.test(String(firstConfirmErr?.message || ''))) {
+      if (!/expir|not.?found|invalid.?preview|stale|boost/i.test(String(firstConfirmErr?.message || ''))) {
         throw firstConfirmErr;
       }
-      console.warn(`[Auto-Proposer] Preview ${previewRes.preview_id} expired; recreating preview...`);
+      if (/boost/i.test(String(firstConfirmErr?.message || ''))) {
+        console.warn(`[Auto-Proposer] Boost bid conflict on confirm for ${job.job_id} (${firstConfirmErr.message}); retrying without boost...`);
+        delete createParams.boost_connects;
+        appliedBoost = 0;
+      } else {
+        console.warn(`[Auto-Proposer] Preview ${previewRes.preview_id} expired; recreating preview...`);
+      }
       previewRes = await callUpworkMcpWithRetry(
         'upwork__manage_proposals',
         {
@@ -539,7 +584,7 @@ async function submitAutoProposalForJob(job, options = {}) {
       JSON.stringify(confirmRes)
     );
 
-    console.log(`[AUTO-PROPOSAL ${status.toUpperCase()}] Job ${job.job_id} (${job.title}) | $${chargedAmount} | ${connectsCost} Connects | ${shareUrl}`);
+    console.log(`[AUTO-PROPOSAL ${status.toUpperCase()}] Job ${job.job_id} (${job.title}) | $${chargedAmount} | ${connectsCost} Connects (Boost=${appliedBoost}) | ${shareUrl}`);
 
     if (status === 'submitted') {
       if (onProposalSubmitted) {
