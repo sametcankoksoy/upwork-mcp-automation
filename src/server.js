@@ -847,6 +847,8 @@ app.get(['/share/:jobId', '/loom/:jobId'], (req, res) => {
 
   let html = fs.readFileSync(path.join(__dirname, '..', 'public', 'loom.html'), 'utf8');
   html = html.replace('<title id="pageTitle">Video Message | Upwork</title>', metaTags);
+  html = html.replace('<video id="loomVideo" class="w-full h-full object-contain cursor-pointer" playsinline preload="auto">', `<video id="loomVideo" poster="${safeThumbUrl}" class="w-full h-full object-contain cursor-pointer" playsinline preload="auto">`);
+  html = html.replace('<source id="videoSrc" src="" type="video/mp4">', `<source id="videoSrc" src="${safeVideoUrl}" type="video/mp4">`);
 
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Content-Type', 'text/html; charset=utf-8');

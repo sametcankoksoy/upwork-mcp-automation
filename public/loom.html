@@ -50,6 +50,9 @@
         </svg>
       </button>
 
+      <!-- Video Buffering / Loading Spinner -->
+      <div id="videoBufferingSpinner" class="hidden absolute inset-0 m-auto w-14 h-14 border-4 border-white/20 border-t-[#14a800] rounded-full animate-spin z-25 pointer-events-none"></div>
+
       <!-- Preparing Video Banner (shown only if client opens within seconds of instant proposal) -->
       <div id="videoPreparingBanner" class="hidden absolute inset-0 bg-black/80 backdrop-blur-sm z-25 flex flex-col items-center justify-center text-white px-6 text-center">
         <div class="w-10 h-10 border-4 border-white/25 border-t-[#14a800] rounded-full animate-spin mb-3"></div>
@@ -303,6 +306,7 @@
     const playIcon = document.getElementById('playIcon');
     const pauseIcon = document.getElementById('pauseIcon');
     const centerPlayBtn = document.getElementById('centerPlayBtn');
+    const bufferingSpinner = document.getElementById('videoBufferingSpinner');
     const progressBar = document.getElementById('progressBar');
     const timeDisplay = document.getElementById('timeDisplay');
     const speedBtn = document.getElementById('speedBtn');
@@ -328,12 +332,25 @@
 
     function togglePlay() {
       if (video.paused || video.ended) {
-        video.play();
-        playIcon.classList.add('hidden');
-        pauseIcon.classList.remove('hidden');
         centerPlayBtn.classList.add('hidden');
+        if (video.readyState < 3 && bufferingSpinner) {
+          bufferingSpinner.classList.remove('hidden');
+        }
+        const p = video.play();
+        if (p !== undefined) {
+          p.then(() => {
+            if (bufferingSpinner) bufferingSpinner.classList.add('hidden');
+            playIcon.classList.add('hidden');
+            pauseIcon.classList.remove('hidden');
+          }).catch(err => {
+            if (bufferingSpinner) bufferingSpinner.classList.add('hidden');
+            centerPlayBtn.classList.remove('hidden');
+            console.warn('Play error:', err);
+          });
+        }
       } else {
         video.pause();
+        if (bufferingSpinner) bufferingSpinner.classList.add('hidden');
         playIcon.classList.remove('hidden');
         pauseIcon.classList.add('hidden');
         centerPlayBtn.classList.remove('hidden');
@@ -341,6 +358,21 @@
     }
 
     video.addEventListener('click', togglePlay);
+
+    video.addEventListener('waiting', () => {
+      if (!video.paused && bufferingSpinner) bufferingSpinner.classList.remove('hidden');
+    });
+
+    video.addEventListener('playing', () => {
+      if (bufferingSpinner) bufferingSpinner.classList.add('hidden');
+      playIcon.classList.add('hidden');
+      pauseIcon.classList.remove('hidden');
+      centerPlayBtn.classList.add('hidden');
+    });
+
+    video.addEventListener('canplay', () => {
+      if (bufferingSpinner) bufferingSpinner.classList.add('hidden');
+    });
 
     function formatTime(sec) {
       if (!sec || isNaN(sec)) return '0:00';
@@ -621,13 +653,22 @@
           }, 3000);
         } else {
           prepBanner.classList.add('hidden');
-          document.getElementById('videoSrc').src = videoSrc;
-          video.load();
+          if (!video.poster) {
+            video.poster = job.thumb_url || `/thumbnails/${jobId}.jpg`;
+          }
+          const srcEl = document.getElementById('videoSrc');
+          if (!srcEl.src || (!srcEl.src.endsWith(videoSrc) && !srcEl.src.includes(videoSrc))) {
+            srcEl.src = videoSrc;
+            video.load();
+          }
         }
       } catch (err) {
         // Fallback
-        document.getElementById('videoSrc').src = `/videos/${jobId}.mp4`;
-        video.load();
+        const srcEl = document.getElementById('videoSrc');
+        if (!srcEl.src) {
+          srcEl.src = `/videos/${jobId}.mp4`;
+          video.load();
+        }
       }
     }
 

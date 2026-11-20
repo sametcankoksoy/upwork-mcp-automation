@@ -194,8 +194,9 @@ def generate_proposal_video(url, out_video_path, proxy=None, strict_under_5=Fals
         "-filter_complex", filter_concat,
         "-map", "[v]",
         "-map", "[a]",
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18", "-pix_fmt", "yuv420p",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "22", "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "192k",
+        "-movflags", "+faststart",
         out_video_path
     ]
     subprocess.run(cmd_concat, check=True)
