@@ -629,35 +629,23 @@ function inferClientDeliverable(job) {
   const rules = [
     {
       test: /\b(voice agent|voice ai|vapi|retell|twilio|elevenlabs|pipecat|livekit|phone agent|ai caller|ai receptionist)\b/i,
-      deliverable: 'AI voice agents and real-time phone automation systems with Vapi, Retell, Twilio, ElevenLabs, and Python'
+      deliverable: 'voice agents'
     },
     {
       test: /\b(chatbot|whatsapp bot|telegram bot|discord bot|conversational ai|chat agent)\b/i,
-      deliverable: 'AI chatbots, WhatsApp/Telegram bots, and automated conversational workflows with Python and Node.js'
+      deliverable: 'chatbots'
     },
     {
-      test: /\b(scrape|scraper|scrapers|scraping|web scraping|data scraping|crawl|crawler|crawling|playwright|selenium|puppeteer|browser automation|anti-bot|cloudflare|data extraction|extract data|amazon reviews|product reviews|price tracker)\b/i,
-      deliverable: 'resilient web scrapers, data extraction pipelines, and browser automation systems with Playwright, Selenium, and Python'
+      test: /\b(scrape|scraper|scrapers|scraping|web scraping|data scraping|crawl|crawler|crawling|playwright|selenium|puppeteer|browser automation|anti-bot|cloudflare|data extraction|extract data)\b/i,
+      deliverable: 'scrapers'
     },
     {
-      test: /(e-commerce|ecommerce|shopify|woocommerce|shopping assistant)/i,
-      deliverable: 'AI-powered e-commerce shopping assistants, semantic search pipelines, and custom integrations'
+      test: /\b(automation|automate|workflow|\bn8n\b|zapier|make\.com|pipeline|integration|webhook)\b/i,
+      deliverable: 'automations'
     },
     {
-      test: /(recruit|candidate matching|outreach|crm automation|lead gen)/i,
-      deliverable: 'AI matching systems, automated outreach workflows, and custom API pipelines'
-    },
-    {
-      test: /(\bmcp\b|\brag\b|evals|clinic|referral|receipt processing|expense management|document automation|pdf extraction)/i,
-      deliverable: 'production AI agents with Claude, MCP servers, RAG pipelines, and automated document workflows'
-    },
-    {
-      test: /(business workflow|workflow automation|\bn8n\b|zapier|make\.com)/i,
-      deliverable: 'AI workflow automations and custom API integrations with Python and Node.js'
-    },
-    {
-      test: /(dashboard|react|next\.js|saas|platform|full-stack|full stack)/i,
-      deliverable: 'production AI agents and full-stack React, Python, and Node.js applications'
+      test: /\b(ai agent|agentic|\bmcp\b|\brag\b|claude|llm|gpt|assistant)\b/i,
+      deliverable: 'AI agents'
     }
   ];
 
@@ -667,7 +655,7 @@ function inferClientDeliverable(job) {
     }
   }
 
-  return 'custom AI agents, automation workflows, and full-stack Python and Node.js systems';
+  return 'systems';
 }
 
 function buildRyanCoverLetter(job, shareUrl) {
