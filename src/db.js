@@ -235,13 +235,66 @@ function tierToNumeric(tier) {
   return parseInt(tier, 10) || 3;
 }
 
-const BLOCKED_COUNTRIES_RE = /\b(india|pakistan|bangladesh|sri lanka|nepal|nigeria|kenya|ghana|egypt|morocco|algeria|tunisia|uganda|tanzania|ethiopia|zimbabwe|zambia|cameroon|senegal|south africa|ivory coast|rwanda|botswana|namibia|mozambique|angola|sudan|somalia|libya|mali|niger|burkina faso|madagascar|malawi|benin|togo|sierra leone|liberia|congo|gabon|mauritius|philippines|vietnam|indonesia)\b/i;
-const US_COUNTRY_RE = /^(usa|us|united states|united states of america)$/i;
-const WESTERN_COUNTRIES_RE = /^(usa|us|united states|united states of america|uk|united kingdom|great britain|england|gbr|canada|can|australia|aus|new zealand|nzl|germany|deu|switzerland|che|netherlands|nld|france|fra|sweden|swe|norway|nor|denmark|dnk|finland|fin|ireland|irl|austria|aut|belgium|bel|luxembourg|lux|spain|esp|italy|ita)$/i;
+const BLOCKED_COUNTRY_NAMES_RE = /\b(india|pakistan|bangladesh|sri lanka|nepal|nigeria|kenya|ghana|egypt|morocco|algeria|tunisia|uganda|tanzania|ethiopia|zimbabwe|zambia|cameroon|senegal|south africa|ivory coast|rwanda|botswana|namibia|mozambique|angola|sudan|somalia|libya|mali|niger|burkina faso|madagascar|malawi|benin|togo|sierra leone|liberia|congo|gabon|mauritius|philippines|vietnam|indonesia)\b/i;
+
+const BLOCKED_COUNTRY_CODES_SET = new Set([
+  'in', 'ind',
+  'pk', 'pak',
+  'bd', 'bgd',
+  'lk', 'lka',
+  'np', 'npl',
+  'ng', 'nga',
+  'ke', 'ken',
+  'gh', 'gha',
+  'eg', 'egy',
+  'ma', 'mar',
+  'dz', 'dza',
+  'tn', 'tun',
+  'ug', 'uga',
+  'tz', 'tza',
+  'et', 'eth',
+  'zw', 'zwe',
+  'zm', 'zmb',
+  'cm', 'cmr',
+  'sn', 'sen',
+  'za', 'zaf',
+  'ci', 'civ',
+  'rw', 'rwa',
+  'bw', 'bwa',
+  'na', 'nam',
+  'mz', 'moz',
+  'ao', 'ago',
+  'sd', 'sdn',
+  'so', 'som',
+  'ly', 'lby',
+  'ml', 'mli',
+  'ne', 'ner',
+  'bf', 'bfa',
+  'mg', 'mdg',
+  'mw', 'mwi',
+  'bj', 'ben',
+  'tg', 'tgo',
+  'sl', 'sle',
+  'lr', 'lbr',
+  'cg', 'cd', 'cog', 'cod',
+  'ga', 'gab',
+  'mu', 'mus',
+  'ph', 'phl',
+  'vn', 'vnm',
+  'id', 'idn'
+]);
 
 function isBlockedClientCountry(country) {
-  return BLOCKED_COUNTRIES_RE.test(String(country || '').trim());
+  const c = String(country || '').trim().toLowerCase();
+  if (!c) return false;
+  if (BLOCKED_COUNTRY_CODES_SET.has(c)) return true;
+  return BLOCKED_COUNTRY_NAMES_RE.test(c);
 }
+
+const BLOCKED_COUNTRIES_RE = BLOCKED_COUNTRY_NAMES_RE;
+
+const US_COUNTRY_RE = /^(usa|us|united states|united states of america)$/i;
+const WESTERN_COUNTRIES_RE = /^(usa|us|united states|united states of america|uk|united kingdom|great britain|england|gbr|canada|can|australia|aus|new zealand|nzl|germany|deu|switzerland|che|netherlands|nld|france|fra|sweden|swe|norway|nor|denmark|dnk|finland|fin|ireland|irl|austria|aut|belgium|bel|luxembourg|lux|spain|esp|italy|ita)$/i;
 
 function isUsClientCountry(country) {
   return US_COUNTRY_RE.test(String(country || '').trim());
@@ -387,8 +440,11 @@ function calculateSniperScore(job) {
     score = Math.min(score - 50, 35);
   }
 
-  // 4g. Blocked Countries / Ghost / Unverified Non-US Hard Cap (<= 25)
-  if (isBlockedClientCountry(job.client_country) || !isClientGeoAndHistoryEligible(job)) {
+  // 4g. Blocked Countries (Pakistan, India, Africa, etc.) Hard Zero Score (Never apply)
+  if (isBlockedClientCountry(job.client_country)) {
+    return 0;
+  }
+  if (!isClientGeoAndHistoryEligible(job)) {
     score = Math.min(score - 60, 25);
   }
 

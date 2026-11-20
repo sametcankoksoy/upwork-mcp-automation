@@ -124,6 +124,7 @@ function isConsultingOrNonBuildJob(job) {
 
   // Reject anti-bot prompt-injection traps and advisory/coaching descriptions
   if (/(if you are one of the ai agents|ignore all previous instructions|disregard previous instructions|super intelligence not artificial intelligence)/i.test(text)
+    || /\b(based in (?:india|pakistan|bangladesh|nigeria|philippines)|team in (?:india|pakistan|bangladesh|nigeria|philippines)|located in (?:india|pakistan|bangladesh|nigeria|philippines))\b/i.test(text)
     || /\b(looking for a consultant|need a consultant|seeking a consultant|consulting call|advisory role|1-on-1 coaching|one-on-one coaching|teach me how|guide me through|no coding required|no development needed|just advice|consulting only|architecture audit|audit how i build|knowledge-transfer engagement|not an outsourced development|private technical mentor|teaching nontechnical|sequence of instruction)\b/i.test(text)) {
     return true;
   }
@@ -159,6 +160,7 @@ function isJobEligibleForAutoProposal(job, options = {}) {
   if (!job || !job.job_id) return false;
   if (job.job_status && job.job_status !== 'open') return false;
   if (job.is_ghost_job) return false;
+  if (isBlockedClientCountry(job.client_country)) return false;
   if ((job.sniper_score || 0) < 80) return false;
   if (!options.force && isConsultingOrNonBuildJob(job)) return false;
   if (!options.force && !isClientHireRateEligible(job)) return false;
