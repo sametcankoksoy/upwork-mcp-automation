@@ -9,7 +9,7 @@ const { db, upsertJobAndSnapshot, getSetting, setSetting } = require('./db');
 const { getFullMarketAnalytics } = require('./analytics');
 const { runTrackerCycle, runUpworkMcpRadarCycle, UPWORK_MCP_URL } = require('./upwork-tracker');
 const { getFlconsoleToken, setFlconsoleToken, runFlconsoleSyncCycle } = require('./flconsole-tracker');
-const { getShareHash, buildRyanCoverLetter, submitAutoProposalForJob, runAutoProposerCycle, setProposalNotificationHandler, ensureVideoGenerated } = require('./auto-proposer');
+const { getShareHash, buildRyanCoverLetter, submitAutoProposalForJob, runAutoProposerCycle, setProposalNotificationHandler, ensureVideoGenerated, getDailySubmittedCount } = require('./auto-proposer');
 const { createAuthorizationUrl, exchangeCodeForTokens, getValidAccessToken } = require('./upwork-oauth');
 
 const app = express();
@@ -716,11 +716,26 @@ app.get('/api/bookings', (req, res) => {
 app.get('/api/auto-proposals', (req, res) => {
   try {
     const proposals = db.prepare('SELECT * FROM auto_proposals ORDER BY id DESC LIMIT 100').all();
+    const countSubmittedToday = getDailySubmittedCount();
+    const dailyLimit = Number(getSetting('daily_proposal_limit') ?? 10);
     res.json({
       ok: true,
       enabled: getSetting('auto_proposer_enabled') !== false,
+      daily_limit: dailyLimit,
+      submitted_today: countSubmittedToday,
+      limit_reached: countSubmittedToday >= dailyLimit,
       proposals
     });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/auto-proposals/limit', (req, res) => {
+  try {
+    const limit = Math.max(1, Math.min(100, Number(req.body?.limit) || 10));
+    setSetting('daily_proposal_limit', limit);
+    res.json({ ok: true, daily_limit: limit, submitted_today: getDailySubmittedCount() });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }

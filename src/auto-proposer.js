@@ -16,6 +16,7 @@ const PUBLIC_BASE_URL = process.env.PUBLIC_LOOM_URL || 'https://loom.sametcankok
 
 const TERMINAL_PROPOSAL_STATUSES = new Set([
   'submitted',
+  'skipped_daily_limit_reached',
   'skipped_over_5_proposals',
   'skipped_over_10_proposals',
   'skipped_over_10_minutes',
@@ -32,6 +33,20 @@ const TRANSIENT_MCP_ERR_RE = /(fetch failed|econnreset|etimedout|socket hang up|
 let isProposerRunning = false;
 let onProposalSubmitted = null;
 const activeVideoRenders = new Map();
+
+function getDailySubmittedCount() {
+  const rowTr = db.prepare(`
+    SELECT count(1) as cnt FROM auto_proposals
+    WHERE status = 'submitted'
+      AND date(created_at, '+3 hours') = date('now', '+3 hours')
+  `).get();
+  const row24h = db.prepare(`
+    SELECT count(1) as cnt FROM auto_proposals
+    WHERE status = 'submitted'
+      AND datetime(created_at) >= datetime('now', '-24 hours')
+  `).get();
+  return Math.max(Number(rowTr?.cnt || 0), Number(row24h?.cnt || 0));
+}
 
 function setProposalNotificationHandler(fn) {
   onProposalSubmitted = typeof fn === 'function' ? fn : null;
@@ -167,6 +182,15 @@ function isJobEligibleForAutoProposal(job, options = {}) {
   if (!options.force && isConsultingOrNonBuildJob(job)) return false;
   if (!options.force && !isClientHireRateEligible(job)) return false;
 
+  // Enforce daily proposal limit (e.g. max 10 proposals per day)
+  if (!options.force) {
+    const maxDaily = Number(getSetting('daily_proposal_limit') ?? 10);
+    const countToday = getDailySubmittedCount();
+    if (countToday >= maxDaily) {
+      return false;
+    }
+  }
+
   // Enforce proposals limit (Strictly Less than 5 only, reject 5+)
   const propsNum = Number(job.current_proposals_numeric || 0);
   const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
@@ -276,6 +300,13 @@ async function submitAutoProposalForJob(job, options = {}) {
     : (Number(job.budget) >= 150 ? Number(job.budget) : 450);
 
   if (!options.force) {
+    const maxDaily = Number(getSetting('daily_proposal_limit') ?? 10);
+    const countToday = getDailySubmittedCount();
+    if (countToday >= maxDaily) {
+      const reason = `Daily proposal limit of ${maxDaily} reached (${countToday} proposals submitted today/last 24h)`;
+      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_daily_limit_reached', null, reason);
+      return { ok: false, status: 'skipped_daily_limit_reached', job_id: job.job_id, reason };
+    }
     if (isConsultingOrNonBuildJob(job)) {
       recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_consulting_or_non_dev', null, 'Consulting, coaching, or non-development listing rejected');
       return { ok: false, status: 'skipped_consulting_or_non_dev', job_id: job.job_id };
@@ -616,6 +647,11 @@ async function runAutoProposerCycle(maxPerCycle = 3) {
   if (getSetting('auto_proposer_enabled') === false) {
     return { status: 'disabled', processed: 0 };
   }
+  const maxDaily = Number(getSetting('daily_proposal_limit') ?? 10);
+  const countToday = getDailySubmittedCount();
+  if (countToday >= maxDaily) {
+    return { status: 'daily_limit_reached', processed: 0, countToday, maxDaily };
+  }
   if (isProposerRunning) {
     return { status: 'already_running', processed: 0 };
   }
@@ -632,6 +668,7 @@ async function runAutoProposerCycle(maxPerCycle = 3) {
           SELECT job_id FROM auto_proposals
           WHERE status IN (
             'submitted',
+            'skipped_daily_limit_reached',
             'skipped_over_5_proposals',
             'skipped_over_10_proposals',
             'skipped_over_10_minutes',
@@ -726,6 +763,7 @@ function buildRyanCoverLetter(job, shareUrl) {
 
 module.exports = {
   getShareHash,
+  getDailySubmittedCount,
   inferClientDeliverable,
   buildRyanCoverLetter,
   selectPortfolioHighlights,

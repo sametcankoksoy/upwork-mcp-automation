@@ -158,6 +158,10 @@ if (getSetting('auto_proposer_enabled') === null) {
   setSetting('auto_proposer_enabled', true);
 }
 
+if (getSetting('daily_proposal_limit') === null) {
+  setSetting('daily_proposal_limit', 10);
+}
+
 // Seed user's exact specialized niche stack
 const defaultKeywords = [
   ['Playwright', 'Browser Automation'],
