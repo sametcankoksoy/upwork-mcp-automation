@@ -84,9 +84,9 @@ def generate_proposal_video(url, out_video_path, proxy=None, strict_under_5=Fals
 
         if strict_under_5:
             body_text = sb.get_text("body") or ""
-            m_prop = re.search(r"Proposals[\s:\r\n]+(5 to 10|10 to 15|15 to 20|20 to 50|50\+)", body_text, re.I)
+            m_prop = re.search(r"Proposals[\s:\r\n]+(10 to 15|15 to 20|20 to 50|50\+)", body_text, re.I)
             if m_prop:
-                raise RuntimeError(f"PROPOSALS_OVER_5:{m_prop.group(1)}")
+                raise RuntimeError(f"PROPOSALS_OVER_10:{m_prop.group(1)}")
         
         # Clean cookie/dark filters and sticky banner popups
         try:

@@ -17,6 +17,7 @@ const PUBLIC_BASE_URL = process.env.PUBLIC_LOOM_URL || 'https://loom.sametcankok
 const TERMINAL_PROPOSAL_STATUSES = new Set([
   'submitted',
   'skipped_over_5_proposals',
+  'skipped_over_10_proposals',
   'skipped_private_listing',
   'skipped_already_applied',
   'skipped_already_hired',
@@ -165,10 +166,11 @@ function isJobEligibleForAutoProposal(job, options = {}) {
   if (!options.force && isConsultingOrNonBuildJob(job)) return false;
   if (!options.force && !isClientHireRateEligible(job)) return false;
 
-  // Enforce strict < 5 proposals rule
+  // Enforce proposals limit (Allow 'Less than 5' and '5 to 10', reject 10+)
   const propsNum = Number(job.current_proposals_numeric || 0);
   const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
-  if (propsNum >= 5 || !['less than 5', 'fewer than 5'].includes(propsTier)) {
+  const isAllowedTier = /^(less than 5|fewer than 5|5 to 10|5-10|<5|<10)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('5 to 10');
+  if (propsNum > 10 || !isAllowedTier) {
     return false;
   }
 
@@ -274,9 +276,10 @@ async function submitAutoProposalForJob(job, options = {}) {
     }
     const propsNum = Number(job.current_proposals_numeric || 0);
     const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
-    if (propsNum >= 5 || !['less than 5', 'fewer than 5'].includes(propsTier)) {
-      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_5_proposals', null, `DB tier=${job.current_proposals_tier} (${propsNum})`);
-      return { ok: false, status: 'skipped_over_5_proposals', job_id: job.job_id };
+    const isAllowedTier = /^(less than 5|fewer than 5|5 to 10|5-10|<5|<10)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('5 to 10');
+    if (propsNum > 10 || !isAllowedTier) {
+      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_10_proposals', null, `DB tier=${job.current_proposals_tier} (${propsNum})`);
+      return { ok: false, status: 'skipped_over_10_proposals', job_id: job.job_id };
     }
     if (job.posted_at) {
       const minsSincePosted = (Date.now() - new Date(job.posted_at).getTime()) / 60000;
@@ -406,11 +409,7 @@ async function submitAutoProposalForJob(job, options = {}) {
     return { ok: false, status: 'skipped_already_hired', job_id: job.job_id, reason };
   }
 
-  if (!options.force && topBids.length >= 4) {
-    const reason = `Boost slots already full (${topBids.length} top bids: ${JSON.stringify(topBids)}), likely 5+ proposals`;
-    recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, connectsCost, 'skipped_over_5_proposals', previewRes.preview_id, reason);
-    return { ok: false, status: 'skipped_over_5_proposals', job_id: job.job_id, reason };
-  }
+
 
   // Handle screening questions if present before video render
   const rawQuestions = preview.screening_questions || preview.screening_answers || [];
@@ -551,6 +550,7 @@ async function runAutoProposerCycle(maxPerCycle = 3) {
           WHERE status IN (
             'submitted',
             'skipped_over_5_proposals',
+            'skipped_over_10_proposals',
             'skipped_private_listing',
             'skipped_already_applied',
             'skipped_already_hired',
