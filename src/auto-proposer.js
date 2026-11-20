@@ -18,6 +18,7 @@ const TERMINAL_PROPOSAL_STATUSES = new Set([
   'submitted',
   'skipped_over_5_proposals',
   'skipped_over_10_proposals',
+  'skipped_over_10_minutes',
   'skipped_private_listing',
   'skipped_already_applied',
   'skipped_already_hired',
@@ -174,10 +175,10 @@ function isJobEligibleForAutoProposal(job, options = {}) {
     return false;
   }
 
-  // Enforce freshness window (<= 20 minutes since posted) unless forced manually
+  // Enforce freshness window (strictly <= 10 minutes since posted) unless forced manually
   if (!options.force && job.posted_at) {
     const minsSincePosted = (Date.now() - new Date(job.posted_at).getTime()) / 60000;
-    if (minsSincePosted > 20) return false;
+    if (minsSincePosted > 10) return false;
   }
 
   const isHourly = (job.job_type || '').toLowerCase() === 'hourly';
@@ -283,9 +284,9 @@ async function submitAutoProposalForJob(job, options = {}) {
     }
     if (job.posted_at) {
       const minsSincePosted = (Date.now() - new Date(job.posted_at).getTime()) / 60000;
-      if (minsSincePosted > 20) {
-        recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_5_proposals', null, `Posted ${Math.round(minsSincePosted)}m ago (>20m freshness limit)`);
-        return { ok: false, status: 'skipped_over_5_proposals', job_id: job.job_id };
+      if (minsSincePosted > 10) {
+        recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_10_minutes', null, `Posted ${Math.round(minsSincePosted)}m ago (>10m freshness limit)`);
+        return { ok: false, status: 'skipped_over_10_minutes', job_id: job.job_id };
       }
     }
 
@@ -544,13 +545,14 @@ async function runAutoProposerCycle(maxPerCycle = 3) {
       WHERE job_status = 'open'
         AND is_ghost_job = 0
         AND sniper_score >= 80
-        AND datetime(posted_at) >= datetime('now', '-6 hours')
+        AND datetime(posted_at) >= datetime('now', '-30 minutes')
         AND job_id NOT IN (
           SELECT job_id FROM auto_proposals
           WHERE status IN (
             'submitted',
             'skipped_over_5_proposals',
             'skipped_over_10_proposals',
+            'skipped_over_10_minutes',
             'skipped_private_listing',
             'skipped_already_applied',
             'skipped_already_hired',
