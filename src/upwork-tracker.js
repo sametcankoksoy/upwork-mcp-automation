@@ -73,7 +73,12 @@ async function callUpworkMcpTool(toolName, args, accessToken, retry = true) {
   const contentText = rpc?.result?.content?.[0]?.text;
   if (!contentText) return rpc.result;
 
-  const parsed = JSON.parse(contentText);
+  let parsed;
+  try {
+    parsed = JSON.parse(contentText);
+  } catch {
+    return contentText;
+  }
   if (parsed.status === 'error') {
     if (parsed.error_code === 'SENSITIVE_RATE_LIMIT_EXCEEDED' && retry) {
       console.log('Upwork MCP rate limit encountered, waiting 5.5s before retry...');
