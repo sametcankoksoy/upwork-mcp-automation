@@ -195,10 +195,12 @@ function isJobEligibleForAutoProposal(job, options = {}) {
 }
 
 function answerScreeningQuestion(question, title, shareUrl) {
+  const isProblemJob = /\b(bug|fix|issue|error|fail|failing|broken|debug|block|blocked|captcha|cloudflare|slow|troubleshoot)\b/i.test(String(title || ''));
+  const target = isProblemJob ? 'problem' : 'project';
   if (shareUrl) {
-    return `Check out the quick 35s Loom walkthrough I prepared for you: ${shareUrl}`;
+    return `Check out the quick 35s Loom I recorded specifically for your ${target}: ${shareUrl}`;
   }
-  return 'Check out the quick 35s Loom walkthrough I prepared for you';
+  return `Check out the quick 35s Loom I recorded specifically for your ${target}`;
 }
 
 async function ensureVideoGenerated(jobId, strictUnder5 = true) {
@@ -670,8 +672,14 @@ function inferClientDeliverable(job) {
 
 function buildRyanCoverLetter(job, shareUrl) {
   const deliverable = inferClientDeliverable(job);
+  const text = `${job?.title || ''}\n${job?.description || ''}`;
+  const isProblemJob = /\b(bug|fix|issue|error|fail|failing|broken|debug|block|blocked|captcha|cloudflare|slow|troubleshoot)\b/i.test(text);
+  const hookTarget = isProblemJob
+    ? 'specifically for your problem showing how I would solve this'
+    : 'specifically for your project showing how I would handle this';
+
   return [
-    `☺️ Made you a quick 35s Loom walkthrough showing exactly how I would handle this:`,
+    `☺️ Recorded a quick 35s Loom ${hookTarget}:`,
     `👉 ${shareUrl}`,
     ``,
     `I've done this exact style of project before. I've built similar ${deliverable}, so I can help you get this built and running smoothly.`,

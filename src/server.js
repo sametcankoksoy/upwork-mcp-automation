@@ -253,7 +253,7 @@ app.get('/oembed', (req, res) => {
   const job = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(realJobId);
   const protocol = req.headers['x-forwarded-proto'] || (req.headers['cf-connecting-ip'] ? 'https' : req.protocol) || 'https';
   const baseUrl = `${protocol}://${req.get('host')}`;
-  const title = job?.title ? `Walkthrough: ${job.title}` : 'Quick Video Walkthrough for Your Project';
+  const title = job?.title ? job.title : 'Quick Video for Your Project';
   const thumbUrl = `${baseUrl}/thumbnails/${outToken}.jpg`;
 
   res.json({
@@ -803,8 +803,8 @@ app.get(['/share/:jobId', '/loom/:jobId'], (req, res) => {
   const job = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(realJobId);
   const protocol = req.headers['x-forwarded-proto'] || (req.headers['cf-connecting-ip'] ? 'https' : req.protocol) || 'https';
   const baseUrl = `${protocol}://${req.get('host')}`;
-  const rawTitle = job?.title ? `Walkthrough: ${job.title}` : 'Quick Video Walkthrough for Your Project';
-  const rawDesc = '35 sec video recorded by Sametcan Koksoy (Top Rated · 100% Job Success) · Click to watch full walkthrough';
+  const rawTitle = job?.title ? job.title : 'Quick Video for Your Project';
+  const rawDesc = '35 sec video recorded by Sametcan Koksoy (Top Rated · 100% Job Success) · Click to watch';
   const thumbUrl = `${baseUrl}/thumbnails/${req.params.jobId}.jpg`;
   const videoUrl = `${baseUrl}/videos/${req.params.jobId}.mp4`;
   const pageUrl = `${baseUrl}${req.originalUrl}`;
