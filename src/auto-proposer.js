@@ -194,8 +194,11 @@ function isJobEligibleForAutoProposal(job, options = {}) {
   return true;
 }
 
-function answerScreeningQuestion() {
-  return 'check out loom i prepared for you';
+function answerScreeningQuestion(question, title, shareUrl) {
+  if (shareUrl) {
+    return `Check out the quick 35s Loom walkthrough I prepared for you: ${shareUrl}`;
+  }
+  return 'Check out the quick 35s Loom walkthrough I prepared for you';
 }
 
 async function ensureVideoGenerated(jobId, strictUnder5 = true) {
@@ -452,7 +455,7 @@ async function submitAutoProposalForJob(job, options = {}) {
       const cleanQ = qStr.replace(/<\/?untrusted_participant_content>/gi, '').trim();
       return {
         question: cleanQ,
-        answer: answerScreeningQuestion(cleanQ, job.title)
+        answer: answerScreeningQuestion(cleanQ, job.title, shareUrl)
       };
     });
 
@@ -668,7 +671,8 @@ function inferClientDeliverable(job) {
 function buildRyanCoverLetter(job, shareUrl) {
   const deliverable = inferClientDeliverable(job);
   return [
-    `☺️ made you a quick loom showing exactly how I'd handle this: ${shareUrl}`,
+    `☺️ Made you a quick 35s Loom walkthrough showing exactly how I would handle this:`,
+    `👉 ${shareUrl}`,
     ``,
     `I've done this exact style of project before. I've built similar ${deliverable}, so I can help you get this built and running smoothly.`,
     ``,
