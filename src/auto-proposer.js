@@ -167,11 +167,11 @@ function isJobEligibleForAutoProposal(job, options = {}) {
   if (!options.force && isConsultingOrNonBuildJob(job)) return false;
   if (!options.force && !isClientHireRateEligible(job)) return false;
 
-  // Enforce proposals limit (Allow 'Less than 5' and '5 to 10', reject 10+)
+  // Enforce proposals limit (Strictly Less than 5 only, reject 5+)
   const propsNum = Number(job.current_proposals_numeric || 0);
   const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
-  const isAllowedTier = /^(less than 5|fewer than 5|5 to 10|5-10|<5|<10)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5') || propsTier.includes('5 to 10');
-  if (propsNum > 10 || !isAllowedTier) {
+  const isAllowedTier = /^(less than 5|fewer than 5|<5)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5');
+  if (propsNum >= 5 || !isAllowedTier) {
     return false;
   }
 
@@ -277,10 +277,10 @@ async function submitAutoProposalForJob(job, options = {}) {
     }
     const propsNum = Number(job.current_proposals_numeric || 0);
     const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
-    const isAllowedTier = /^(less than 5|fewer than 5|5 to 10|5-10|<5|<10)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5') || propsTier.includes('5 to 10');
-    if (propsNum > 10 || !isAllowedTier) {
-      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_10_proposals', null, `DB tier=${job.current_proposals_tier} (${propsNum})`);
-      return { ok: false, status: 'skipped_over_10_proposals', job_id: job.job_id };
+    const isAllowedTier = /^(less than 5|fewer than 5|<5)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5');
+    if (propsNum >= 5 || !isAllowedTier) {
+      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_5_proposals', null, `DB tier=${job.current_proposals_tier} (${propsNum})`);
+      return { ok: false, status: 'skipped_over_5_proposals', job_id: job.job_id };
     }
     if (job.posted_at) {
       const minsSincePosted = (Date.now() - new Date(job.posted_at).getTime()) / 60000;

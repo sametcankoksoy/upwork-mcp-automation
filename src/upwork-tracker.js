@@ -287,11 +287,13 @@ async function runTrackerCycle(options = {}) {
   return { mode, newJobsFound, jobsUpdated };
 }
 
-const RADAR_QUERIES = [
-  'Python OR Automation OR Scraping OR "AI Agent" OR Bot',
-  '"Voice Agent" OR Retell OR Vapi OR n8n OR "Make.com" OR Chatbot OR Playwright OR Selenium'
+const RADAR_TARGETS = [
+  { action: 'smart_search', params: { mode: 'best_match', limit: 10 }, label: 'Best Match' },
+  { action: 'search', params: { query: 'Python OR Automation OR Scraping OR "AI Agent" OR Bot', sort: 'recency', limit: 10, include_full_details: false }, label: 'Marketplace (Python/Agents)' },
+  { action: 'smart_search', params: { mode: 'best_match', limit: 10 }, label: 'Best Match' },
+  { action: 'search', params: { query: '"Voice Agent" OR Retell OR Vapi OR n8n OR "Make.com" OR Chatbot OR Playwright OR Selenium', sort: 'recency', limit: 10, include_full_details: false }, label: 'Marketplace (Voice/Automation)' }
 ];
-let currentRadarQueryIndex = 0;
+let currentRadarTargetIndex = 0;
 
 async function runUpworkMcpRadarCycle() {
   const startedAt = new Date().toISOString();
@@ -305,8 +307,8 @@ async function runUpworkMcpRadarCycle() {
     return { ok: false, error: 'no_access_token' };
   }
 
-  const query = RADAR_QUERIES[currentRadarQueryIndex % RADAR_QUERIES.length];
-  currentRadarQueryIndex++;
+  const target = RADAR_TARGETS[currentRadarTargetIndex % RADAR_TARGETS.length];
+  currentRadarTargetIndex++;
 
   let newJobsFound = 0;
   let jobsUpdated = 0;
@@ -317,14 +319,9 @@ async function runUpworkMcpRadarCycle() {
     const searchRes = await callUpworkMcpTool(
       'upwork__find_jobs',
       {
-        action: 'search',
+        action: target.action,
         org_uid: orgUid,
-        params: {
-          query,
-          sort: 'recency',
-          limit: 10,
-          include_full_details: false
-        }
+        params: target.params
       },
       accessToken
     );
@@ -345,7 +342,7 @@ async function runUpworkMcpRadarCycle() {
         job_id: jobId,
         title: j.title,
         description: (j.description_snippet || j.description || '').replace(/<\/?untrusted_participant_content>/g, '').trim(),
-        keyword_matched: query.split(' ')[0] || 'Automation',
+        keyword_matched: target.action === 'smart_search' ? 'Best Match' : (target.params.query?.split(' ')[0] || 'Automation'),
         job_type: j.job_type === 'hourly' ? 'Hourly' : 'Fixed',
         budget,
         hourly_min: hourlyMin,
@@ -384,10 +381,10 @@ async function runUpworkMcpRadarCycle() {
       new Date().toISOString(),
       newJobsFound,
       jobsUpdated,
-      `Query: [${query.slice(0, 40)}...] -> ${jobs.length} jobs (${newJobsFound} new, ${jobsUpdated} updated)`
+      `Target: [${target.label}] -> ${jobs.length} jobs (${newJobsFound} new, ${jobsUpdated} updated)`
     );
 
-    return { ok: true, query, totalReturned: jobs.length, newJobsFound, jobsUpdated, newJobsList };
+    return { ok: true, target: target.label, totalReturned: jobs.length, newJobsFound, jobsUpdated, newJobsList };
   } catch (err) {
     db.prepare(`
       INSERT INTO bot_runs (run_type, started_at, finished_at, new_jobs_found, jobs_updated, status, details)
@@ -398,9 +395,9 @@ async function runUpworkMcpRadarCycle() {
       new Date().toISOString(),
       newJobsFound,
       jobsUpdated,
-      `Query: [${query.slice(0, 40)}...] -> ${err.message}`
+      `Target: [${target.label}] -> ${err.message}`
     );
-    return { ok: false, query, error: err.message };
+    return { ok: false, target: target.label, error: err.message };
   }
 }
 
