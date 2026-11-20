@@ -113,9 +113,12 @@ function isConsultingOrNonBuildJob(job) {
     return true;
   }
 
-  // Reject QA Testing, Bug Finding, SDET, and E2E Test Suite Writing jobs
-  if (/\b(qa engineer|qa tester|qa automation|qa specialist|quality assurance|software tester|manual testing|bug hunter|bug finder|find bugs|bug hunting|bug testing|bug report|test cases|test plan|regression testing|write unit tests|e2e test(s|ing)?|end-to-end test(s|ing)?|test automation engineer|sdet|penetration test(ing|er)?|pentest|usability testing|user testing)\b/i.test(text)
-    && !/\b(web scraping|scraper|data extraction|crawl|crawler)\b/i.test(title)) {
+  // Reject QA Testing, Bug Finding, SDET, and Dedicated Tester Roles
+  const isQaTitleRole = /\b(qa engineer|qa tester|qa automation|qa specialist|quality assurance|software tester|manual tester|manual testing|bug hunter|bug finder|find bugs|bug hunting|bug testing|sdet|penetration test(ing|er)?|pentest|usability testing|user testing)\b/i.test(title);
+  if (isQaTitleRole || (
+    /\b(qa engineer|qa tester|qa automation|quality assurance|manual testing|bug hunter|bug finder|find bugs|test cases|test plan|regression testing)\b/i.test(text)
+    && !/\b(developer|dev\b|engineer|builder|architect|full-stack|full stack|backend|web scraping|scraper|ai agent|chatbot)\b/i.test(title)
+  )) {
     return true;
   }
 
@@ -167,10 +170,10 @@ function isJobEligibleForAutoProposal(job, options = {}) {
     return false;
   }
 
-  // Enforce freshness window (<= 12 minutes since posted) unless forced manually
+  // Enforce freshness window (<= 20 minutes since posted) unless forced manually
   if (!options.force && job.posted_at) {
     const minsSincePosted = (Date.now() - new Date(job.posted_at).getTime()) / 60000;
-    if (minsSincePosted > 12) return false;
+    if (minsSincePosted > 20) return false;
   }
 
   const isHourly = (job.job_type || '').toLowerCase() === 'hourly';
@@ -275,8 +278,8 @@ async function submitAutoProposalForJob(job, options = {}) {
     }
     if (job.posted_at) {
       const minsSincePosted = (Date.now() - new Date(job.posted_at).getTime()) / 60000;
-      if (minsSincePosted > 12) {
-        recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_5_proposals', null, `Posted ${Math.round(minsSincePosted)}m ago (>12m freshness limit)`);
+      if (minsSincePosted > 20) {
+        recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_5_proposals', null, `Posted ${Math.round(minsSincePosted)}m ago (>20m freshness limit)`);
         return { ok: false, status: 'skipped_over_5_proposals', job_id: job.job_id };
       }
     }

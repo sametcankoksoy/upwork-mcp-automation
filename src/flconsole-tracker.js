@@ -55,13 +55,14 @@ async function callFlconsoleMcp(method, params = {}) {
   }
 }
 
-async function findJobs(limit = 50) {
-  // Use all active saved feeds for automated server-side tracking
+async function findJobs(limit = 30) {
+  // Use all active saved feeds for automated server-side tracking (flconsole max limit: 30)
+  const safeLimit = Math.min(Math.max(1, limit || 30), 30);
   return callFlconsoleMcp('tools/call', {
     name: 'find_jobs',
     arguments: {
       all_feeds: true,
-      limit: limit
+      limit: safeLimit
     }
   });
 }
@@ -153,14 +154,17 @@ async function runFlconsoleSyncCycle() {
   let jobsUpdated = 0;
 
   try {
-    const res = await findJobs(50);
+    const res = await findJobs(30);
 
-    // Handle rate limiting gracefully
-    if (res?.error?.code === 'too_early') {
-      return {
-        status: 'throttled',
-        retry_after_seconds: res.error.retry_after_seconds || 60
-      };
+    // Handle rate limiting and API errors gracefully
+    if (res?.error) {
+      if (res.error.code === 'too_early') {
+        return {
+          status: 'throttled',
+          retry_after_seconds: res.error.retry_after_seconds || 60
+        };
+      }
+      throw new Error(`flconsole API error [${res.error.code}]: ${res.error.message}`);
     }
 
     const jobs = res?.jobs || (Array.isArray(res) ? res : []);

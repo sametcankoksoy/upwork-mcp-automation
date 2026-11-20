@@ -237,7 +237,7 @@ function tierToNumeric(tier) {
 
 const BLOCKED_COUNTRIES_RE = /\b(india|pakistan|bangladesh|sri lanka|nepal|nigeria|kenya|ghana|egypt|morocco|algeria|tunisia|uganda|tanzania|ethiopia|zimbabwe|zambia|cameroon|senegal|south africa|ivory coast|rwanda|botswana|namibia|mozambique|angola|sudan|somalia|libya|mali|niger|burkina faso|madagascar|malawi|benin|togo|sierra leone|liberia|congo|gabon|mauritius|philippines|vietnam|indonesia)\b/i;
 const US_COUNTRY_RE = /^(usa|us|united states|united states of america)$/i;
-const WESTERN_COUNTRIES_RE = /^(usa|us|united states|united states of america|uk|united kingdom|great britain|england|canada|australia|new zealand|germany|switzerland|netherlands|france|sweden|norway|denmark|finland|ireland|austria|belgium|luxembourg|spain|italy)$/i;
+const WESTERN_COUNTRIES_RE = /^(usa|us|united states|united states of america|uk|united kingdom|great britain|england|gbr|canada|can|australia|aus|new zealand|nzl|germany|deu|switzerland|che|netherlands|nld|france|fra|sweden|swe|norway|nor|denmark|dnk|finland|fin|ireland|irl|austria|aut|belgium|bel|luxembourg|lux|spain|esp|italy|ita)$/i;
 
 function isBlockedClientCountry(country) {
   return BLOCKED_COUNTRIES_RE.test(String(country || '').trim());
@@ -283,7 +283,7 @@ function isClientGeoAndHistoryEligible(job) {
 
 const LEAD_ENRICHMENT_RE = /\b(lead enrichment|enrich lead|enrich leads|b2b leads?|lead list|email list|contact list|cold email|apollo\.io|clay\.com|clayagent|linkedin leads?|yellow pages|skip tracing|extract contact information)\b/i;
 
-const STRICT_CORE_NICHE_RE = /\b(automate|automation|automated|workflow|workflows|n8n|make\.com|zapier|ai agents?|agentic|\bmcp\b|chatbots?|chat bot|whatsapp bot|telegram bot|discord bot|slack bot|voice bot|phone bot|ai bot|custom bot|conversational ai|rag agent|rag pipeline|voice agent|voice ai|ai voice|vapi|retell|bland ai|twilio|elevenlabs|pipecat|livekit|phone agent|ai caller|ai receptionist|call automation|scrape|scraper|scrapers|scraping|web scraping|data scraping|data extraction|extract data|extracting|crawl|crawler|crawlers|crawling|playwright|selenium|puppeteer|cheerio|beautifulsoup|scrapy|browser automation|cloudflare bypass|anti-bot|python script|automation script|custom script|script developer|bot developer|bot development|python bot|python automation|api integration|webhook)\b/i;
+const STRICT_CORE_NICHE_RE = /\b(automate|automation|automated|workflow|workflows|n8n|make\.com|zapier|ai agents?|multi[- ]agent|agentic|\bmcp\b|chatbots?|chat bot|whatsapp bot|telegram bot|discord bot|slack bot|voice bot|phone bot|ai bot|custom bot|conversational ai|ai chat|rag agent|rag pipeline|rag|embeddings?|vector (?:search|db|database)|voice agent|voice ai|ai voice|vapi|retell|bland ai|twilio|elevenlabs|pipecat|livekit|phone agent|ai caller|ai receptionist|call automation|scrape|scraper|scrapers|scraping|web scraping|data scraping|data extraction|extract data|extracting|crawl|crawler|crawlers|crawling|playwright|selenium|puppeteer|cheerio|beautifulsoup|scrapy|browser automation|cloudflare bypass|anti-bot|python script|automation script|custom script|script developer|bot developer|bot development|python bot|python automation|api integration|webhook)\b/i;
 
 function calculateSniperScore(job) {
   let score = 50;
@@ -370,9 +370,12 @@ function calculateSniperScore(job) {
     score = Math.min(score - 85, 20);
   }
 
-  // 4e. QA Testing, Bug-Finder & E2E Test Suite Hard Cap (<= 20)
-  const isQaOrBugTesting = /\b(qa engineer|qa tester|qa automation|qa specialist|quality assurance|software tester|manual testing|bug hunter|bug finder|find bugs|bug hunting|bug testing|bug report|test cases|test plan|regression testing|write unit tests|e2e test(s|ing)?|end-to-end test(s|ing)?|test automation engineer|sdet|penetration test(ing|er)?|pentest|usability testing|user testing)\b/i.test(text)
-    && !/\b(web scraping|scraper|data extraction|crawl|crawler)\b/i.test(titleText);
+  // 4e. QA Testing, Bug-Finder & Dedicated Tester Roles Hard Cap (<= 20)
+  const isQaTitleRole = /\b(qa engineer|qa tester|qa automation|qa specialist|quality assurance|software tester|manual tester|manual testing|bug hunter|bug finder|find bugs|bug hunting|bug testing|sdet|penetration test(ing|er)?|pentest|usability testing|user testing)\b/i.test(titleText);
+  const isQaOrBugTesting = isQaTitleRole || (
+    /\b(qa engineer|qa tester|qa automation|quality assurance|manual testing|bug hunter|bug finder|find bugs|test cases|test plan|regression testing)\b/i.test(text)
+    && !/\b(developer|dev\b|engineer|builder|architect|full-stack|full stack|backend|web scraping|scraper|ai agent|chatbot)\b/i.test(titleText)
+  );
   if (isQaOrBugTesting) {
     score = Math.min(score - 85, 20);
   }
