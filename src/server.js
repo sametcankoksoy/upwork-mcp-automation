@@ -9,7 +9,7 @@ const { db, upsertJobAndSnapshot, getSetting, setSetting } = require('./db');
 const { getFullMarketAnalytics } = require('./analytics');
 const { runTrackerCycle, runUpworkMcpRadarCycle, UPWORK_MCP_URL } = require('./upwork-tracker');
 const { getFlconsoleToken, setFlconsoleToken, runFlconsoleSyncCycle } = require('./flconsole-tracker');
-const { getShareHash, buildRyanCoverLetter, submitAutoProposalForJob, runAutoProposerCycle, setProposalNotificationHandler, ensureVideoGenerated, getDailySubmittedCount } = require('./auto-proposer');
+const { getShareHash, buildRyanCoverLetter, submitAutoProposalForJob, runAutoProposerCycle, setProposalNotificationHandler, ensureVideoGenerated, getDailySubmittedCount, getCurrentTurkeyHour, isNightShiftWindow, getNightShiftSubmittedCount } = require('./auto-proposer');
 const { createAuthorizationUrl, exchangeCodeForTokens, getValidAccessToken } = require('./upwork-oauth');
 
 const app = express();
@@ -718,12 +718,19 @@ app.get('/api/auto-proposals', (req, res) => {
     const proposals = db.prepare('SELECT * FROM auto_proposals ORDER BY id DESC LIMIT 100').all();
     const countSubmittedToday = getDailySubmittedCount();
     const dailyLimit = Number(getSetting('daily_proposal_limit') ?? 10);
+    const trHour = getCurrentTurkeyHour();
+    const nightShift = isNightShiftWindow();
+    const nightShiftSubmitted = getNightShiftSubmittedCount();
     res.json({
       ok: true,
       enabled: getSetting('auto_proposer_enabled') !== false,
       daily_limit: dailyLimit,
       submitted_today: countSubmittedToday,
-      limit_reached: countSubmittedToday >= dailyLimit,
+      limit_reached: nightShift ? (nightShiftSubmitted >= 3) : (countSubmittedToday >= dailyLimit),
+      turkey_hour: trHour,
+      night_shift_active: nightShift,
+      night_shift_submitted: nightShiftSubmitted,
+      night_shift_limit: 3,
       proposals
     });
   } catch (err) {

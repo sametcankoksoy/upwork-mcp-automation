@@ -17,6 +17,9 @@ const PUBLIC_BASE_URL = process.env.PUBLIC_LOOM_URL || 'https://loom.sametcankok
 const TERMINAL_PROPOSAL_STATUSES = new Set([
   'submitted',
   'skipped_daily_limit_reached',
+  'skipped_waiting_night_shift',
+  'skipped_night_limit_reached',
+  'skipped_not_core_sametlik',
   'skipped_over_5_proposals',
   'skipped_over_10_proposals',
   'skipped_over_10_minutes',
@@ -34,6 +37,28 @@ let isProposerRunning = false;
 let onProposalSubmitted = null;
 const activeVideoRenders = new Map();
 
+function getCurrentTurkeyHour() {
+  const now = new Date();
+  const trDate = new Date(now.getTime() + (3 * 60 * 60 * 1000));
+  return trDate.getUTCHours();
+}
+
+function isNightShiftWindow() {
+  const trHour = getCurrentTurkeyHour();
+  return trHour >= 3 && trHour < 6;
+}
+
+function getNightShiftSubmittedCount() {
+  const row = db.prepare(`
+    SELECT count(1) as cnt FROM auto_proposals
+    WHERE status = 'submitted'
+      AND date(created_at, '+3 hours') = date('now', '+3 hours')
+      AND CAST(strftime('%H', created_at, '+3 hours') AS INTEGER) >= 3
+      AND CAST(strftime('%H', created_at, '+3 hours') AS INTEGER) < 6
+  `).get();
+  return Number(row?.cnt || 0);
+}
+
 function getDailySubmittedCount() {
   const rowTr = db.prepare(`
     SELECT count(1) as cnt FROM auto_proposals
@@ -46,6 +71,34 @@ function getDailySubmittedCount() {
       AND datetime(created_at) >= datetime('now', '-24 hours')
   `).get();
   return Math.max(Number(rowTr?.cnt || 0), Number(row24h?.cnt || 0));
+}
+
+function isTamSametlikJob(job) {
+  if (!job || !job.job_id) return false;
+  if (isBlockedClientCountry(job.client_country)) return false;
+  if (isConsultingOrNonBuildJob(job)) return false;
+  if (!isClientGeoAndHistoryEligible(job)) return false;
+  if ((job.sniper_score || 0) < 85) return false;
+
+  const text = `${job.title || ''}\n${job.description || ''}`;
+  if (!STRICT_CORE_NICHE_RE.test(text)) return false;
+  if (LEAD_ENRICHMENT_RE.test(text)) return false;
+
+  // Enforce tier strictly < 5
+  const propsNum = Number(job.current_proposals_numeric || 0);
+  const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
+  const isAllowedTier = /^(less than 5|fewer than 5|<5)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5');
+  if (propsNum >= 5 || !isAllowedTier) return false;
+
+  // Enforce solid rate (Hourly >= $35 or Fixed >= $200)
+  const isHourly = (job.job_type || '').toLowerCase() === 'hourly';
+  if (isHourly) {
+    if (job.hourly_max > 0 && job.hourly_max < 35) return false;
+  } else {
+    if (job.budget > 0 && job.budget < 200) return false;
+  }
+
+  return true;
 }
 
 function setProposalNotificationHandler(fn) {
@@ -182,12 +235,22 @@ function isJobEligibleForAutoProposal(job, options = {}) {
   if (!options.force && isConsultingOrNonBuildJob(job)) return false;
   if (!options.force && !isClientHireRateEligible(job)) return false;
 
-  // Enforce daily proposal limit (e.g. max 10 proposals per day)
+  // Night shift vs Daytime scheduling
   if (!options.force) {
-    const maxDaily = Number(getSetting('daily_proposal_limit') ?? 10);
-    const countToday = getDailySubmittedCount();
-    if (countToday >= maxDaily) {
+    const trHour = getCurrentTurkeyHour();
+    if (trHour >= 3 && trHour < 6) {
+      // Night shift window (03:00 - 06:00 TR time) -> max 3 proposals, strictly "Tam Sametlik"
+      const nightCount = getNightShiftSubmittedCount();
+      if (nightCount >= 3) return false;
+      if (!isTamSametlikJob(job)) return false;
+    } else if (trHour < 3) {
+      // Waiting for night shift to start at 03:00 TR time
       return false;
+    } else {
+      // Daytime (06:00 onwards) -> daily limit
+      const maxDaily = Number(getSetting('daily_proposal_limit') ?? 10);
+      const countToday = getDailySubmittedCount();
+      if (countToday >= maxDaily) return false;
     }
   }
 
@@ -300,12 +363,31 @@ async function submitAutoProposalForJob(job, options = {}) {
     : (Number(job.budget) >= 150 ? Number(job.budget) : 450);
 
   if (!options.force) {
-    const maxDaily = Number(getSetting('daily_proposal_limit') ?? 10);
-    const countToday = getDailySubmittedCount();
-    if (countToday >= maxDaily) {
-      const reason = `Daily proposal limit of ${maxDaily} reached (${countToday} proposals submitted today/last 24h)`;
-      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_daily_limit_reached', null, reason);
-      return { ok: false, status: 'skipped_daily_limit_reached', job_id: job.job_id, reason };
+    const trHour = getCurrentTurkeyHour();
+    if (trHour >= 3 && trHour < 6) {
+      const nightCount = getNightShiftSubmittedCount();
+      if (nightCount >= 3) {
+        const reason = `Night shift proposal limit of 3 reached (${nightCount}/3 submitted between 03:00-06:00 TR time)`;
+        recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_night_limit_reached', null, reason);
+        return { ok: false, status: 'skipped_night_limit_reached', job_id: job.job_id, reason };
+      }
+      if (!isTamSametlikJob(job)) {
+        const reason = `Job does not qualify for night shift Tam Sametlik criteria (sniper >= 85, tier < 5, core builder stack)`;
+        recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_not_core_sametlik', null, reason);
+        return { ok: false, status: 'skipped_not_core_sametlik', job_id: job.job_id, reason };
+      }
+    } else if (trHour < 3) {
+      const reason = `Waiting for night shift window starting at 03:00 TR time (current TR hour: ${trHour})`;
+      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_waiting_night_shift', null, reason);
+      return { ok: false, status: 'skipped_waiting_night_shift', job_id: job.job_id, reason };
+    } else {
+      const maxDaily = Number(getSetting('daily_proposal_limit') ?? 10);
+      const countToday = getDailySubmittedCount();
+      if (countToday >= maxDaily) {
+        const reason = `Daily proposal limit of ${maxDaily} reached (${countToday} proposals submitted today/last 24h)`;
+        recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_daily_limit_reached', null, reason);
+        return { ok: false, status: 'skipped_daily_limit_reached', job_id: job.job_id, reason };
+      }
     }
     if (isConsultingOrNonBuildJob(job)) {
       recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_consulting_or_non_dev', null, 'Consulting, coaching, or non-development listing rejected');
@@ -647,10 +729,21 @@ async function runAutoProposerCycle(maxPerCycle = 3) {
   if (getSetting('auto_proposer_enabled') === false) {
     return { status: 'disabled', processed: 0 };
   }
-  const maxDaily = Number(getSetting('daily_proposal_limit') ?? 10);
-  const countToday = getDailySubmittedCount();
-  if (countToday >= maxDaily) {
-    return { status: 'daily_limit_reached', processed: 0, countToday, maxDaily };
+  const trHour = getCurrentTurkeyHour();
+  if (trHour < 3) {
+    return { status: 'waiting_for_night_shift_03_00', processed: 0, current_tr_hour: trHour };
+  }
+  if (trHour >= 3 && trHour < 6) {
+    const nightCount = getNightShiftSubmittedCount();
+    if (nightCount >= 3) {
+      return { status: 'night_shift_limit_reached', processed: 0, nightCount, maxNight: 3 };
+    }
+  } else {
+    const maxDaily = Number(getSetting('daily_proposal_limit') ?? 10);
+    const countToday = getDailySubmittedCount();
+    if (countToday >= maxDaily) {
+      return { status: 'daily_limit_reached', processed: 0, countToday, maxDaily };
+    }
   }
   if (isProposerRunning) {
     return { status: 'already_running', processed: 0 };
@@ -658,6 +751,7 @@ async function runAutoProposerCycle(maxPerCycle = 3) {
 
   isProposerRunning = true;
   try {
+    const terminalStatusList = Array.from(TERMINAL_PROPOSAL_STATUSES).map(s => `'${s}'`).join(', ');
     const candidates = db.prepare(`
       SELECT * FROM jobs
       WHERE job_status = 'open'
@@ -666,19 +760,7 @@ async function runAutoProposerCycle(maxPerCycle = 3) {
         AND datetime(posted_at) >= datetime('now', '-30 minutes')
         AND job_id NOT IN (
           SELECT job_id FROM auto_proposals
-          WHERE status IN (
-            'submitted',
-            'skipped_daily_limit_reached',
-            'skipped_over_5_proposals',
-            'skipped_over_10_proposals',
-            'skipped_over_10_minutes',
-            'skipped_private_listing',
-            'skipped_already_applied',
-            'skipped_already_hired',
-            'skipped_consulting_or_non_dev',
-            'skipped_low_hire_rate',
-            'error_screening_answers'
-          )
+          WHERE status IN (${terminalStatusList})
         )
       ORDER BY posted_at DESC, sniper_score DESC
       LIMIT 10
@@ -763,7 +845,11 @@ function buildRyanCoverLetter(job, shareUrl) {
 
 module.exports = {
   getShareHash,
+  getCurrentTurkeyHour,
+  isNightShiftWindow,
+  getNightShiftSubmittedCount,
   getDailySubmittedCount,
+  isTamSametlikJob,
   inferClientDeliverable,
   buildRyanCoverLetter,
   selectPortfolioHighlights,
