@@ -334,7 +334,7 @@ function isClientGeoAndHistoryEligible(job) {
   return hireRate >= 60;
 }
 
-const LEAD_ENRICHMENT_RE = /\b(lead enrichment|enrich lead|enrich leads|b2b leads?|lead list|email list|contact list|cold email|apollo\.io|clay\.com|clayagent|linkedin leads?|yellow pages|skip tracing|extract contact information)\b/i;
+const LEAD_ENRICHMENT_RE = /\b(lead enrichment|enrich lead|enrich leads|b2b leads?|lead list|email list|contact list|cold email|apollo\.io|clay\.com|clayagent|linkedin leads?|yellow pages|skip tracing|extract contact information|email (?:address )?extraction|extract emails?|extract email addresses?|email scraper|scraping emails?)\b/i;
 
 const STRICT_CORE_NICHE_RE = /\b(automate|automation|automated|workflow|workflows|n8n|make\.com|zapier|ai agents?|multi[- ]agent|agentic|\bmcp\b|chatbots?|chat bot|whatsapp bot|telegram bot|discord bot|slack bot|voice bot|phone bot|ai bot|custom bot|conversational ai|ai chat|rag agent|rag pipeline|rag|embeddings?|vector (?:search|db|database)|voice agent|voice ai|ai voice|vapi|retell|bland ai|twilio|elevenlabs|pipecat|livekit|phone agent|ai caller|ai receptionist|call automation|scrape|scraper|scrapers|scraping|web scraping|data scraping|data extraction|extract data|extracting|crawl|crawler|crawlers|crawling|playwright|selenium|puppeteer|cheerio|beautifulsoup|scrapy|browser automation|cloudflare bypass|anti-bot|python script|automation script|custom script|script developer|bot developer|bot development|python bot|python automation|api integration|webhook)\b/i;
 
