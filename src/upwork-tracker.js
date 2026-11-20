@@ -287,9 +287,129 @@ async function runTrackerCycle(options = {}) {
   return { mode, newJobsFound, jobsUpdated };
 }
 
+const RADAR_QUERIES = [
+  'Python OR Automation OR Scraping OR "AI Agent" OR Bot',
+  '"Voice Agent" OR Retell OR Vapi OR n8n OR "Make.com" OR Chatbot OR Playwright OR Selenium'
+];
+let currentRadarQueryIndex = 0;
+
+async function runUpworkMcpRadarCycle() {
+  const startedAt = new Date().toISOString();
+  let accessToken = null;
+  try {
+    accessToken = await getValidAccessToken();
+  } catch (err) {
+    return { ok: false, error: `token_error: ${err.message}` };
+  }
+  if (!accessToken) {
+    return { ok: false, error: 'no_access_token' };
+  }
+
+  const query = RADAR_QUERIES[currentRadarQueryIndex % RADAR_QUERIES.length];
+  currentRadarQueryIndex++;
+
+  let newJobsFound = 0;
+  let jobsUpdated = 0;
+  const newJobsList = [];
+
+  try {
+    const orgUid = await getTalentOrgUid(accessToken);
+    const searchRes = await callUpworkMcpTool(
+      'upwork__find_jobs',
+      {
+        action: 'search',
+        org_uid: orgUid,
+        params: {
+          query,
+          sort: 'recency',
+          limit: 10,
+          include_full_details: false
+        }
+      },
+      accessToken
+    );
+
+    const jobs = searchRes?.jobs || [];
+    for (const j of jobs) {
+      const jobId = String(j.id);
+      const { budget, hourlyMin, hourlyMax } = parseBudgetField(j.budget, j.job_type);
+      const activity = j.job_activity || {};
+      const clientTotalSpent = parseMoneyString(j.client?.total_spent);
+      const clientTotalPosted = j.client?.total_posted_jobs || 1;
+      const reviews = j.client?.total_reviews || 0;
+      const clientHireRate = clientTotalPosted > 0
+        ? Math.min(100, Math.round((Math.max(reviews, clientTotalSpent > 500 ? 1 : 0) / clientTotalPosted) * 100))
+        : 0;
+
+      const jobRecord = {
+        job_id: jobId,
+        title: j.title,
+        description: (j.description_snippet || j.description || '').replace(/<\/?untrusted_participant_content>/g, '').trim(),
+        keyword_matched: query.split(' ')[0] || 'Automation',
+        job_type: j.job_type === 'hourly' ? 'Hourly' : 'Fixed',
+        budget,
+        hourly_min: hourlyMin,
+        hourly_max: hourlyMax,
+        posted_at: j.published_date || j.created_date || new Date().toISOString(),
+        checked_at: new Date().toISOString(),
+        client_country: j.client?.country || 'United States',
+        client_total_spent: clientTotalSpent,
+        client_hire_rate: clientHireRate,
+        client_total_posted: clientTotalPosted,
+        client_total_hires: reviews,
+        client_payment_verified: j.client?.verification_status === 'VERIFIED' ? 1 : 0,
+        client_rating: j.client?.rating || 0,
+        current_proposals_tier: j.proposals_tier || 'Less than 5',
+        interviewing_count: activity.invited_to_interview || 0,
+        invites_sent: activity.invites_sent || 0,
+        unanswered_invites: Math.max(0, (activity.invites_sent || 0) - (activity.invited_to_interview || 0)),
+        hires_count: activity.total_hired || 0
+      };
+
+      const isNew = upsertJobAndSnapshot(jobRecord);
+      if (isNew) {
+        newJobsFound++;
+        newJobsList.push(jobRecord);
+      } else {
+        jobsUpdated++;
+      }
+    }
+
+    db.prepare(`
+      INSERT INTO bot_runs (run_type, started_at, finished_at, new_jobs_found, jobs_updated, status, details)
+      VALUES (?, ?, ?, ?, ?, 'success', ?)
+    `).run(
+      'upwork_mcp_radar',
+      startedAt,
+      new Date().toISOString(),
+      newJobsFound,
+      jobsUpdated,
+      `Query: [${query.slice(0, 40)}...] -> ${jobs.length} jobs (${newJobsFound} new, ${jobsUpdated} updated)`
+    );
+
+    return { ok: true, query, totalReturned: jobs.length, newJobsFound, jobsUpdated, newJobsList };
+  } catch (err) {
+    db.prepare(`
+      INSERT INTO bot_runs (run_type, started_at, finished_at, new_jobs_found, jobs_updated, status, details)
+      VALUES (?, ?, ?, ?, ?, 'error', ?)
+    `).run(
+      'upwork_mcp_radar',
+      startedAt,
+      new Date().toISOString(),
+      newJobsFound,
+      jobsUpdated,
+      `Query: [${query.slice(0, 40)}...] -> ${err.message}`
+    );
+    return { ok: false, query, error: err.message };
+  }
+}
+
 module.exports = {
   runTrackerCycle,
+  runUpworkMcpRadarCycle,
   callUpworkMcpTool,
   getTalentOrgUid,
+  parseBudgetField,
+  parseMoneyString,
   UPWORK_MCP_URL
 };

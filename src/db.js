@@ -226,7 +226,7 @@ if (process.env.UPWORK_TOKENS_JSON && !getSetting('upwork_tokens')) {
 function tierToNumeric(tier) {
   if (!tier) return 2;
   const t = tier.toLowerCase();
-  if (t.includes('less than 5') || t === '<5') return 3;
+  if (t.includes('less than 5') || t.includes('fewer than 5') || t === '<5') return 3;
   if (t.includes('5 to 10') || t === '5-10') return 8;
   if (t.includes('10 to 15') || t === '10-15') return 13;
   if (t.includes('15 to 20') || t === '15-20') return 18;

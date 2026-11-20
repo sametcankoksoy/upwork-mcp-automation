@@ -170,7 +170,7 @@ function isJobEligibleForAutoProposal(job, options = {}) {
   // Enforce proposals limit (Allow 'Less than 5' and '5 to 10', reject 10+)
   const propsNum = Number(job.current_proposals_numeric || 0);
   const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
-  const isAllowedTier = /^(less than 5|fewer than 5|5 to 10|5-10|<5|<10)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('5 to 10');
+  const isAllowedTier = /^(less than 5|fewer than 5|5 to 10|5-10|<5|<10)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5') || propsTier.includes('5 to 10');
   if (propsNum > 10 || !isAllowedTier) {
     return false;
   }
@@ -277,7 +277,7 @@ async function submitAutoProposalForJob(job, options = {}) {
     }
     const propsNum = Number(job.current_proposals_numeric || 0);
     const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
-    const isAllowedTier = /^(less than 5|fewer than 5|5 to 10|5-10|<5|<10)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('5 to 10');
+    const isAllowedTier = /^(less than 5|fewer than 5|5 to 10|5-10|<5|<10)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5') || propsTier.includes('5 to 10');
     if (propsNum > 10 || !isAllowedTier) {
       recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_10_proposals', null, `DB tier=${job.current_proposals_tier} (${propsNum})`);
       return { ok: false, status: 'skipped_over_10_proposals', job_id: job.job_id };
@@ -290,7 +290,7 @@ async function submitAutoProposalForJob(job, options = {}) {
       }
     }
 
-    // Verify live client stats & full untruncated description via flconsole get_job_details
+    // Verify live client stats & full untruncated description via flconsole get_job_details or Upwork MCP fallback
     let detJob = null;
     try {
       const { getJobDetails } = require('./flconsole-tracker');
@@ -306,26 +306,58 @@ async function submitAutoProposalForJob(job, options = {}) {
         if (detJob.client?.payment_verified !== undefined) {
           job.client_payment_verified = detJob.client.payment_verified ? 1 : 0;
         }
-        job.sniper_score = calculateSniperScore(job);
-        db.prepare(`
-          UPDATE jobs
-          SET description = ?, client_country = ?, client_hire_rate = ?, client_total_spent = ?, client_total_posted = ?, client_total_hires = ?, client_payment_verified = ?, sniper_score = ?
-          WHERE job_id = ?
-        `).run(
-          job.description,
-          job.client_country,
-          job.client_hire_rate,
-          job.client_total_spent,
-          job.client_total_posted,
-          job.client_total_hires,
-          job.client_payment_verified,
-          job.sniper_score,
-          job.job_id
-        );
       }
     } catch (detErr) {
       console.warn(`[Auto-Proposer] getJobDetails verification warning for ${job.job_id}: ${detErr.message}`);
     }
+
+    if (!detJob) {
+      try {
+        const { callUpworkMcpTool, getTalentOrgUid } = require('./upwork-tracker');
+        const { getValidAccessToken } = require('./upwork-oauth');
+        const token = await getValidAccessToken();
+        const orgUid = await getTalentOrgUid(token);
+        const detail = await callUpworkMcpTool('upwork__find_jobs', {
+          action: 'get',
+          org_uid: orgUid,
+          params: { job_id: job.job_id }
+        }, token);
+        const posting = detail?.data?.marketplaceJobPosting?.content;
+        if (posting?.description) {
+          job.description = posting.description.replace(/<\/?untrusted_participant_content>/g, '').trim();
+        }
+        const cr = detail?.client_record;
+        if (cr) {
+          job.client_total_posted = cr.jobs_posted ?? job.client_total_posted;
+          job.client_total_hires = cr.jobs_with_hires ?? cr.contracts_total ?? job.client_total_hires;
+          if (cr.hire_rate_percent !== undefined) {
+            job.client_hire_rate = cr.hire_rate_percent;
+          }
+          if (cr.spend_total) {
+            job.client_total_spent = typeof cr.spend_total === 'number' ? cr.spend_total : (parseFloat(String(cr.spend_total).replace(/[^0-9.]/g, '')) || 0);
+          }
+        }
+      } catch (mcpDetErr) {
+        console.warn(`[Auto-Proposer] MCP get fallback note for ${job.job_id}: ${mcpDetErr.message}`);
+      }
+    }
+
+    job.sniper_score = calculateSniperScore(job);
+    db.prepare(`
+      UPDATE jobs
+      SET description = ?, client_country = ?, client_hire_rate = ?, client_total_spent = ?, client_total_posted = ?, client_total_hires = ?, client_payment_verified = ?, sniper_score = ?
+      WHERE job_id = ?
+    `).run(
+      job.description,
+      job.client_country,
+      job.client_hire_rate,
+      job.client_total_spent,
+      job.client_total_posted,
+      job.client_total_hires,
+      job.client_payment_verified,
+      job.sniper_score,
+      job.job_id
+    );
 
     if (isConsultingOrNonBuildJob(job)) {
       recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_consulting_or_non_dev', null, 'Full job description matched consulting/mentoring/non-development filter');

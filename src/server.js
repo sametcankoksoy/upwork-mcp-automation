@@ -7,7 +7,7 @@ require('dotenv').config();
 
 const { db, upsertJobAndSnapshot, getSetting, setSetting } = require('./db');
 const { getFullMarketAnalytics } = require('./analytics');
-const { runTrackerCycle, UPWORK_MCP_URL } = require('./upwork-tracker');
+const { runTrackerCycle, runUpworkMcpRadarCycle, UPWORK_MCP_URL } = require('./upwork-tracker');
 const { getFlconsoleToken, setFlconsoleToken, runFlconsoleSyncCycle } = require('./flconsole-tracker');
 const { getShareHash, buildRyanCoverLetter, submitAutoProposalForJob, runAutoProposerCycle, setProposalNotificationHandler, ensureVideoGenerated } = require('./auto-proposer');
 const { createAuthorizationUrl, exchangeCodeForTokens, getValidAccessToken } = require('./upwork-oauth');
@@ -865,7 +865,29 @@ if (require.main === module) {
     console.log(`Upwork Market Intelligence Server running on http://localhost:${PORT}`);
   });
 
-  // Adaptive flconsole sync loop (avoids 60s fixed-interval too_early boundary collisions)
+  // Primary Real-time Upwork MCP Radar loop (every 36 seconds)
+  function scheduleNextUpworkMcpRadar(delayMs = 3000) {
+    setTimeout(async () => {
+      let nextDelay = 36 * 1000;
+      try {
+        const token = await getValidAccessToken();
+        if (token) {
+          const res = await runUpworkMcpRadarCycle();
+          if (res?.newJobsFound > 0) {
+            // Instantly trigger proposal check for newly caught fresh jobs!
+            runAutoProposerCycle(3).catch(err => console.error('[Auto-Proposer] Trigger error:', err));
+          }
+        }
+      } catch (err) {
+        console.error('[upwork-mcp-radar] Cycle error:', err);
+      }
+      scheduleNextUpworkMcpRadar(nextDelay);
+    }, delayMs);
+  }
+
+  scheduleNextUpworkMcpRadar(3000);
+
+  // Secondary adaptive flconsole sync loop (fallback stream ~61s)
   function scheduleNextFlconsoleSync(delayMs = 2000) {
     setTimeout(async () => {
       let nextDelay = 61 * 1000;
