@@ -726,11 +726,12 @@ app.get('/api/auto-proposals', (req, res) => {
       enabled: getSetting('auto_proposer_enabled') !== false,
       daily_limit: dailyLimit,
       submitted_today: countSubmittedToday,
-      limit_reached: nightShift ? (nightShiftSubmitted >= 3) : (countSubmittedToday >= dailyLimit),
+      limit_reached: nightShift ? (nightShiftSubmitted >= dailyLimit) : true,
       turkey_hour: trHour,
       night_shift_active: nightShift,
       night_shift_submitted: nightShiftSubmitted,
-      night_shift_limit: 3,
+      night_shift_limit: dailyLimit,
+      proposer_mode: 'night_only_01_00_to_07_00',
       proposals
     });
   } catch (err) {
