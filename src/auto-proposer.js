@@ -84,6 +84,16 @@ function isTamSametlikJob(job) {
   if (!STRICT_CORE_NICHE_RE.test(text)) return false;
   if (LEAD_ENRICHMENT_RE.test(text)) return false;
 
+  // Strict rejection of SEO, SEM, Marketing, Copywriting, Translation, and language-specific tasks
+  if (/\b(seo|sem|search engine optimization|google search console|semrush|ahrefs|keyword research|backlinks?|link building|hreflang|copywriting|copywriter|content writer|article writer|blog writer|spanish|french|german|italian|portuguese|translation|translator|bilingual|meta ads|facebook ads|google ads|ppc specialist|media buyer)\b/i.test(text)) {
+    return false;
+  }
+
+  // Require positive match on Sametcan's REAL core builder stack:
+  // Scrapers (Playwright/Selenium/Puppeteer/BeautifulSoup), Bots (WhatsApp/Telegram/Discord), Voice Agents (Vapi/Retell/Twilio), Python/n8n Automations, AI Agents (MCP/RAG)
+  const CORE_BUILDER_STACK_RE = /\b(playwright|selenium|puppeteer|scrapy|beautifulsoup|web scraping|data scraping|scrape|scraper|scrapers|scraping|crawler|crawling|anti-bot|cloudflare bypass|whatsapp bot|telegram bot|discord bot|slack bot|voice agent|voice ai|vapi|retell|twilio|elevenlabs|bland ai|pipecat|livekit|\bn8n\b|make\.com|python script|python automation|automation script|bot developer|custom bot|ai agent|agentic|\bmcp\b|\brag\b|browser automation|account automation|social media automation|multi-account|simulate interactions)\b/i;
+  if (!CORE_BUILDER_STACK_RE.test(text)) return false;
+
   // Enforce tier strictly < 5
   const propsNum = Number(job.current_proposals_numeric || 0);
   const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
@@ -202,6 +212,14 @@ function isConsultingOrNonBuildJob(job) {
   // Reject non-builder / coordinator / assistant / manager roles
   if (/\b(solutions specialist|technical specialist|operations assistant|executive assistant|virtual assistant|project manager|product manager|delivery manager|program manager|scrum master|business analyst|system administrator|client success|customer success|account manager|sales rep|copywriter|content writer)\b/i.test(title)
     || /\b(advising clients|evaluate technical proposals|coordinate with software engineers to clarify|review ai generated emails)\b/i.test(text)) {
+    return true;
+  }
+
+  // Reject SEO, SEM, PPC, Ads Management, Content Writing, Copywriting, Translation, and Non-dev Marketing roles
+  if (/\b(seo specialist|seo expert|seo consultant|seo manager|search engine optimization|technical seo|on-page seo|off-page seo|link building|backlinks?|google search console|semrush|ahrefs|hreflang|keyword research|spanish seo|bilingual seo|seo audit)\b/i.test(title)
+    || (/\b(seo|search engine optimization)\b/i.test(title) && !/\b(scraper|scrape|playwright|bot|api|crawler|pipeline)\b/i.test(title))
+    || /\b(copywriter|content writer|article writer|blog writer|copywriting|content creation|social media manager|social media specialist|smm|meta ads|facebook ads|google ads|ppc specialist|media buyer|influencer marketing|translator|translation|bilingual (?:english|spanish|french)|native spanish|fluent spanish)\b/i.test(title)
+    || /\b(fluent spanish|native spanish|spanish-language seo|spanish keywords|hreflang|backlink outreach|manual seo audit|guest posting)\b/i.test(text)) {
     return true;
   }
 
