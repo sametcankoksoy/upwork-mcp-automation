@@ -582,13 +582,13 @@ async function submitAutoProposalForJob(job, options = {}) {
     return { ok: false, status: 'skipped_already_hired', job_id: job.job_id, reason };
   }
 
-  // If no one has boosted yet, bid 30 connects to secure Slot #1 instantly
+  // Apply 5 connects boost to take an early top slot cheaply (user strategy: secure top rank for cheap, refund if outbid)
   let appliedBoost = 0;
-  if (!hasBoostBids && isBoostAvailable && maxBoost >= minBoost) {
-    appliedBoost = Math.min(30, maxBoost);
+  if (isBoostAvailable && minBoost <= 5 && maxBoost >= 1) {
+    appliedBoost = Math.min(5, maxBoost);
     if (appliedBoost >= minBoost) {
       createParams.boost_connects = appliedBoost;
-      console.log(`[Auto-Proposer] No competing boost bids on ${job.job_id}. Bidding ${appliedBoost} connects for Slot #1`);
+      console.log(`[Auto-Proposer] Bidding ${appliedBoost} connects boost for job ${job.job_id} (min=${minBoost}, max=${maxBoost})`);
     }
   }
 
