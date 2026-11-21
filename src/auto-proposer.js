@@ -7,6 +7,7 @@ const { promisify } = require('node:util');
 const { db, getSetting, calculateSniperScore, LEAD_ENRICHMENT_RE, STRICT_CORE_NICHE_RE, isClientGeoAndHistoryEligible, isBlockedClientCountry } = require('./db');
 const { getValidAccessToken } = require('./upwork-oauth');
 const { callUpworkMcpTool, getTalentOrgUid } = require('./upwork-tracker');
+const { evaluateJobFitWithAI } = require('./ai-evaluator');
 
 const execFileAsync = promisify(execFile);
 
@@ -20,6 +21,7 @@ const TERMINAL_PROPOSAL_STATUSES = new Set([
   'skipped_waiting_night_shift',
   'skipped_night_limit_reached',
   'skipped_not_core_sametlik',
+  'skipped_ai_eval_rejected',
   'skipped_over_5_proposals',
   'skipped_over_10_proposals',
   'skipped_over_10_minutes',
@@ -512,6 +514,17 @@ async function submitAutoProposalForJob(job, options = {}) {
       recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_low_hire_rate', null, reason);
       return { ok: false, status: 'skipped_low_hire_rate', job_id: job.job_id, reason };
     }
+
+    // AI Semantic Evaluation Layer: LLM reads full posting and judges real match with Sametcan's stack
+    console.log(`[Auto-Proposer] Running AI layer evaluation on job ${job.job_id}: ${job.title}...`);
+    const aiFit = await evaluateJobFitWithAI(job);
+    if (!aiFit.fit) {
+      const reason = `AI Screener rejected (${aiFit.confidence}%): ${aiFit.reason}`;
+      console.log(`[Auto-Proposer] AI Layer REJECTED job ${job.job_id} (${job.title}): ${reason}`);
+      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_ai_eval_rejected', null, reason);
+      return { ok: false, status: 'skipped_ai_eval_rejected', job_id: job.job_id, reason };
+    }
+    console.log(`[Auto-Proposer] AI Layer APPROVED job ${job.job_id} (${aiFit.confidence}%): ${aiFit.reason}`);
   }
 
   const accessToken = await getValidAccessToken();
@@ -879,5 +892,6 @@ module.exports = {
   ensureVideoGenerated,
   submitAutoProposalForJob,
   runAutoProposerCycle,
-  setProposalNotificationHandler
+  setProposalNotificationHandler,
+  evaluateJobFitWithAI
 };
