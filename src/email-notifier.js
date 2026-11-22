@@ -111,6 +111,7 @@ function detectDeviceSummary(userAgent = '') {
 async function sendVideoWatchEmail({
   jobId,
   jobTitle,
+  jobClientCountry,
   eventType,
   eventLabel,
   watchSeconds,
@@ -161,7 +162,8 @@ async function sendVideoWatchEmail({
     `${icon} Client ${eventLabel}`,
     ``,
     `Job: ${jobTitle}`,
-    `Country: ${countryLabel}`,
+    `Visitor Country (IP): ${countryLabel}`,
+    ...(jobClientCountry ? [`Upwork Client Country: ${jobClientCountry}`] : []),
     `Location: ${visitorLocation}${utcOffset ? ` (${utcOffset})` : ''}`,
     `Timezone: ${visitorTimezone || 'N/A'}`,
     `Watch Duration: ${watchSeconds}s`,
@@ -186,7 +188,8 @@ async function sendVideoWatchEmail({
           ${escapeHtml(jobTitle)}
         </div>
         <table style="width:100%;border-collapse:collapse;font-size:14px;color:#cbd5e1;">
-          <tr><td style="padding:5px 0;color:#94a3b8;width:130px;">🌍 Country</td><td style="padding:5px 0;font-weight:600;color:#38bdf8;">${escapeHtml(countryLabel)}</td></tr>
+          <tr><td style="padding:5px 0;color:#94a3b8;width:155px;">🌍 Visitor Country (IP)</td><td style="padding:5px 0;font-weight:600;color:#38bdf8;">${escapeHtml(countryLabel)}</td></tr>
+          ${jobClientCountry ? `<tr><td style="padding:5px 0;color:#94a3b8;">🏢 Upwork Client</td><td style="padding:5px 0;font-weight:600;color:#facc15;">${escapeHtml(jobClientCountry)}</td></tr>` : ''}
           <tr><td style="padding:5px 0;color:#94a3b8;">📍 Location</td><td style="padding:5px 0;">${escapeHtml(visitorLocation)}${utcOffset ? ` (${escapeHtml(utcOffset)})` : ''}</td></tr>
           <tr><td style="padding:5px 0;color:#94a3b8;">⏱️ Watch Time</td><td style="padding:5px 0;font-weight:600;color:#4ade80;">${Number(watchSeconds || 0)}s</td></tr>
           <tr><td style="padding:5px 0;color:#94a3b8;">💻 Device</td><td style="padding:5px 0;">${escapeHtml(device)}</td></tr>

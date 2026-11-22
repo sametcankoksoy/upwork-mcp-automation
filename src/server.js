@@ -87,6 +87,27 @@ function formatUtcOffset(offsetSeconds) {
   return mins > 0 ? `UTC${sign}${hours}:${String(mins).padStart(2, '0')}` : `UTC${sign}${hours}`;
 }
 
+const regionDisplayNames = (() => {
+  try { return new Intl.DisplayNames(['en'], { type: 'region' }); } catch { return null; }
+})();
+
+function cfCountryFallback(req) {
+  const code = String(req.headers['cf-ipcountry'] || '').trim().toUpperCase();
+  if (!code || code === 'XX' || code === 'T1') return null;
+  let countryName = code;
+  try {
+    if (regionDisplayNames) countryName = regionDisplayNames.of(code) || code;
+  } catch {}
+  return {
+    timezone: '',
+    utc_offset: '',
+    city: '',
+    region: '',
+    country: countryName,
+    label: countryName
+  };
+}
+
 async function detectVisitorTimezone(req) {
   try {
     const rawIp = req.headers['cf-connecting-ip'] ||
@@ -109,7 +130,7 @@ async function detectVisitorTimezone(req) {
 
     const url = `http://ip-api.com/json/${isPublicIp ? encodeURIComponent(cleanIp) : ''}?fields=status,country,regionName,city,timezone,offset`;
     const geoRes = await fetch(url, { signal: AbortSignal.timeout(2000) });
-    if (!geoRes.ok) return null;
+    if (!geoRes.ok) return cfCountryFallback(req);
 
     const data = await geoRes.json();
     if (data.status === 'success' && data.timezone) {
@@ -129,9 +150,9 @@ async function detectVisitorTimezone(req) {
       ipGeoCache.set(cacheKey, result);
       return result;
     }
-    return null;
+    return cfCountryFallback(req);
   } catch {
-    return null;
+    return cfCountryFallback(req);
   }
 }
 
@@ -894,8 +915,9 @@ app.post('/api/track-view/:jobId', async (req, res) => {
     const eventType = allowedEvents.has(req.body?.event_type) ? req.body.event_type : 'page_open';
     const watchSeconds = Math.max(0, Math.round(Number(req.body?.watch_seconds || 0)));
 
-    const job = db.prepare('SELECT title FROM jobs WHERE job_id = ?').get(realJobId);
+    const job = db.prepare('SELECT title, client_country FROM jobs WHERE job_id = ?').get(realJobId);
     const jobTitle = job?.title || `Upwork Job (${realJobId})`;
+    const jobClientCountry = job?.client_country || '';
     const shareId = getShareHash(realJobId);
     const visitorIp = req.headers['cf-connecting-ip'] ||
       (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : '') ||
@@ -937,6 +959,7 @@ app.post('/api/track-view/:jobId', async (req, res) => {
     sendVideoWatchEmail({
       jobId: realJobId,
       jobTitle,
+      jobClientCountry,
       eventType,
       eventLabel: eventLabels[eventType],
       watchSeconds,
