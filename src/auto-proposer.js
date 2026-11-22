@@ -437,25 +437,27 @@ async function submitAutoProposalForJob(job, options = {}) {
       }
     }
 
-    // Verify live client stats & full untruncated description via flconsole get_job_details or Upwork MCP fallback
+    // Direct Upwork MCP mode: skip flconsole getJobDetails unless flconsole_sync_enabled is explicitly true
     let detJob = null;
-    try {
-      const { getJobDetails } = require('./flconsole-tracker');
-      const detRes = await getJobDetails([job.job_id]);
-      detJob = detRes?.jobs?.[0] || null;
-      if (detJob) {
-        job.description = detJob.description || job.description;
-        job.client_country = detJob.client?.country || job.client_country;
-        job.client_hire_rate = typeof detJob.client?.hire_rate === 'number' ? detJob.client.hire_rate : job.client_hire_rate;
-        job.client_total_spent = detJob.client?.total_spent ?? job.client_total_spent;
-        job.client_total_posted = detJob.client?.posted_jobs_count ?? job.client_total_posted;
-        job.client_total_hires = detJob.client?.hires_count ?? job.client_total_hires;
-        if (detJob.client?.payment_verified !== undefined) {
-          job.client_payment_verified = detJob.client.payment_verified ? 1 : 0;
+    if (getSetting('flconsole_sync_enabled') === true) {
+      try {
+        const { getJobDetails } = require('./flconsole-tracker');
+        const detRes = await getJobDetails([job.job_id]);
+        detJob = detRes?.jobs?.[0] || null;
+        if (detJob) {
+          job.description = detJob.description || job.description;
+          job.client_country = detJob.client?.country || job.client_country;
+          job.client_hire_rate = typeof detJob.client?.hire_rate === 'number' ? detJob.client.hire_rate : job.client_hire_rate;
+          job.client_total_spent = detJob.client?.total_spent ?? job.client_total_spent;
+          job.client_total_posted = detJob.client?.posted_jobs_count ?? job.client_total_posted;
+          job.client_total_hires = detJob.client?.hires_count ?? job.client_total_hires;
+          if (detJob.client?.payment_verified !== undefined) {
+            job.client_payment_verified = detJob.client.payment_verified ? 1 : 0;
+          }
         }
+      } catch (detErr) {
+        console.warn(`[Auto-Proposer] getJobDetails verification warning for ${job.job_id}: ${detErr.message}`);
       }
-    } catch (detErr) {
-      console.warn(`[Auto-Proposer] getJobDetails verification warning for ${job.job_id}: ${detErr.message}`);
     }
 
     // Skip MCP action: 'get' fallback to prevent triggering Upwork's JOB_BROWSE_COOLDOWN (403 denial)

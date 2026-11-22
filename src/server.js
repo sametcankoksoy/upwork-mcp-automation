@@ -741,11 +741,12 @@ async function buildLiveStatusMessage(header = '🤖 <b>Upwork Automation Live S
     }
   }
 
+  const flcEnabled = getSetting('flconsole_sync_enabled') === true;
   const lines = [
     header,
     '',
-    `• <b>Upwork MCP Radar:</b> ${isFrozen ? `❄️ Frozen (${minsLeft}m left → resumes every ${intervalMin}m)` : (mcpRadarOn ? `✅ Active (every ${intervalMin} min)` : '🛡️ PAUSED')}`,
-    `• <b>flconsole 24/7 Radar:</b> ✅ Active (${escapeTgHtml(lastFlc?.details || 'waiting')})`,
+    `• <b>Direct Upwork MCP Radar:</b> ${isFrozen ? `❄️ Frozen (${minsLeft}m left → resumes every ${intervalMin}m)` : (mcpRadarOn ? `✅ Active (every ${intervalMin} min)` : '🛡️ PAUSED')}`,
+    `• <b>flconsole Sync:</b> ${flcEnabled ? `✅ Active (${escapeTgHtml(lastFlc?.details || 'waiting')})` : '⛔ Disabled (Direct MCP Mode)'}`,
     `• <b>Auto-Proposer (0 Boost, Auto-Confirm):</b> ${isFrozen ? `❄️ Frozen (${minsLeft}m left)` : (autoPropOn ? '✅ Enabled' : '⏸️ Paused')} (${dailyCount}/${maxDaily} today)`,
     `• <b>Connects Balance:</b> ${connectsText}`,
     `• <b>Upwork Cooldown Check:</b> ${escapeTgHtml(cooldownText)}`,
@@ -1182,12 +1183,12 @@ if (require.main === module) {
   // Start interactive Telegram bot (handles Approve & Retry MCP button + /status, /pause_auto, /resume_auto)
   startTelegramInteractiveBot();
 
-  // Primary 24/7 zero-risk flconsole sync loop (~61s, zero load on personal Upwork OAuth account)
-  function scheduleNextFlconsoleSync(delayMs = 2000) {
+  // Optional flconsole sync loop: DISABLED in Direct Upwork MCP mode (only runs if flconsole_sync_enabled === true)
+  function scheduleNextFlconsoleSync(delayMs = 5000) {
     setTimeout(async () => {
       let nextDelay = 61 * 1000;
       try {
-        if (getFlconsoleToken()) {
+        if (getSetting('flconsole_sync_enabled') === true && getFlconsoleToken()) {
           const res = await runFlconsoleSyncCycle();
           if (res?.status === 'throttled') {
             nextDelay = Math.max(5, Number(res.retry_after_seconds || 30) + 1) * 1000;
@@ -1200,7 +1201,7 @@ if (require.main === module) {
     }, delayMs);
   }
 
-  scheduleNextFlconsoleSync(2000);
+  scheduleNextFlconsoleSync(5000);
 
   // Realtime proposal watcher every 40 seconds (strictly respects Upwork MCP rate limit)
   setInterval(() => {
