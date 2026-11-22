@@ -700,6 +700,62 @@ setProposalFallbackHandler(async ({ job, coverLetter, shareUrl, chargedAmount, c
   await sendTelegramMessage(text, { replyMarkup: inlineKeyboard });
 });
 
+async function buildLiveStatusMessage(header = '🤖 <b>Upwork Automation Live Status</b>', extraLines = []) {
+  const mcpRadarOn = getSetting('upwork_mcp_radar_enabled') === true;
+  const intervalMin = Math.round(Math.max(300000, Number(getSetting('mcp_radar_interval_ms') || 300000)) / 60000);
+  const autoPropOn = getSetting('auto_proposer_enabled') !== false;
+  const dailyCount = getDailySubmittedCount();
+  const maxDaily = Number(getSetting('daily_proposal_limit') ?? 5);
+  const freezeUntil = Number(getSetting('mcp_freeze_until') || 0);
+  const isFrozen = freezeUntil > Date.now();
+  const minsLeft = isFrozen ? Math.max(1, Math.ceil((freezeUntil - Date.now()) / 60000)) : 0;
+  const lastFlc = db.prepare(`SELECT started_at, status, details FROM bot_runs WHERE run_type = 'flconsole_mcp_sync' ORDER BY id DESC LIMIT 1`).get();
+
+  let cooldownText = isFrozen ? `❄️ Frozen for ${minsLeft}m (resting Upwork MCP)` : 'Unknown (no token)';
+  let connectsText = 'N/A';
+
+  if (!isFrozen) {
+    try {
+      const token = await getValidAccessToken();
+      if (token) {
+        const { callUpworkMcpTool, getTalentOrgUid } = require('./upwork-tracker');
+        const orgUid = await getTalentOrgUid(token);
+        const dash = await callUpworkMcpTool('upwork__get_freelancer_dashboard', { action: 'check', org_uid: orgUid }, token).catch(() => null);
+        connectsText = String(dash?.data?.connects?.balance?.connectsBalance ?? 'N/A');
+        const sample = db.prepare(`SELECT job_id FROM jobs ORDER BY posted_at DESC LIMIT 1`).get();
+        if (sample) {
+          try {
+            await callUpworkMcpTool('upwork__find_jobs', {
+              action: 'get',
+              org_uid: orgUid,
+              params: { job_id: String(sample.job_id).replace(/^~?02/, '') }
+            }, token);
+            cooldownText = '✅ CLEAR (Upwork MCP Ready)';
+          } catch (e) {
+            cooldownText = `⏳ STILL ACTIVE (${String(e.message || '').slice(0, 90)})`;
+          }
+        }
+      }
+    } catch (e) {
+      cooldownText = `Error: ${e.message}`;
+    }
+  }
+
+  const lines = [
+    header,
+    '',
+    `• <b>Upwork MCP Radar:</b> ${isFrozen ? `❄️ Frozen (${minsLeft}m left → resumes every ${intervalMin}m)` : (mcpRadarOn ? `✅ Active (every ${intervalMin} min)` : '🛡️ PAUSED')}`,
+    `• <b>flconsole 24/7 Radar:</b> ✅ Active (${escapeTgHtml(lastFlc?.details || 'waiting')})`,
+    `• <b>Auto-Proposer (0 Boost, Auto-Confirm):</b> ${isFrozen ? `❄️ Frozen (${minsLeft}m left)` : (autoPropOn ? '✅ Enabled' : '⏸️ Paused')} (${dailyCount}/${maxDaily} today)`,
+    `• <b>Connects Balance:</b> ${connectsText}`,
+    `• <b>Upwork Cooldown Check:</b> ${escapeTgHtml(cooldownText)}`,
+    ...extraLines,
+    '',
+    `<i>Commands: /status · /pause_auto · /resume_auto</i>`
+  ];
+  return lines.join('\n');
+}
+
 function startTelegramInteractiveBot() {
   const tgToken = process.env.TELEGRAM_BOT_TOKEN || getSetting('telegram_bot_token');
   const allowedChatId = String(process.env.TELEGRAM_CHAT_ID || getSetting('telegram_chat_id') || '');
@@ -719,46 +775,7 @@ function startTelegramInteractiveBot() {
   }
 
   async function handleStatusCommand(chatId) {
-    const mcpRadarOn = getSetting('upwork_mcp_radar_enabled') === true;
-    const autoPropOn = getSetting('auto_proposer_enabled') !== false;
-    const dailyCount = getDailySubmittedCount();
-    const maxDaily = Number(getSetting('daily_proposal_limit') ?? 5);
-    const lastFlc = db.prepare(`SELECT started_at, status, details FROM bot_runs WHERE run_type = 'flconsole_mcp_sync' ORDER BY id DESC LIMIT 1`).get();
-
-    let cooldownText = 'Unknown (no token)';
-    let connectsText = 'N/A';
-    try {
-      const token = await getValidAccessToken();
-      if (token) {
-        const { callUpworkMcpTool, getTalentOrgUid } = require('./upwork-tracker');
-        const orgUid = await getTalentOrgUid(token);
-        const dash = await callUpworkMcpTool('upwork__get_freelancer_dashboard', { action: 'check', org_uid: orgUid }, token).catch(() => null);
-        connectsText = String(dash?.data?.connects?.balance?.connectsBalance ?? 'N/A');
-        const sample = db.prepare(`SELECT job_id FROM jobs ORDER BY posted_at DESC LIMIT 1`).get();
-        if (sample) {
-          try {
-            await callUpworkMcpTool('upwork__find_jobs', {
-              action: 'get',
-              org_uid: orgUid,
-              params: { job_id: String(sample.job_id).replace(/^~?02/, '') }
-            }, token);
-            cooldownText = '✅ CLEAR (Upwork MCP Ready)';
-          } catch (e) {
-            cooldownText = `⏳ ACTIVE (${String(e.message || '').slice(0, 90)})`;
-          }
-        }
-      }
-    } catch (e) {
-      cooldownText = `Error: ${e.message}`;
-    }
-
-    const msg = `🤖 <b>Upwork Automation Live Status</b>\n\n` +
-      `• <b>Upwork MCP Radar (40s):</b> ${mcpRadarOn ? '⚠️ ON' : '🛡️ PAUSED (Safe Mode)'}\n` +
-      `• <b>flconsole 24/7 Radar:</b> ✅ Active (${escapeTgHtml(lastFlc?.details || 'waiting')})\n` +
-      `• <b>Auto-Proposer:</b> ${autoPropOn ? '✅ Enabled' : '⏸️ Paused'} (${dailyCount}/${maxDaily} today)\n` +
-      `• <b>Connects Balance:</b> ${connectsText}\n` +
-      `• <b>Upwork Cooldown Check:</b> ${escapeTgHtml(cooldownText)}\n\n` +
-      `<i>Commands: /status · /pause_auto · /resume_auto</i>`;
+    const msg = await buildLiveStatusMessage();
     await sendTelegramMessage(msg, { chatId });
   }
 
@@ -1099,14 +1116,17 @@ if (require.main === module) {
     console.log(`Upwork Market Intelligence Server running on http://localhost:${PORT}`);
   });
 
-  // Safe Upwork MCP Radar loop: DISABLED by default to protect account from Upwork search/browse cooldowns.
-  // Primary 24/7 zero-risk job discovery runs via flconsole below.
-  // If explicitly enabled via setting upwork_mcp_radar_enabled=true, enforces a safe >= 3 minute interval.
+  // Safe Upwork MCP Radar loop: enforces >= 5 minute interval and strictly respects mcp_freeze_until cooldown windows.
   function scheduleNextUpworkMcpRadar(delayMs = 5000) {
     setTimeout(async () => {
-      let nextDelay = 180 * 1000;
+      const intervalMs = Math.max(5 * 60 * 1000, Number(getSetting('mcp_radar_interval_ms') || 5 * 60 * 1000));
+      let nextDelay = intervalMs;
       try {
-        if (getSetting('upwork_mcp_radar_enabled') === true) {
+        const freezeUntil = Number(getSetting('mcp_freeze_until') || 0);
+        if (freezeUntil > Date.now()) {
+          // Wait until freeze ends (+3s buffer) without touching Upwork MCP
+          nextDelay = Math.min(intervalMs, Math.max(15000, (freezeUntil - Date.now()) + 3000));
+        } else if (getSetting('upwork_mcp_radar_enabled') === true) {
           const token = await getValidAccessToken();
           if (token) {
             const res = await runUpworkMcpRadarCycle();
@@ -1123,6 +1143,41 @@ if (require.main === module) {
   }
 
   scheduleNextUpworkMcpRadar(5000);
+
+  // Cooldown Freeze Wake-Up Watcher: automatically unfreezes after mcp_freeze_until, resumes 5-min radar + auto-proposer, and sends Telegram status report
+  let freezeWakeupRunning = false;
+  setInterval(async () => {
+    if (freezeWakeupRunning) return;
+    if (getSetting('mcp_freeze_report_pending') !== true) return;
+    const freezeUntil = Number(getSetting('mcp_freeze_until') || 0);
+    if (freezeUntil > Date.now()) return;
+
+    freezeWakeupRunning = true;
+    try {
+      setSetting('mcp_freeze_report_pending', false);
+      setSetting('mcp_freeze_until', 0);
+      setSetting('upwork_mcp_radar_enabled', true);
+      setSetting('auto_proposer_enabled', true);
+      setSetting('mcp_freeze_report_sent_at', new Date().toISOString());
+
+      console.log('[Cooldown-Wakeup] 30-min freeze complete. Resuming 5-min MCP radar & automatic proposals...');
+      const radarRes = await runUpworkMcpRadarCycle().catch(e => ({ ok: false, error: e.message }));
+      const autoRes = await runAutoProposerCycle(1).catch(e => ({ status: 'error', error: e.message }));
+
+      const extra = [
+        `• <b>Post-Freeze Radar Check:</b> ${radarRes?.ok ? `✅ OK (${radarRes.totalReturned || 0} jobs fetched, ${radarRes.newJobsFound || 0} new)` : `⚠️ ${escapeTgHtml(String(radarRes?.error || 'error').slice(0, 100))}`}`,
+        `• <b>Auto-Proposal Check:</b> ${escapeTgHtml(autoRes?.status || 'checked')}${autoRes?.processed ? ` (processed=${autoRes.processed})` : ''}`
+      ];
+
+      const msg = await buildLiveStatusMessage('⏰ <b>30-Minute Cooldown Complete — Automation Resumed!</b>', extra);
+      await sendTelegramMessage(msg);
+      console.log('[Cooldown-Wakeup] Telegram status report dispatched.');
+    } catch (err) {
+      console.error('[Cooldown-Wakeup] Error:', err.message);
+    } finally {
+      freezeWakeupRunning = false;
+    }
+  }, 15 * 1000);
 
   // Start interactive Telegram bot (handles Approve & Retry MCP button + /status, /pause_auto, /resume_auto)
   startTelegramInteractiveBot();

@@ -764,6 +764,10 @@ async function runAutoProposerCycle(maxPerCycle = 3) {
   if (getSetting('auto_proposer_enabled') === false) {
     return { status: 'disabled', processed: 0 };
   }
+  const freezeUntil = Number(getSetting('mcp_freeze_until') || 0);
+  if (freezeUntil > Date.now()) {
+    return { status: 'frozen_cooldown', processed: 0, freezeUntil };
+  }
   const maxDaily = Number(getSetting('daily_proposal_limit') ?? 5);
   const dailyCount = getDailySubmittedCount();
   if (dailyCount >= maxDaily) {
