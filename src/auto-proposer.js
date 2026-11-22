@@ -90,8 +90,14 @@ function isTamSametlikJob(job) {
   if (!STRICT_CORE_NICHE_RE.test(text)) return false;
   if (LEAD_ENRICHMENT_RE.test(text)) return false;
 
-  // Strict rejection of SEO, SEM, Marketing, Copywriting, Translation, and language-specific tasks
+  // Strict rejection of WordPress, CMS, SEO, Marketing, Copywriting, Translation, Manual VA, and Cold calling across title & full description
+  if (/\b(wordpress|woocommerce|wix|squarespace|shopify|drupal|magento|joomla|prestashop|elementor|divi|webflow)\b/i.test(text)) {
+    return false;
+  }
   if (/\b(seo|sem|search engine optimization|google search console|semrush|ahrefs|keyword research|backlinks?|link building|hreflang|copywriting|copywriter|content writer|article writer|blog writer|spanish|french|german|italian|portuguese|translation|translator|bilingual|meta ads|facebook ads|google ads|ppc specialist|media buyer)\b/i.test(text)) {
+    return false;
+  }
+  if (/\b(virtual assistant|appointment setter|cold call|cold calling|telemarketing|manual data entry|data entry|copy paste|lead enrichment|enrich leads|customer service|customer support)\b/i.test(text)) {
     return false;
   }
 
@@ -194,9 +200,8 @@ function isConsultingOrNonBuildJob(job) {
   }
 
   // Strictly reject WordPress, WooCommerce, Wix, Squarespace, CMS and Theme development
-  // User note: We are NOT WordPress/CMS developers
-  if (/\b(wordpress|woocommerce|wix|squarespace|shopify theme|drupal|magento|joomla|prestashop)\b/i.test(title)
-    || /\b(wordpress (?:developer|expert|specialist|designer|coder|programmer|admin)|woocommerce (?:developer|expert)|wix (?:developer|expert)|squarespace (?:developer|expert))\b/i.test(text)) {
+  // User note: We are NOT WordPress/CMS developers under any circumstances (check title & full description)
+  if (/\b(wordpress|woocommerce|wix|squarespace|shopify|drupal|magento|joomla|prestashop|elementor|divi|webflow)\b/i.test(text)) {
     return true;
   }
 
@@ -222,17 +227,17 @@ function isConsultingOrNonBuildJob(job) {
     return true;
   }
 
-  // Reject non-builder / coordinator / assistant / manager roles
+  // Reject non-builder / coordinator / assistant / manager roles / manual non-dev tasks
   if (/\b(solutions specialist|technical specialist|operations assistant|executive assistant|virtual assistant|project manager|product manager|delivery manager|program manager|scrum master|business analyst|system administrator|client success|customer success|account manager|sales rep|copywriter|content writer)\b/i.test(title)
-    || /\b(advising clients|evaluate technical proposals|coordinate with software engineers to clarify|review ai generated emails)\b/i.test(text)) {
+    || /\b(virtual assistant|appointment setter|cold call|cold calling|telemarketing|customer support|customer service|data entry|manual data entry|copy paste|copy-paste|advising clients|evaluate technical proposals|coordinate with software engineers to clarify|review ai generated emails)\b/i.test(text)) {
     return true;
   }
 
   // Reject SEO, SEM, PPC, Ads Management, Content Writing, Copywriting, Translation, and Non-dev Marketing roles
-  if (/\b(seo specialist|seo expert|seo consultant|seo manager|search engine optimization|technical seo|on-page seo|off-page seo|link building|backlinks?|google search console|semrush|ahrefs|hreflang|keyword research|spanish seo|bilingual seo|seo audit)\b/i.test(title)
+  if (/\b(seo specialist|seo expert|seo consultant|seo manager|search engine optimization|technical seo|on-page seo|off-page seo|link building|backlinks?|google search console|semrush|ahrefs|hreflang|keyword research|spanish seo|bilingual seo|seo audit)\b/i.test(text)
     || (/\b(seo|search engine optimization)\b/i.test(title) && !/\b(scraper|scrape|playwright|bot|api|crawler|pipeline)\b/i.test(title))
-    || /\b(copywriter|content writer|article writer|blog writer|copywriting|content creation|social media manager|social media specialist|smm|meta ads|facebook ads|google ads|ppc specialist|media buyer|influencer marketing|translator|translation|bilingual (?:english|spanish|french)|native spanish|fluent spanish)\b/i.test(title)
-    || /\b(fluent spanish|native spanish|spanish-language seo|spanish keywords|hreflang|backlink outreach|manual seo audit|guest posting)\b/i.test(text)) {
+    || /\b(copywriter|content writer|article writer|blog writer|copywriting|content creation|social media manager|social media specialist|smm|meta ads|facebook ads|google ads|ppc specialist|media buyer|influencer marketing|translator|translation)\b/i.test(text)
+    || /\b(fluent (?:in )?(?:german|spanish|french|italian|portuguese|arabic|russian|chinese|japanese)|native (?:german|spanish|french|italian|portuguese|arabic|russian|chinese|japanese)|bilingual (?:in )?(?:spanish|french|german)|fluent spanish|native spanish|spanish-language seo|spanish keywords|hreflang|backlink outreach|manual seo audit|guest posting)\b/i.test(text)) {
     return true;
   }
 
@@ -384,19 +389,12 @@ async function submitAutoProposalForJob(job, options = {}) {
     : (Number(job.budget) >= 150 ? Number(job.budget) : 450);
 
   if (!options.force) {
-    const isNight = isNightShiftWindow();
-    const trHour = getCurrentTurkeyHour();
-    if (!isNight) {
-      const reason = `Daytime pause: Proposals are reserved exclusively for night window (01:00-07:00 TR time, current TR hour: ${trHour})`;
-      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_waiting_night_shift', null, reason);
-      return { ok: false, status: 'skipped_waiting_night_shift', job_id: job.job_id, reason };
-    }
-    const maxNight = Number(getSetting('daily_proposal_limit') ?? 10);
-    const nightCount = getNightShiftSubmittedCount();
-    if (nightCount >= maxNight) {
-      const reason = `Night proposal limit reached (${nightCount}/${maxNight} submitted in 01:00-07:00 TR window)`;
-      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_night_limit_reached', null, reason);
-      return { ok: false, status: 'skipped_night_limit_reached', job_id: job.job_id, reason };
+    const maxDaily = Number(getSetting('daily_proposal_limit') ?? 5);
+    const dailyCount = getDailySubmittedCount();
+    if (dailyCount >= maxDaily) {
+      const reason = `Daily proposal limit reached (${dailyCount}/${maxDaily} submitted today)`;
+      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_daily_limit_reached', null, reason);
+      return { ok: false, status: 'skipped_daily_limit_reached', job_id: job.job_id, reason };
     }
     if (!isTamSametlikJob(job)) {
       const reason = `Job does not qualify for Tam Sametlik criteria (sniper >= 85, tier < 5, core builder stack)`;

@@ -291,10 +291,10 @@ async function runTrackerCycle(options = {}) {
 }
 
 const RADAR_TARGETS = [
-  { action: 'smart_search', params: { mode: 'best_match', limit: 10 }, label: 'Best Match' },
-  { action: 'search', params: { query: 'Python OR Automation OR Scraping OR "AI Agent" OR Bot', sort: 'recency', limit: 10, include_full_details: false }, label: 'Marketplace (Python/Agents)' },
-  { action: 'smart_search', params: { mode: 'best_match', limit: 10 }, label: 'Best Match' },
-  { action: 'search', params: { query: '"Voice Agent" OR Retell OR Vapi OR n8n OR "Make.com" OR Chatbot OR Playwright OR Selenium', sort: 'recency', limit: 10, include_full_details: false }, label: 'Marketplace (Voice/Automation)' }
+  { action: 'smart_search', params: { mode: 'best_match', limit: 10, include_full_details: true }, label: 'Best Match' },
+  { action: 'search', params: { query: 'Python OR Automation OR Scraping OR "AI Agent" OR Bot', sort: 'recency', limit: 10, include_full_details: true }, label: 'Marketplace (Python/Agents)' },
+  { action: 'smart_search', params: { mode: 'best_match', limit: 10, include_full_details: true }, label: 'Best Match' },
+  { action: 'search', params: { query: '"Voice Agent" OR Retell OR Vapi OR n8n OR "Make.com" OR Chatbot OR Playwright OR Selenium', sort: 'recency', limit: 10, include_full_details: true }, label: 'Marketplace (Voice/Automation)' }
 ];
 let currentRadarTargetIndex = 0;
 
@@ -344,7 +344,7 @@ async function runUpworkMcpRadarCycle() {
       const jobRecord = {
         job_id: jobId,
         title: j.title,
-        description: (j.description_snippet || j.description || '').replace(/<\/?untrusted_participant_content>/g, '').trim(),
+        description: (j.description || j.description_snippet || '').replace(/<\/?untrusted_participant_content>/g, '').trim(),
         keyword_matched: target.action === 'smart_search' ? 'Best Match' : (target.params.query?.split(' ')[0] || 'Automation'),
         job_type: j.job_type === 'hourly' ? 'Hourly' : 'Fixed',
         budget,

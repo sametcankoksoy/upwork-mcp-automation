@@ -429,9 +429,8 @@ function calculateSniperScore(job) {
   }
 
   // 4d. Strictly reject WordPress, WooCommerce, Wix, Squarespace, CMS and Theme development
-  // User note: We are NOT WordPress/CMS developers
-  const isCmsOrWpJob = /\b(wordpress|woocommerce|wix|squarespace|shopify theme|drupal|magento|joomla|prestashop)\b/i.test(titleText)
-    || /\b(wordpress (?:developer|expert|specialist|designer|coder|programmer|admin)|woocommerce (?:developer|expert)|wix (?:developer|expert)|squarespace (?:developer|expert))\b/i.test(text);
+  // User note: We are NOT WordPress/CMS developers under any circumstances (check title & full description)
+  const isCmsOrWpJob = /\b(wordpress|woocommerce|wix|squarespace|shopify|drupal|magento|joomla|prestashop|elementor|divi|webflow)\b/i.test(text);
   if (isCmsOrWpJob) {
     score = Math.min(score - 85, 10);
   }
