@@ -592,11 +592,6 @@ async function submitAutoProposalForJob(job, options = {}) {
   const preview = previewRes?.preview || {};
   const baseConnectsCost = Number(preview.connects_cost || 0);
   const rationale = String(preview.boost?.rationale || '').toLowerCase();
-  const topBids = preview.boost?.current_top_bids || [];
-  const hasBoostBids = Array.isArray(topBids) && topBids.length > 0 && topBids.some(b => Number(b) > 0);
-  const isBoostAvailable = preview.boost?.available !== false;
-  const maxBoost = Number(preview.boost?.max_boost_connects || 0);
-  const minBoost = Number(preview.boost?.min_boost_connects || 1);
 
   if (preview.can_apply === false || rationale.includes('already hired')) {
     const reason = preview.can_apply === false ? 'can_apply=false' : (preview.boost?.rationale || 'cannot_apply');
@@ -604,22 +599,11 @@ async function submitAutoProposalForJob(job, options = {}) {
     return { ok: false, status: 'skipped_already_hired', job_id: job.job_id, reason };
   }
 
-  // User rule: Önceden biri bastıysa (hasBoostBids) kesinlikle boost basma (0 boost, standart teklif)
-  // Sadece kimse basmamışsa (!hasBoostBids) ve 5 connects veya altı ile 1. sıra alınabiliyorsa bas
-  let appliedBoost = 0;
-  const recommendedBoost = Number(preview.boost?.recommended_connects || preview.boost?.min_boost_connects || 1);
-  if (!hasBoostBids && isBoostAvailable && recommendedBoost <= 5 && maxBoost >= recommendedBoost) {
-    appliedBoost = recommendedBoost;
-    createParams.boost_connects = appliedBoost;
-    console.log(`[Auto-Proposer] Empty boost auction on ${job.job_id}. Bidding ${appliedBoost} connects for Slot #1`);
-  } else {
-    delete createParams.boost_connects;
-    if (hasBoostBids) {
-      console.log(`[Auto-Proposer] Competing boost bids exist on ${job.job_id} ([${topBids.join(', ')}]). Submitting standard proposal without boost.`);
-    }
-  }
+  // Boosting disabled per user instruction: always submit standard proposal directly (0 boost connects)
+  const appliedBoost = 0;
+  delete createParams.boost_connects;
 
-  // Handle screening questions if present before video render
+  // Handle screening questions if present before confirm
   const rawQuestions = preview.screening_questions || preview.screening_answers || [];
   const hasQuestions = Array.isArray(rawQuestions) && rawQuestions.length > 0;
   if (hasQuestions) {
@@ -631,10 +615,7 @@ async function submitAutoProposalForJob(job, options = {}) {
         answer: answerScreeningQuestion(cleanQ, job.title, shareUrl)
       };
     });
-  }
 
-  // If answers or boost was added, regenerate preview to commit parameters before confirm
-  if (hasQuestions || createParams.boost_connects) {
     try {
       previewRes = await callUpworkMcpWithRetry(
         'upwork__manage_proposals',
@@ -646,54 +627,12 @@ async function submitAutoProposalForJob(job, options = {}) {
         accessToken
       );
     } catch (createErr2) {
-      // If boost failed (e.g. outbid in flight), fallback to standard proposal without boost
-      if (createParams.boost_connects) {
-        console.warn(`[Auto-Proposer] Boost bid failed for ${job.job_id} (${createErr2.message}). Retrying without boost...`);
-        delete createParams.boost_connects;
-        appliedBoost = 0;
-        try {
-          previewRes = await callUpworkMcpWithRetry(
-            'upwork__manage_proposals',
-            {
-              action: 'create',
-              org_uid: orgUid,
-              params: createParams
-            },
-            accessToken
-          );
-        } catch (retryErr) {
-          recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, baseConnectsCost, 'error_preview', null, retryErr.message);
-          return { ok: false, status: 'error_preview', error: retryErr.message, job_id: job.job_id };
-        }
-      } else {
-        recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, baseConnectsCost, 'error_screening_answers', null, createErr2.message);
-        return { ok: false, status: 'error_screening_answers', error: createErr2.message, job_id: job.job_id };
+      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, baseConnectsCost, 'error_screening_answers', null, createErr2.message);
+      if (onProposalFallbackReady && !options.skipFallbackNotify) {
+        Promise.resolve(onProposalFallbackReady({ job, coverLetter, shareUrl, chargedAmount, connectsCost: baseConnectsCost, error: createErr2.message })).catch(() => {});
       }
-    }
-  }
-
-  // If previewRes returned a text message (e.g. boost bid refused because slot requires higher bid)
-  // or preview_id is missing, fallback cleanly without boost
-  if (typeof previewRes === 'string' || !previewRes?.preview_id) {
-    const errText = typeof previewRes === 'string' ? previewRes : JSON.stringify(previewRes);
-    if (createParams.boost_connects || /boost/i.test(errText)) {
-      console.warn(`[Auto-Proposer] Boost was refused for ${job.job_id} (${errText}). Retrying cleanly without boost...`);
-      delete createParams.boost_connects;
-      appliedBoost = 0;
-      try {
-        previewRes = await callUpworkMcpWithRetry(
-          'upwork__manage_proposals',
-          {
-            action: 'create',
-            org_uid: orgUid,
-            params: createParams
-          },
-          accessToken
-        );
-      } catch (retryErr) {
-        recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, baseConnectsCost, 'error_preview', null, retryErr.message);
-        return { ok: false, status: 'error_preview', error: retryErr.message, job_id: job.job_id };
-      }
+      ensureVideoGenerated(job.job_id, false).catch(() => {});
+      return { ok: false, status: 'error_screening_answers', error: createErr2.message, job_id: job.job_id };
     }
   }
 
@@ -707,7 +646,7 @@ async function submitAutoProposalForJob(job, options = {}) {
     return { ok: false, status: 'error_preview', error: errText, job_id: job.job_id };
   }
 
-  const connectsCost = baseConnectsCost + appliedBoost;
+  const connectsCost = baseConnectsCost;
 
   if (options.dryRun) {
     return {
@@ -745,19 +684,12 @@ async function submitAutoProposalForJob(job, options = {}) {
     } catch (firstConfirmErr) {
       const errMsg = String(firstConfirmErr?.message || '');
       // Per Upwork MCP guidance: NEVER blindly retry confirm_preview on UNEXPECTED_ERROR (risks cooldown escalation / double connects).
-      // Only retry when a boost bid was outbid in flight or the preview genuinely expired.
-      const isBoostConflict = Boolean(createParams.boost_connects) && /boost/i.test(errMsg);
+      // Only retry if the preview token genuinely expired.
       const isExpiredPreview = /expir|stale/i.test(errMsg);
-      if (!isBoostConflict && !isExpiredPreview) {
+      if (!isExpiredPreview) {
         throw firstConfirmErr;
       }
-      if (isBoostConflict) {
-        console.warn(`[Auto-Proposer] Boost conflict on ${job.job_id} (${errMsg}); retrying proposal cleanly without boost...`);
-        delete createParams.boost_connects;
-        appliedBoost = 0;
-      } else {
-        console.warn(`[Auto-Proposer] Preview ${previewRes.preview_id} expired (${errMsg}); recreating preview...`);
-      }
+      console.warn(`[Auto-Proposer] Preview ${previewRes.preview_id} expired (${errMsg}); recreating preview...`);
       await new Promise(r => setTimeout(r, 1500));
       previewRes = await callUpworkMcpWithRetry(
         'upwork__manage_proposals',
