@@ -388,6 +388,11 @@ async function runUpworkMcpRadarCycle() {
 
     return { ok: true, target: target.label, totalReturned: jobs.length, newJobsFound, jobsUpdated, newJobsList };
   } catch (err) {
+    const errMsg = String(err.message || '');
+    if (/restricted|terms of service|cooldown|opened too quickly/i.test(errMsg)) {
+      console.error(`[upwork-mcp-radar] CRITICAL: Upwork restriction/cooldown detected (${errMsg}). Auto-disabling Upwork MCP radar to protect account!`);
+      setSetting('upwork_mcp_radar_enabled', false);
+    }
     db.prepare(`
       INSERT INTO bot_runs (run_type, started_at, finished_at, new_jobs_found, jobs_updated, status, details)
       VALUES (?, ?, ?, ?, ?, 'error', ?)
@@ -397,9 +402,9 @@ async function runUpworkMcpRadarCycle() {
       new Date().toISOString(),
       newJobsFound,
       jobsUpdated,
-      `Target: [${target.label}] -> ${err.message}`
+      `Target: [${target.label}] -> ${errMsg}`
     );
-    return { ok: false, target: target.label, error: err.message };
+    return { ok: false, target: target.label, error: errMsg };
   }
 }
 

@@ -548,7 +548,10 @@ async function submitAutoProposalForJob(job, options = {}) {
     certificate_ids: selectCertificateHighlights()
   };
 
-
+  if (!isHourly) {
+    createParams.estimated_duration = 'less_than_1_month';
+    createParams.payment_mode = 'by_project';
+  }
 
   // Fast pre-flight preview check before spending 35-45s rendering Playwright video
   let previewRes;
@@ -569,7 +572,21 @@ async function submitAutoProposalForJob(job, options = {}) {
       return { ok: false, status: 'skipped_already_applied', job_id: job.job_id };
     }
     recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'error_preview', null, msg);
+    if (onProposalFallbackReady && !options.skipFallbackNotify) {
+      Promise.resolve(onProposalFallbackReady({ job, coverLetter, shareUrl, chargedAmount, connectsCost: 0, error: msg })).catch(() => {});
+    }
+    ensureVideoGenerated(job.job_id, false).catch(() => {});
     return { ok: false, status: 'error_preview', error: msg, job_id: job.job_id };
+  }
+
+  if (typeof previewRes === 'string' || !previewRes?.preview_id) {
+    const errText = typeof previewRes === 'string' ? previewRes : JSON.stringify(previewRes);
+    recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'error_preview', null, errText);
+    if (onProposalFallbackReady && !options.skipFallbackNotify) {
+      Promise.resolve(onProposalFallbackReady({ job, coverLetter, shareUrl, chargedAmount, connectsCost: 0, error: errText })).catch(() => {});
+    }
+    ensureVideoGenerated(job.job_id, false).catch(() => {});
+    return { ok: false, status: 'error_preview', error: errText, job_id: job.job_id };
   }
 
   const preview = previewRes?.preview || {};
@@ -683,6 +700,10 @@ async function submitAutoProposalForJob(job, options = {}) {
   if (typeof previewRes === 'string' || !previewRes?.preview_id) {
     const errText = typeof previewRes === 'string' ? previewRes : JSON.stringify(previewRes);
     recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, baseConnectsCost, 'error_preview', null, errText);
+    if (onProposalFallbackReady && !options.skipFallbackNotify) {
+      Promise.resolve(onProposalFallbackReady({ job, coverLetter, shareUrl, chargedAmount, connectsCost: baseConnectsCost, error: errText })).catch(() => {});
+    }
+    ensureVideoGenerated(job.job_id, false).catch(() => {});
     return { ok: false, status: 'error_preview', error: errText, job_id: job.job_id };
   }
 
@@ -723,15 +744,19 @@ async function submitAutoProposalForJob(job, options = {}) {
       }
     } catch (firstConfirmErr) {
       const errMsg = String(firstConfirmErr?.message || '');
-      if (!/expir|not.?found|invalid.?preview|stale|boost|unexpected|failed/i.test(errMsg)) {
+      // Per Upwork MCP guidance: NEVER blindly retry confirm_preview on UNEXPECTED_ERROR (risks cooldown escalation / double connects).
+      // Only retry when a boost bid was outbid in flight or the preview genuinely expired.
+      const isBoostConflict = Boolean(createParams.boost_connects) && /boost/i.test(errMsg);
+      const isExpiredPreview = /expir|stale/i.test(errMsg);
+      if (!isBoostConflict && !isExpiredPreview) {
         throw firstConfirmErr;
       }
-      if (createParams.boost_connects || /boost|unexpected/i.test(errMsg)) {
-        console.warn(`[Auto-Proposer] Confirm conflict on ${job.job_id} (${errMsg}); retrying proposal cleanly without boost...`);
+      if (isBoostConflict) {
+        console.warn(`[Auto-Proposer] Boost conflict on ${job.job_id} (${errMsg}); retrying proposal cleanly without boost...`);
         delete createParams.boost_connects;
         appliedBoost = 0;
       } else {
-        console.warn(`[Auto-Proposer] Preview ${previewRes.preview_id} expired/invalid (${errMsg}); recreating preview...`);
+        console.warn(`[Auto-Proposer] Preview ${previewRes.preview_id} expired (${errMsg}); recreating preview...`);
       }
       await new Promise(r => setTimeout(r, 1500));
       previewRes = await callUpworkMcpWithRetry(
@@ -743,6 +768,9 @@ async function submitAutoProposalForJob(job, options = {}) {
         },
         accessToken
       );
+      if (typeof previewRes === 'string' || !previewRes?.preview_id) {
+        throw new Error(typeof previewRes === 'string' ? previewRes : JSON.stringify(previewRes));
+      }
       confirmRes = await confirmProposalPreview(previewRes.preview_id);
     }
 
@@ -769,7 +797,7 @@ async function submitAutoProposalForJob(job, options = {}) {
         .then(r => console.log(`[Auto-Proposer] Background video render completed for ${job.job_id} (generatedNow=${r.generatedNow})`))
         .catch(err => console.error(`[Auto-Proposer] Background video render error for ${job.job_id}:`, err.stderr || err.message));
     } else if (status === 'error_confirm') {
-      if (onProposalFallbackReady) {
+      if (onProposalFallbackReady && !options.skipFallbackNotify) {
         Promise.resolve(onProposalFallbackReady({ job, coverLetter, shareUrl, chargedAmount, connectsCost, error: confirmRes })).catch(() => {});
       }
       ensureVideoGenerated(job.job_id, false)
@@ -790,7 +818,7 @@ async function submitAutoProposalForJob(job, options = {}) {
     };
   } catch (confirmErr) {
     recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, connectsCost, 'error_confirm', previewRes?.preview_id, confirmErr.message);
-    if (onProposalFallbackReady) {
+    if (onProposalFallbackReady && !options.skipFallbackNotify) {
       Promise.resolve(onProposalFallbackReady({ job, coverLetter, shareUrl, chargedAmount, connectsCost, error: confirmErr.message })).catch(() => {});
     }
     ensureVideoGenerated(job.job_id, false)

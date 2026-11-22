@@ -633,31 +633,57 @@ setProposalNotificationHandler(({ job, shareUrl, chargedAmount, connectsCost }) 
   });
 });
 
-setProposalFallbackHandler(async ({ job, coverLetter, shareUrl, chargedAmount, connectsCost, error }) => {
+function buildUpworkApplyUrl(jobId) {
+  const cleanId = String(jobId || '').trim().replace(/^~?02/, '');
+  return `https://www.upwork.com/ab/proposals/job/~02${cleanId}/apply/`;
+}
+
+function escapeTgHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+async function sendTelegramMessage(text, options = {}) {
   const tgToken = process.env.TELEGRAM_BOT_TOKEN || getSetting('telegram_bot_token');
-  const tgChatId = process.env.TELEGRAM_CHAT_ID || getSetting('telegram_chat_id');
-  const rateLabel = (job?.job_type || '').toLowerCase() === 'hourly' ? `$${chargedAmount}/hr` : `$${chargedAmount}`;
-  const applyUrl = `https://www.upwork.com/ab/proposals/job/~02${job?.job_id}/apply/`;
-
-  console.log(`[AUTO-PROPOSAL FALLBACK] Job ${job?.job_id} | Dispatching 1-Click Apply to Telegram`);
-  showWindowsBalloon('⚠️ Upwork Proposal Fallback Ready', `${job?.title || job?.job_id}\n1-Click application sent to Telegram.`);
-
-  if (!tgToken || !tgChatId) return;
-
-  function escapeHtml(str) {
-    return String(str || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+  const tgChatId = options.chatId || process.env.TELEGRAM_CHAT_ID || getSetting('telegram_chat_id');
+  if (!tgToken || !tgChatId) return null;
+  try {
+    const resp = await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: tgChatId,
+        text,
+        parse_mode: options.parseMode || 'HTML',
+        disable_web_page_preview: options.disablePreview ?? true,
+        ...(options.replyMarkup ? { reply_markup: options.replyMarkup } : {})
+      })
+    });
+    return await resp.json();
+  } catch (err) {
+    console.error('[Telegram] sendMessage failed:', err.message);
+    return null;
   }
+}
 
-  const text = `⚠️ <b>Upwork Proposal Ready (1-Click Fallback)</b>\n\n` +
-    `📌 <b>Job:</b> ${escapeHtml(job?.title || job?.job_id)}\n` +
-    `💰 <b>Rate:</b> ${rateLabel} | <b>Connects:</b> ${connectsCost || 16}\n` +
-    `⚠️ <b>API Status:</b> Upwork confirmation paused (<code>${escapeHtml(String(error || 'UNEXPECTED_ERROR'))}</code>)\n\n` +
-    `📋 <b>Proposal Pitch (Tap below to copy):</b>\n` +
-    `<code>${escapeHtml(coverLetter || '')}</code>\n\n` +
-    `👇 <i>Click below to open the Upwork application page directly in your browser, paste the text, and submit!</i>`;
+setProposalFallbackHandler(async ({ job, coverLetter, shareUrl, chargedAmount, connectsCost, error }) => {
+  const cleanId = String(job?.job_id || '').trim().replace(/^~?02/, '');
+  const rateLabel = (job?.job_type || '').toLowerCase() === 'hourly' ? `$${chargedAmount}/hr` : `$${chargedAmount}`;
+  const applyUrl = buildUpworkApplyUrl(job?.job_id);
+  const errSummary = String(typeof error === 'object' ? JSON.stringify(error) : (error || 'UNEXPECTED_ERROR')).slice(0, 180);
+
+  console.log(`[AUTO-PROPOSAL FALLBACK] Job ${job?.job_id} | Dispatching 1-Click Apply + MCP Approve button to Telegram`);
+  showWindowsBalloon('⚠️ Upwork Proposal Ready (1-Click)', `${job?.title || job?.job_id}\n1-Click application & MCP retry sent to Telegram.`);
+
+  const text = `⚡ <b>Proposal Ready — 1-Click Apply</b>\n\n` +
+    `📌 <b>Job:</b> ${escapeTgHtml(job?.title || job?.job_id)}\n` +
+    `💰 <b>Rate:</b> ${rateLabel}${connectsCost ? ` | <b>Connects:</b> ${connectsCost}` : ''}\n` +
+    `⚠️ <b>MCP Status:</b> <code>${escapeTgHtml(errSummary)}</code>\n\n` +
+    `📋 <b>Cover Letter (Tap to copy):</b>\n` +
+    `<code>${escapeTgHtml(coverLetter || '')}</code>\n\n` +
+    `👇 <i>Tap 1-Click Apply to submit safely in your browser, or tap Approve &amp; Retry MCP once cooldown clears.</i>`;
 
   const inlineKeyboard = {
     inline_keyboard: [
@@ -665,26 +691,158 @@ setProposalFallbackHandler(async ({ job, coverLetter, shareUrl, chargedAmount, c
         { text: '🚀 1-Click Apply on Upwork', url: applyUrl }
       ],
       [
-        { text: '🎥 Watch Custom Loom Video', url: shareUrl }
+        { text: '✅ Approve & Retry via MCP', callback_data: `mcp_retry:${cleanId}` },
+        { text: '🎥 Watch Loom Video', url: shareUrl }
       ]
     ]
   };
 
-  try {
-    await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: tgChatId,
-        text,
-        parse_mode: 'HTML',
-        reply_markup: inlineKeyboard
-      })
-    });
-  } catch (err) {
-    console.error('[Auto-Proposer] Telegram fallback dispatch failed:', err.message);
-  }
+  await sendTelegramMessage(text, { replyMarkup: inlineKeyboard });
 });
+
+function startTelegramInteractiveBot() {
+  const tgToken = process.env.TELEGRAM_BOT_TOKEN || getSetting('telegram_bot_token');
+  const allowedChatId = String(process.env.TELEGRAM_CHAT_ID || getSetting('telegram_chat_id') || '');
+  if (!tgToken || !allowedChatId) return;
+
+  let offset = Number(getSetting('telegram_update_offset') || 0);
+  const activeRetries = new Set();
+
+  async function answerCallback(callbackQueryId, text, showAlert = false) {
+    try {
+      await fetch(`https://api.telegram.org/bot${tgToken}/answerCallbackQuery`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ callback_query_id: callbackQueryId, text: String(text || '').slice(0, 190), show_alert: showAlert })
+      });
+    } catch {}
+  }
+
+  async function handleStatusCommand(chatId) {
+    const mcpRadarOn = getSetting('upwork_mcp_radar_enabled') === true;
+    const autoPropOn = getSetting('auto_proposer_enabled') !== false;
+    const dailyCount = getDailySubmittedCount();
+    const maxDaily = Number(getSetting('daily_proposal_limit') ?? 5);
+    const lastFlc = db.prepare(`SELECT started_at, status, details FROM bot_runs WHERE run_type = 'flconsole_mcp_sync' ORDER BY id DESC LIMIT 1`).get();
+
+    let cooldownText = 'Unknown (no token)';
+    let connectsText = 'N/A';
+    try {
+      const token = await getValidAccessToken();
+      if (token) {
+        const { callUpworkMcpTool, getTalentOrgUid } = require('./upwork-tracker');
+        const orgUid = await getTalentOrgUid(token);
+        const dash = await callUpworkMcpTool('upwork__get_freelancer_dashboard', { action: 'check', org_uid: orgUid }, token).catch(() => null);
+        connectsText = String(dash?.data?.connects?.balance?.connectsBalance ?? 'N/A');
+        const sample = db.prepare(`SELECT job_id FROM jobs ORDER BY posted_at DESC LIMIT 1`).get();
+        if (sample) {
+          try {
+            await callUpworkMcpTool('upwork__find_jobs', {
+              action: 'get',
+              org_uid: orgUid,
+              params: { job_id: String(sample.job_id).replace(/^~?02/, '') }
+            }, token);
+            cooldownText = '✅ CLEAR (Upwork MCP Ready)';
+          } catch (e) {
+            cooldownText = `⏳ ACTIVE (${String(e.message || '').slice(0, 90)})`;
+          }
+        }
+      }
+    } catch (e) {
+      cooldownText = `Error: ${e.message}`;
+    }
+
+    const msg = `🤖 <b>Upwork Automation Live Status</b>\n\n` +
+      `• <b>Upwork MCP Radar (40s):</b> ${mcpRadarOn ? '⚠️ ON' : '🛡️ PAUSED (Safe Mode)'}\n` +
+      `• <b>flconsole 24/7 Radar:</b> ✅ Active (${escapeTgHtml(lastFlc?.details || 'waiting')})\n` +
+      `• <b>Auto-Proposer:</b> ${autoPropOn ? '✅ Enabled' : '⏸️ Paused'} (${dailyCount}/${maxDaily} today)\n` +
+      `• <b>Connects Balance:</b> ${connectsText}\n` +
+      `• <b>Upwork Cooldown Check:</b> ${escapeTgHtml(cooldownText)}\n\n` +
+      `<i>Commands: /status · /pause_auto · /resume_auto</i>`;
+    await sendTelegramMessage(msg, { chatId });
+  }
+
+  async function pollOnce() {
+    try {
+      const resp = await fetch(`https://api.telegram.org/bot${tgToken}/getUpdates?timeout=20&offset=${offset}&allowed_updates=${encodeURIComponent(JSON.stringify(['message', 'callback_query']))}`, {
+        signal: AbortSignal.timeout(28000)
+      });
+      const data = await resp.json();
+      if (data?.ok && Array.isArray(data.result)) {
+        for (const upd of data.result) {
+          offset = Math.max(offset, Number(upd.update_id) + 1);
+          setSetting('telegram_update_offset', offset);
+
+          if (upd.callback_query) {
+            const cb = upd.callback_query;
+            const chatId = String(cb.message?.chat?.id || '');
+            if (chatId !== allowedChatId) continue;
+            const payload = String(cb.data || '');
+
+            if (payload.startsWith('mcp_retry:')) {
+              const targetId = payload.slice('mcp_retry:'.length).replace(/^~?02/, '');
+              if (activeRetries.has(targetId)) {
+                await answerCallback(cb.id, 'Already submitting this job...');
+                continue;
+              }
+              const job = db.prepare(`SELECT * FROM jobs WHERE job_id = ? OR job_id = ?`).get(targetId, `02${targetId}`);
+              if (!job) {
+                await answerCallback(cb.id, 'Job not found in local DB.', true);
+                continue;
+              }
+              activeRetries.add(targetId);
+              await answerCallback(cb.id, '⏳ Submitting via Upwork MCP...');
+              submitAutoProposalForJob(job, { force: true, skipFallbackNotify: true })
+                .then(async (res) => {
+                  if (res?.ok) {
+                    await sendTelegramMessage(
+                      `✅ <b>Approved &amp; Submitted via Upwork MCP!</b>\n\n📌 ${escapeTgHtml(job.title)}\n💰 $${res.charged_amount} | ${res.connects_cost} Connects\n🎥 ${escapeTgHtml(res.share_url)}`,
+                      { chatId }
+                    );
+                  } else {
+                    await sendTelegramMessage(
+                      `⚠️ <b>MCP Retry Still Blocked</b>\n\n📌 ${escapeTgHtml(job.title)}\n❌ <code>${escapeTgHtml(String(res?.error || res?.status || 'Unknown error').slice(0, 200))}</code>\n\n👉 Use the 1-Click Apply button above to submit directly in your browser.`,
+                      {
+                        chatId,
+                        replyMarkup: {
+                          inline_keyboard: [[{ text: '🚀 1-Click Apply on Upwork', url: buildUpworkApplyUrl(job.job_id) }]]
+                        }
+                      }
+                    );
+                  }
+                })
+                .catch(async (err) => {
+                  await sendTelegramMessage(`❌ MCP Retry error: <code>${escapeTgHtml(err.message)}</code>`, { chatId });
+                })
+                .finally(() => activeRetries.delete(targetId));
+            }
+          } else if (upd.message?.text) {
+            const chatId = String(upd.message.chat?.id || '');
+            if (chatId !== allowedChatId) continue;
+            const cmd = upd.message.text.trim().split(/\s+/)[0].toLowerCase();
+            if (cmd === '/status') {
+              await handleStatusCommand(chatId);
+            } else if (cmd === '/pause_auto') {
+              setSetting('auto_proposer_enabled', false);
+              await sendTelegramMessage('⏸️ <b>Auto-Proposer paused.</b>', { chatId });
+            } else if (cmd === '/resume_auto') {
+              setSetting('auto_proposer_enabled', true);
+              await sendTelegramMessage('▶️ <b>Auto-Proposer resumed.</b>', { chatId });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      if (!/abort|timeout/i.test(String(err?.message || ''))) {
+        console.warn('[TelegramBot] Poll error:', err.message);
+      }
+    }
+    setTimeout(pollOnce, 1500);
+  }
+
+  console.log('[TelegramBot] Interactive callback & command polling started.');
+  setTimeout(pollOnce, 2500);
+}
 
 // API: Real-Time Video Watch Tracking & Notifications
 app.post('/api/track-view/:jobId', async (req, res) => {
@@ -941,17 +1099,20 @@ if (require.main === module) {
     console.log(`Upwork Market Intelligence Server running on http://localhost:${PORT}`);
   });
 
-  // Primary Real-time Upwork MCP Radar loop (every 40 seconds for steady job interception)
-  function scheduleNextUpworkMcpRadar(delayMs = 1000) {
+  // Safe Upwork MCP Radar loop: DISABLED by default to protect account from Upwork search/browse cooldowns.
+  // Primary 24/7 zero-risk job discovery runs via flconsole below.
+  // If explicitly enabled via setting upwork_mcp_radar_enabled=true, enforces a safe >= 3 minute interval.
+  function scheduleNextUpworkMcpRadar(delayMs = 5000) {
     setTimeout(async () => {
-      let nextDelay = 40 * 1000;
+      let nextDelay = 180 * 1000;
       try {
-        const token = await getValidAccessToken();
-        if (token) {
-          const res = await runUpworkMcpRadarCycle();
-          if (res?.newJobsFound > 0) {
-            // Instantly trigger proposal check for newly caught fresh jobs without waiting!
-            runAutoProposerCycle(3).catch(err => console.error('[Auto-Proposer] Trigger error:', err));
+        if (getSetting('upwork_mcp_radar_enabled') === true) {
+          const token = await getValidAccessToken();
+          if (token) {
+            const res = await runUpworkMcpRadarCycle();
+            if (res?.newJobsFound > 0) {
+              runAutoProposerCycle(3).catch(err => console.error('[Auto-Proposer] Trigger error:', err));
+            }
           }
         }
       } catch (err) {
@@ -961,9 +1122,12 @@ if (require.main === module) {
     }, delayMs);
   }
 
-  scheduleNextUpworkMcpRadar(1000);
+  scheduleNextUpworkMcpRadar(5000);
 
-  // Secondary adaptive flconsole sync loop (fallback stream ~61s)
+  // Start interactive Telegram bot (handles Approve & Retry MCP button + /status, /pause_auto, /resume_auto)
+  startTelegramInteractiveBot();
+
+  // Primary 24/7 zero-risk flconsole sync loop (~61s, zero load on personal Upwork OAuth account)
   function scheduleNextFlconsoleSync(delayMs = 2000) {
     setTimeout(async () => {
       let nextDelay = 61 * 1000;
