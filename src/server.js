@@ -14,6 +14,7 @@ const { runTrackerCycle, runUpworkMcpRadarCycle, UPWORK_MCP_URL } = require('./u
 const { getFlconsoleToken, setFlconsoleToken, runFlconsoleSyncCycle } = require('./flconsole-tracker');
 const { getShareHash, buildRyanCoverLetter, submitAutoProposalForJob, runAutoProposerCycle, setProposalNotificationHandler, setProposalFallbackHandler, ensureVideoGenerated, getDailySubmittedCount, getCurrentTurkeyHour, isNightShiftWindow, getNightShiftSubmittedCount } = require('./auto-proposer');
 const { createAuthorizationUrl, exchangeCodeForTokens, getValidAccessToken } = require('./upwork-oauth');
+const { sendVideoWatchEmail, sendBookingEmail, sendAlertEmail, isEmailConfigured } = require('./email-notifier');
 
 const app = express();
 app.use(cors());
@@ -566,6 +567,17 @@ app.post('/api/book-call/:jobId', (req, res) => {
       subtitle: `${jobTitle}`,
       bodyText: `${selected_date} at ${selected_time} | ${visitor_timezone || visitorIp}`
     });
+    const publicBaseUrl = process.env.PUBLIC_LOOM_URL || 'https://loom.sametcankoksoy.com';
+    sendBookingEmail({
+      jobId: realJobId,
+      jobTitle,
+      selectedDate: selected_date,
+      selectedTime: selected_time,
+      visitorTimezone: visitor_timezone,
+      visitorIp,
+      clientNote: client_note,
+      shareUrl: `${publicBaseUrl}/share/${shareId}`
+    }).catch(err => console.error('[Email-Notifier] Booking email error:', err.message));
     res.json({ ok: true, booking_id: Number(info.lastInsertRowid), job_id: realJobId });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
@@ -921,7 +933,57 @@ app.post('/api/track-view/:jobId', async (req, res) => {
       bodyText: `${visitorLocation}${tzInfo?.utc_offset ? ` (${tzInfo.utc_offset})` : ''} | Duration: ${watchSeconds}s`
     });
 
+    const publicBaseUrl = process.env.PUBLIC_LOOM_URL || 'https://loom.sametcankoksoy.com';
+    sendVideoWatchEmail({
+      jobId: realJobId,
+      jobTitle,
+      eventType,
+      eventLabel: eventLabels[eventType],
+      watchSeconds,
+      visitorCountry: tzInfo?.country || '',
+      visitorCity: tzInfo?.city || '',
+      visitorRegion: tzInfo?.region || '',
+      visitorLocation,
+      visitorTimezone,
+      utcOffset: tzInfo?.utc_offset || '',
+      visitorIp: String(visitorIp),
+      userAgent,
+      shareUrl: `${publicBaseUrl}/share/${shareId}`
+    })
+      .then(r => {
+        if (r?.ok) console.log(`[Email-Notifier] Watch alert sent via ${r.provider} for ${realJobId} (${eventType}, ${visitorLocation})`);
+      })
+      .catch(err => console.error('[Email-Notifier] Watch email error:', err.message));
+
     res.json({ ok: true, view_id: Number(info.lastInsertRowid), event_type: eventType });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// API: Local-only test email endpoint
+app.post('/api/email/test', async (req, res) => {
+  try {
+    if (!isEmailConfigured()) {
+      return res.status(400).json({ ok: false, error: 'Email not configured yet. Set ALERT_EMAIL_TO + SMTP_USER/SMTP_PASS (or RESEND_API_KEY).' });
+    }
+    const result = await sendVideoWatchEmail({
+      jobId: '2123838758892869262',
+      jobTitle: 'Test Notification — Upwork Loom Video Watch Alert',
+      eventType: 'video_play',
+      eventLabel: 'Started Watching Video',
+      watchSeconds: 18,
+      visitorCountry: 'United States',
+      visitorCity: 'New York',
+      visitorRegion: 'NY',
+      visitorLocation: 'New York, NY, United States',
+      visitorTimezone: 'America/New_York',
+      utcOffset: 'UTC-5',
+      visitorIp: '127.0.0.1',
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) Chrome/130.0',
+      shareUrl: 'https://loom.sametcankoksoy.com/share/test'
+    });
+    res.json(result);
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
