@@ -562,9 +562,9 @@ app.post('/api/book-call/:jobId', (req, res) => {
 
     console.log(`[CALL BOOKED] #${info.lastInsertRowid} | Job: ${realJobId} (${jobTitle}) | ${selected_date} at ${selected_time} | ${visitor_timezone || 'N/A'} | IP: ${visitorIp}`);
     notifyVideoActivity({
-      title: 'Upwork Görüşme Talebi!',
+      title: '📞 New Meeting Booked on Upwork!',
       subtitle: `${jobTitle}`,
-      bodyText: `${selected_date} saat ${selected_time} | ${visitor_timezone || visitorIp}`
+      bodyText: `${selected_date} at ${selected_time} | ${visitor_timezone || visitorIp}`
     });
     res.json({ ok: true, booking_id: Number(info.lastInsertRowid), job_id: realJobId });
   } catch (err) {
@@ -627,8 +627,8 @@ setProposalNotificationHandler(({ job, shareUrl, chargedAmount, connectsCost }) 
   const rateLabel = (job?.job_type || '').toLowerCase() === 'hourly' ? `$${chargedAmount}/hr` : `$${chargedAmount}`;
   notifyDesktopAndTelegram({
     logTag: 'AUTO-PROPOSAL SENT',
-    title: '🔥🔥 Yeni Oto-Proposal Gönderildi!',
-    subtitle: job?.title || `Upwork İlanı (${job?.job_id || ''})`,
+    title: '🔥 New Proposal Submitted!',
+    subtitle: job?.title || `Upwork Job (${job?.job_id || ''})`,
     bodyText: `${rateLabel} | ${connectsCost} Connects | ${shareUrl}`
   });
 });
@@ -651,14 +651,14 @@ app.post('/api/track-view/:jobId', async (req, res) => {
     const watchSeconds = Math.max(0, Math.round(Number(req.body?.watch_seconds || 0)));
 
     const job = db.prepare('SELECT title FROM jobs WHERE job_id = ?').get(realJobId);
-    const jobTitle = job?.title || `Upwork İlanı (${realJobId})`;
+    const jobTitle = job?.title || `Upwork Job (${realJobId})`;
     const shareId = getShareHash(realJobId);
     const visitorIp = req.headers['cf-connecting-ip'] ||
       (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : '') ||
       req.socket?.remoteAddress ||
       '';
     const tzInfo = await detectVisitorTimezone(req);
-    const visitorLocation = [tzInfo?.city, tzInfo?.region, tzInfo?.country].filter(Boolean).join(', ') || 'Bilinmeyen Konum';
+    const visitorLocation = [tzInfo?.city, tzInfo?.region, tzInfo?.country].filter(Boolean).join(', ') || 'Unknown Location';
     const visitorTimezone = tzInfo?.label || '';
 
     const info = db.prepare(`
@@ -677,16 +677,16 @@ app.post('/api/track-view/:jobId', async (req, res) => {
     );
 
     const eventLabels = {
-      page_open: 'Sayfayı Açtı',
-      video_play: 'Videoyu Oynatmaya Başladı',
-      video_50pct: 'Videonun Yarısını İzledi',
-      video_completed: 'Videonun Tamamını İzledi'
+      page_open: 'Opened Proposal Page',
+      video_play: 'Started Watching Video',
+      video_50pct: 'Watched 50% of Video',
+      video_completed: 'Finished Video (100%)'
     };
 
     notifyVideoActivity({
-      title: `Müşteri ${eventLabels[eventType]}`,
+      title: `Client ${eventLabels[eventType]}`,
       subtitle: jobTitle,
-      bodyText: `${visitorLocation}${tzInfo?.utc_offset ? ` (${tzInfo.utc_offset})` : ''} | Süre: ${watchSeconds}sn`
+      bodyText: `${visitorLocation}${tzInfo?.utc_offset ? ` (${tzInfo.utc_offset})` : ''} | Duration: ${watchSeconds}s`
     });
 
     res.json({ ok: true, view_id: Number(info.lastInsertRowid), event_type: eventType });
