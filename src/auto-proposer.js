@@ -41,6 +41,7 @@ const TRANSIENT_MCP_ERR_RE = /(fetch failed|econnreset|etimedout|socket hang up|
 
 let isProposerRunning = false;
 let onProposalSubmitted = null;
+let onProposalFallbackReady = null;
 const activeVideoRenders = new Map();
 
 function getCurrentTurkeyHour() {
@@ -129,6 +130,10 @@ function isTamSametlikJob(job) {
 
 function setProposalNotificationHandler(fn) {
   onProposalSubmitted = typeof fn === 'function' ? fn : null;
+}
+
+function setProposalFallbackHandler(fn) {
+  onProposalFallbackReady = typeof fn === 'function' ? fn : null;
 }
 
 async function callUpworkMcpWithRetry(toolName, args, accessToken, maxAttempts = 3) {
@@ -763,6 +768,13 @@ async function submitAutoProposalForJob(job, options = {}) {
       ensureVideoGenerated(job.job_id, false)
         .then(r => console.log(`[Auto-Proposer] Background video render completed for ${job.job_id} (generatedNow=${r.generatedNow})`))
         .catch(err => console.error(`[Auto-Proposer] Background video render error for ${job.job_id}:`, err.stderr || err.message));
+    } else if (status === 'error_confirm') {
+      if (onProposalFallbackReady) {
+        Promise.resolve(onProposalFallbackReady({ job, coverLetter, shareUrl, chargedAmount, connectsCost, error: confirmRes })).catch(() => {});
+      }
+      ensureVideoGenerated(job.job_id, false)
+        .then(r => console.log(`[Auto-Proposer] Background fallback video render completed for ${job.job_id}`))
+        .catch(() => {});
     }
 
     return {
@@ -777,7 +789,13 @@ async function submitAutoProposalForJob(job, options = {}) {
       confirm: confirmRes
     };
   } catch (confirmErr) {
-    recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, connectsCost, 'error_confirm', previewRes.preview_id, confirmErr.message);
+    recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, connectsCost, 'error_confirm', previewRes?.preview_id, confirmErr.message);
+    if (onProposalFallbackReady) {
+      Promise.resolve(onProposalFallbackReady({ job, coverLetter, shareUrl, chargedAmount, connectsCost, error: confirmErr.message })).catch(() => {});
+    }
+    ensureVideoGenerated(job.job_id, false)
+      .then(r => console.log(`[Auto-Proposer] Background fallback video render completed for ${job.job_id}`))
+      .catch(() => {});
     return { ok: false, status: 'error_confirm', error: confirmErr.message, job_id: job.job_id };
   }
 }
@@ -908,5 +926,6 @@ module.exports = {
   submitAutoProposalForJob,
   runAutoProposerCycle,
   setProposalNotificationHandler,
+  setProposalFallbackHandler,
   evaluateJobFitWithAI
 };

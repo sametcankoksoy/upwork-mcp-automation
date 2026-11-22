@@ -12,7 +12,7 @@ const { db, upsertJobAndSnapshot, getSetting, setSetting } = require('./db');
 const { getFullMarketAnalytics } = require('./analytics');
 const { runTrackerCycle, runUpworkMcpRadarCycle, UPWORK_MCP_URL } = require('./upwork-tracker');
 const { getFlconsoleToken, setFlconsoleToken, runFlconsoleSyncCycle } = require('./flconsole-tracker');
-const { getShareHash, buildRyanCoverLetter, submitAutoProposalForJob, runAutoProposerCycle, setProposalNotificationHandler, ensureVideoGenerated, getDailySubmittedCount, getCurrentTurkeyHour, isNightShiftWindow, getNightShiftSubmittedCount } = require('./auto-proposer');
+const { getShareHash, buildRyanCoverLetter, submitAutoProposalForJob, runAutoProposerCycle, setProposalNotificationHandler, setProposalFallbackHandler, ensureVideoGenerated, getDailySubmittedCount, getCurrentTurkeyHour, isNightShiftWindow, getNightShiftSubmittedCount } = require('./auto-proposer');
 const { createAuthorizationUrl, exchangeCodeForTokens, getValidAccessToken } = require('./upwork-oauth');
 
 const app = express();
@@ -631,6 +631,59 @@ setProposalNotificationHandler(({ job, shareUrl, chargedAmount, connectsCost }) 
     subtitle: job?.title || `Upwork Job (${job?.job_id || ''})`,
     bodyText: `${rateLabel} | ${connectsCost} Connects | ${shareUrl}`
   });
+});
+
+setProposalFallbackHandler(async ({ job, coverLetter, shareUrl, chargedAmount, connectsCost, error }) => {
+  const tgToken = process.env.TELEGRAM_BOT_TOKEN || getSetting('telegram_bot_token');
+  const tgChatId = process.env.TELEGRAM_CHAT_ID || getSetting('telegram_chat_id');
+  const rateLabel = (job?.job_type || '').toLowerCase() === 'hourly' ? `$${chargedAmount}/hr` : `$${chargedAmount}`;
+  const applyUrl = `https://www.upwork.com/ab/proposals/job/~02${job?.job_id}/apply/`;
+
+  console.log(`[AUTO-PROPOSAL FALLBACK] Job ${job?.job_id} | Dispatching 1-Click Apply to Telegram`);
+  showWindowsBalloon('⚠️ Upwork Proposal Fallback Ready', `${job?.title || job?.job_id}\n1-Click application sent to Telegram.`);
+
+  if (!tgToken || !tgChatId) return;
+
+  function escapeHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  const text = `⚠️ <b>Upwork Proposal Ready (1-Click Fallback)</b>\n\n` +
+    `📌 <b>Job:</b> ${escapeHtml(job?.title || job?.job_id)}\n` +
+    `💰 <b>Rate:</b> ${rateLabel} | <b>Connects:</b> ${connectsCost || 16}\n` +
+    `⚠️ <b>API Status:</b> Upwork confirmation paused (<code>${escapeHtml(String(error || 'UNEXPECTED_ERROR'))}</code>)\n\n` +
+    `📋 <b>Proposal Pitch (Tap below to copy):</b>\n` +
+    `<code>${escapeHtml(coverLetter || '')}</code>\n\n` +
+    `👇 <i>Click below to open the Upwork application page directly in your browser, paste the text, and submit!</i>`;
+
+  const inlineKeyboard = {
+    inline_keyboard: [
+      [
+        { text: '🚀 1-Click Apply on Upwork', url: applyUrl }
+      ],
+      [
+        { text: '🎥 Watch Custom Loom Video', url: shareUrl }
+      ]
+    ]
+  };
+
+  try {
+    await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: tgChatId,
+        text,
+        parse_mode: 'HTML',
+        reply_markup: inlineKeyboard
+      })
+    });
+  } catch (err) {
+    console.error('[Auto-Proposer] Telegram fallback dispatch failed:', err.message);
+  }
 });
 
 // API: Real-Time Video Watch Tracking & Notifications
