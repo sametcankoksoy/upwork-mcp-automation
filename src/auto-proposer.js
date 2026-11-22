@@ -586,13 +586,19 @@ async function submitAutoProposalForJob(job, options = {}) {
     return { ok: false, status: 'skipped_already_hired', job_id: job.job_id, reason };
   }
 
-  // Apply up to 5 connects boost only if 5 connects is enough to win a top-4 slot (recommended_connects <= 5)
+  // User rule: Önceden biri bastıysa (hasBoostBids) kesinlikle boost basma (0 boost, standart teklif)
+  // Sadece kimse basmamışsa (!hasBoostBids) ve 5 connects veya altı ile 1. sıra alınabiliyorsa bas
   let appliedBoost = 0;
   const recommendedBoost = Number(preview.boost?.recommended_connects || preview.boost?.min_boost_connects || 1);
-  if (isBoostAvailable && recommendedBoost <= 5 && maxBoost >= recommendedBoost) {
+  if (!hasBoostBids && isBoostAvailable && recommendedBoost <= 5 && maxBoost >= recommendedBoost) {
     appliedBoost = recommendedBoost;
     createParams.boost_connects = appliedBoost;
-    console.log(`[Auto-Proposer] Bidding ${appliedBoost} connects boost for job ${job.job_id} (recommended=${recommendedBoost})`);
+    console.log(`[Auto-Proposer] Empty boost auction on ${job.job_id}. Bidding ${appliedBoost} connects for Slot #1`);
+  } else {
+    delete createParams.boost_connects;
+    if (hasBoostBids) {
+      console.log(`[Auto-Proposer] Competing boost bids exist on ${job.job_id} ([${topBids.join(', ')}]). Submitting standard proposal without boost.`);
+    }
   }
 
   // Handle screening questions if present before video render
