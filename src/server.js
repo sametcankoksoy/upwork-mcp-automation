@@ -709,9 +709,12 @@ async function buildLiveStatusMessage(header = '🤖 <b>Upwork Automation Live S
   const freezeUntil = Number(getSetting('mcp_freeze_until') || 0);
   const isFrozen = freezeUntil > Date.now();
   const minsLeft = isFrozen ? Math.max(1, Math.ceil((freezeUntil - Date.now()) / 60000)) : 0;
+  const freezeRemainingLabel = minsLeft >= 60
+    ? `${Math.floor(minsLeft / 60)}h ${minsLeft % 60}m`
+    : `${minsLeft}m`;
   const lastFlc = db.prepare(`SELECT started_at, status, details FROM bot_runs WHERE run_type = 'flconsole_mcp_sync' ORDER BY id DESC LIMIT 1`).get();
 
-  let cooldownText = isFrozen ? `❄️ Frozen for ${minsLeft}m (resting Upwork MCP)` : 'Unknown (no token)';
+  let cooldownText = isFrozen ? `❄️ Frozen for ${freezeRemainingLabel} (resting Upwork MCP)` : 'Unknown (no token)';
   let connectsText = 'N/A';
 
   if (!isFrozen) {
@@ -745,9 +748,9 @@ async function buildLiveStatusMessage(header = '🤖 <b>Upwork Automation Live S
   const lines = [
     header,
     '',
-    `• <b>Direct Upwork MCP Radar:</b> ${isFrozen ? `❄️ Frozen (${minsLeft}m left → resumes every ${intervalMin}m)` : (mcpRadarOn ? `✅ Active (every ${intervalMin} min)` : '🛡️ PAUSED')}`,
+    `• <b>Direct Upwork MCP Radar:</b> ${isFrozen ? `❄️ Frozen (${freezeRemainingLabel} left → resumes every ${intervalMin}m)` : (mcpRadarOn ? `✅ Active (every ${intervalMin} min)` : '🛡️ PAUSED')}`,
     `• <b>flconsole Sync:</b> ${flcEnabled ? `✅ Active (${escapeTgHtml(lastFlc?.details || 'waiting')})` : '⛔ Disabled (Direct MCP Mode)'}`,
-    `• <b>Auto-Proposer (0 Boost, Auto-Confirm):</b> ${isFrozen ? `❄️ Frozen (${minsLeft}m left)` : (autoPropOn ? '✅ Enabled' : '⏸️ Paused')} (${dailyCount}/${maxDaily} today)`,
+    `• <b>Auto-Proposer (0 Boost, Auto-Confirm):</b> ${isFrozen ? `❄️ Frozen (${freezeRemainingLabel} left)` : (autoPropOn ? '✅ Enabled' : '⏸️ Paused')} (${dailyCount}/${maxDaily} today)`,
     `• <b>Connects Balance:</b> ${connectsText}`,
     `• <b>Upwork Cooldown Check:</b> ${escapeTgHtml(cooldownText)}`,
     ...extraLines,
@@ -1170,7 +1173,7 @@ if (require.main === module) {
         `• <b>Auto-Proposal Check:</b> ${escapeTgHtml(autoRes?.status || 'checked')}${autoRes?.processed ? ` (processed=${autoRes.processed})` : ''}`
       ];
 
-      const msg = await buildLiveStatusMessage('⏰ <b>30-Minute Cooldown Complete — Automation Resumed!</b>', extra);
+      const msg = await buildLiveStatusMessage('⏰ <b>24-Hour Cooldown Complete — Automation Resumed!</b>', extra);
       await sendTelegramMessage(msg);
       console.log('[Cooldown-Wakeup] Telegram status report dispatched.');
     } catch (err) {
