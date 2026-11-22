@@ -321,11 +321,14 @@ function isClientGeoAndHistoryEligible(job) {
   const isWestern = isWesternClientCountry(country);
   const verified = Boolean(job?.client_payment_verified);
   const posted = Number(job?.client_total_posted || 0);
+  const spent = Number(job?.client_total_spent || 0);
   const hires = Number(job?.client_total_hires || 0);
   const hireRate = Number(job?.client_hire_rate || 0);
 
-  // Rule 1: Tier-1 (US, Canada, UK, Australia, Austria) 1st job (verified or unverified allowed, strictly only if posted <= 1)
-  if (isTier1 && posted <= 1 && hires === 0 && hireRate === 0) {
+  // Rule 1: Tier-1 (US, Canada, UK, Australia, Austria) strictly 1st job only
+  // Must be their VERY FIRST job post (posted <= 1, spent === 0, hires === 0, hireRate === 0)
+  // Strictly rejects spam ghost posters with 2+ jobs and 0 spent/hires
+  if (isTier1 && posted <= 1 && spent === 0 && hires === 0 && hireRate === 0) {
     return true;
   }
 
@@ -334,7 +337,7 @@ function isClientGeoAndHistoryEligible(job) {
 
   // Rule 2: Western payment-verified client who is NOT a habitual ghost-job poster
   if (isWestern) {
-    if (posted <= 1 && hires === 0 && hireRate === 0) return true;
+    if (posted <= 1 && spent === 0 && hires === 0 && hireRate === 0) return true;
     if (posted === 2 && hires >= 1) return true;
     return hireRate >= 50;
   }
@@ -353,8 +356,10 @@ function calculateSniperScore(job) {
   const text = `${job.title || ''} ${job.description || ''}`.toLowerCase();
 
   // 1. Client Geo, Hire Rate & Non-Ghost Rules
+  // Strictly 1st job only: posted <= 1, spent === 0, hires === 0, hireRate === 0
   const isTier1FirstPost = isTier1FirstPostCountry(job.client_country)
     && Number(job.client_total_posted || 0) <= 1
+    && Number(job.client_total_spent || 0) === 0
     && Number(job.client_total_hires || 0) === 0
     && Number(job.client_hire_rate || 0) === 0;
   const isWesternVerifiedEligible = isWesternClientCountry(job.client_country)
