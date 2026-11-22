@@ -1,3 +1,6 @@
+const dns = require('node:dns');
+try { dns.setDefaultResultOrder('ipv4first'); } catch {}
+
 const { db, upsertJobAndSnapshot, getSetting, setSetting } = require('./db');
 const { getValidAccessToken } = require('./upwork-oauth');
 

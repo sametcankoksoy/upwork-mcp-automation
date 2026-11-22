@@ -1,3 +1,6 @@
+const dns = require('node:dns');
+try { dns.setDefaultResultOrder('ipv4first'); } catch {}
+
 const path = require('node:path');
 const fs = require('node:fs');
 const crypto = require('node:crypto');
@@ -30,7 +33,8 @@ const TERMINAL_PROPOSAL_STATUSES = new Set([
   'skipped_already_hired',
   'skipped_consulting_or_non_dev',
   'skipped_low_hire_rate',
-  'error_screening_answers'
+  'error_screening_answers',
+  'error_confirm'
 ]);
 
 const TRANSIENT_MCP_ERR_RE = /(fetch failed|econnreset|etimedout|socket hang up|\b502\b|\b503\b|\b504\b)/i;
@@ -681,16 +685,18 @@ async function submitAutoProposalForJob(job, options = {}) {
         throw new Error(confirmRes.reason || JSON.stringify(confirmRes));
       }
     } catch (firstConfirmErr) {
-      if (!/expir|not.?found|invalid.?preview|stale|boost/i.test(String(firstConfirmErr?.message || ''))) {
+      const errMsg = String(firstConfirmErr?.message || '');
+      if (!/expir|not.?found|invalid.?preview|stale|boost|unexpected|failed/i.test(errMsg)) {
         throw firstConfirmErr;
       }
-      if (/boost/i.test(String(firstConfirmErr?.message || ''))) {
-        console.warn(`[Auto-Proposer] Boost bid conflict on confirm for ${job.job_id} (${firstConfirmErr.message}); retrying without boost...`);
+      if (createParams.boost_connects || /boost|unexpected/i.test(errMsg)) {
+        console.warn(`[Auto-Proposer] Confirm conflict on ${job.job_id} (${errMsg}); retrying proposal cleanly without boost...`);
         delete createParams.boost_connects;
         appliedBoost = 0;
       } else {
-        console.warn(`[Auto-Proposer] Preview ${previewRes.preview_id} expired; recreating preview...`);
+        console.warn(`[Auto-Proposer] Preview ${previewRes.preview_id} expired/invalid (${errMsg}); recreating preview...`);
       }
+      await new Promise(r => setTimeout(r, 1500));
       previewRes = await callUpworkMcpWithRetry(
         'upwork__manage_proposals',
         {
@@ -703,7 +709,8 @@ async function submitAutoProposalForJob(job, options = {}) {
       confirmRes = await confirmProposalPreview(previewRes.preview_id);
     }
 
-    const status = confirmRes?.status === 'error' ? 'error_confirm' : 'submitted';
+    const isSuccess = (confirmRes?.status === 'ok' || confirmRes?.status === 'submitted' || confirmRes?.data?.createJobProposal?.status === 'SUCCESS');
+    const status = isSuccess ? 'submitted' : 'error_confirm';
     recordAutoProposalOutcome(
       job,
       shareId,
