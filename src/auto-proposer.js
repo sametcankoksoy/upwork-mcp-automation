@@ -543,10 +543,7 @@ async function submitAutoProposalForJob(job, options = {}) {
     certificate_ids: selectCertificateHighlights()
   };
 
-  if (!isHourly) {
-    createParams.estimated_duration = 'less_than_1_month';
-    createParams.payment_mode = 'by_project';
-  }
+
 
   // Fast pre-flight preview check before spending 35-45s rendering Playwright video
   let previewRes;
