@@ -102,8 +102,8 @@ function isTamSametlikJob(job) {
   }
 
   // Require positive match on Sametcan's REAL core builder stack:
-  // Scrapers (Playwright/Selenium/Puppeteer/BeautifulSoup), Bots (WhatsApp/Telegram/Discord), Voice Agents (Vapi/Retell/Twilio), Python/n8n Automations, AI Agents (MCP/RAG)
-  const CORE_BUILDER_STACK_RE = /\b(playwright|selenium|puppeteer|scrapy|beautifulsoup|web scraping|data scraping|scrape|scraper|scrapers|scraping|crawler|crawling|anti-bot|cloudflare bypass|whatsapp bot|telegram bot|discord bot|slack bot|voice agent|voice ai|vapi|retell|twilio|elevenlabs|bland ai|pipecat|livekit|\bn8n\b|make\.com|python script|python automation|automation script|bot developer|custom bot|ai agent|agentic|\bmcp\b|\brag\b|browser automation|account automation|social media automation|multi-account|simulate interactions)\b/i;
+  // Scrapers (Playwright/Selenium/Puppeteer/BeautifulSoup), Bots (WhatsApp/Telegram/Discord), Voice Agents (Vapi/Retell/Twilio), Python/n8n Automations, AI Agents (MCP/RAG), Conversational AI
+  const CORE_BUILDER_STACK_RE = /\b(playwright|selenium|puppeteer|scrapy|beautifulsoup|web scraping|data scraping|scrape|scraper|scrapers|scraping|crawler|crawling|anti-bot|cloudflare bypass|whatsapp bot|telegram bot|discord bot|slack bot|voice agent|voice ai|vapi|retell|twilio|elevenlabs|bland ai|pipecat|livekit|\bn8n\b|make\.com|python script|python automation|automation script|bot developer|custom bot|ai agent|agentic|\bmcp\b|\brag\b|conversational ai|ai backend|chat api|langgraph|langchain|crewai|browser automation|account automation|social media automation|multi-account|simulate interactions)\b/i;
   if (!CORE_BUILDER_STACK_RE.test(text)) return false;
 
   // Enforce proposal competition:
@@ -516,6 +516,20 @@ async function submitAutoProposalForJob(job, options = {}) {
     const msg = String(orgErr?.message || orgErr);
     recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'error_preview', null, msg);
     return { ok: false, status: 'error_preview', error: msg, job_id: job.job_id };
+  }
+
+  // Ensure Upwork disintermediation policy is acknowledged for this session
+  try {
+    await callUpworkMcpWithRetry(
+      'upwork__manage_proposals',
+      {
+        action: 'acknowledge_policy',
+        org_uid: orgUid
+      },
+      accessToken
+    );
+  } catch (ackErr) {
+    console.warn(`[Auto-Proposer] Policy ack warning: ${ackErr.message}`);
   }
 
   const numericJobRef = toNumericJobRef(job.job_id);
