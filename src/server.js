@@ -888,10 +888,10 @@ if (require.main === module) {
     console.log(`Upwork Market Intelligence Server running on http://localhost:${PORT}`);
   });
 
-  // Primary Real-time Upwork MCP Radar loop (every 20 seconds for instant job interception)
+  // Primary Real-time Upwork MCP Radar loop (every 40 seconds for steady job interception)
   function scheduleNextUpworkMcpRadar(delayMs = 1000) {
     setTimeout(async () => {
-      let nextDelay = 20 * 1000;
+      let nextDelay = 40 * 1000;
       try {
         const token = await getValidAccessToken();
         if (token) {
@@ -930,10 +930,10 @@ if (require.main === module) {
 
   scheduleNextFlconsoleSync(2000);
 
-  // Realtime proposal watcher every 20 seconds (strictly respects Upwork MCP ~12 req/min rate limit)
+  // Realtime proposal watcher every 40 seconds (strictly respects Upwork MCP rate limit)
   setInterval(() => {
     runAutoProposerCycle(2).catch(err => console.error('[Auto-Proposer] Loop error:', err));
-  }, 20 * 1000);
+  }, 40 * 1000);
 
   // Self keep-alive ping every 4 minutes
   const externalUrl = process.env.RENDER_EXTERNAL_URL || 'https://upwork-mcp-automation.onrender.com';
