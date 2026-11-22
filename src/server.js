@@ -15,6 +15,9 @@ const { getFlconsoleToken, setFlconsoleToken, runFlconsoleSyncCycle } = require(
 const { getShareHash, buildRyanCoverLetter, submitAutoProposalForJob, runAutoProposerCycle, setProposalNotificationHandler, setProposalFallbackHandler, ensureVideoGenerated, getDailySubmittedCount, getCurrentTurkeyHour, isNightShiftWindow, getNightShiftSubmittedCount } = require('./auto-proposer');
 const { createAuthorizationUrl, exchangeCodeForTokens, getValidAccessToken } = require('./upwork-oauth');
 const { sendVideoWatchEmail, sendBookingEmail, sendAlertEmail, isEmailConfigured } = require('./email-notifier');
+const { resolveCloudVideoMeta, uploadJobVideoToCloud } = require('./cloud-video-sync');
+
+const IS_RENDER_CLOUD = Boolean(process.env.RENDER || process.env.RENDER_EXTERNAL_URL || process.env.PORTAL_ONLY === 'true');
 
 const app = express();
 app.use(cors());
@@ -75,6 +78,57 @@ function resolveVideoJobId(idOrToken) {
 
 function hasValidVideo(idOrToken) {
   return Boolean(resolveVideoJobId(idOrToken));
+}
+
+async function resolveVideoInfoAsync(idOrToken) {
+  const localJobId = resolveVideoJobId(idOrToken);
+  if (localJobId) {
+    const localVideoPath = path.join(videosDir, `${localJobId}.mp4`);
+    const specificThumb = path.join(thumbsDir, `${localJobId}.jpg`);
+    const hasLocalVideo = fs.existsSync(localVideoPath);
+    const job = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(localJobId);
+    if (hasLocalVideo) {
+      return {
+        jobId: localJobId,
+        shareId: getShareHash(localJobId),
+        title: job?.title || '',
+        clientCountry: job?.client_country || '',
+        job,
+        hasLocalVideo: true,
+        localVideoPath,
+        localThumbPath: fs.existsSync(specificThumb) ? specificThumb : null,
+        cloudMeta: null
+      };
+    }
+    // Local DB knows the job, check cloud CDN for rendered video (e.g. Render portal)
+    const cloudMeta = await resolveCloudVideoMeta(idOrToken) || await resolveCloudVideoMeta(getShareHash(localJobId));
+    return {
+      jobId: localJobId,
+      shareId: cloudMeta?.share_id || getShareHash(localJobId),
+      title: job?.title || cloudMeta?.title || '',
+      clientCountry: job?.client_country || cloudMeta?.client_country || '',
+      job,
+      hasLocalVideo: false,
+      localVideoPath: null,
+      localThumbPath: fs.existsSync(specificThumb) ? specificThumb : null,
+      cloudMeta
+    };
+  }
+
+  const cloudMeta = await resolveCloudVideoMeta(idOrToken);
+  if (!cloudMeta) return null;
+  const dbJob = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(cloudMeta.job_id);
+  return {
+    jobId: cloudMeta.job_id,
+    shareId: cloudMeta.share_id,
+    title: dbJob?.title || cloudMeta.title || 'Quick Video for Your Project',
+    clientCountry: dbJob?.client_country || cloudMeta.client_country || '',
+    job: dbJob || null,
+    hasLocalVideo: false,
+    localVideoPath: null,
+    localThumbPath: null,
+    cloudMeta
+  };
 }
 
 const ipGeoCache = new Map();
@@ -211,8 +265,9 @@ function extractValidExternalJobId(reqPath) {
   return null;
 }
 
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
   const isExternal = Boolean(req.headers['cf-connecting-ip']) ||
+    IS_RENDER_CLOUD ||
     (req.hostname && !['localhost', '127.0.0.1'].includes(req.hostname));
 
   if (!isExternal) {
@@ -229,56 +284,73 @@ app.use((req, res, next) => {
     }
 
     const jobId = extractValidExternalJobId(req.path);
-    if (jobId && hasValidVideo(jobId)) {
-      return next();
+    if (jobId) {
+      const info = await resolveVideoInfoAsync(jobId);
+      if (info) {
+        req.resolvedVideoInfo = info;
+        return next();
+      }
     }
   }
 
   if (req.method === 'POST' && (req.path.startsWith('/api/book-call/') || req.path.startsWith('/api/track-view/'))) {
     const jobId = extractValidExternalJobId(req.path);
-    if (jobId && hasValidVideo(jobId)) {
-      return next();
+    if (jobId) {
+      const info = await resolveVideoInfoAsync(jobId);
+      if (info) {
+        req.resolvedVideoInfo = info;
+        return next();
+      }
     }
   }
 
   return sendPrivatePortalLocked(req, res);
 });
 
-app.get('/videos/:idOrToken.mp4', (req, res) => {
-  const realJobId = resolveVideoJobId(req.params.idOrToken);
-  if (!realJobId) return sendPrivatePortalLocked(req, res);
-  const videoFile = path.join(videosDir, `${realJobId}.mp4`);
-  if (!fs.existsSync(videoFile)) {
-    return res.status(404).end();
+app.get('/videos/:idOrToken.mp4', async (req, res) => {
+  const info = req.resolvedVideoInfo || await resolveVideoInfoAsync(req.params.idOrToken);
+  if (!info) return sendPrivatePortalLocked(req, res);
+  if (info.hasLocalVideo && info.localVideoPath) {
+    return res.sendFile(info.localVideoPath);
   }
-  res.sendFile(videoFile);
+  if (info.cloudMeta?.video_cdn_url) {
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.redirect(302, info.cloudMeta.video_cdn_url);
+  }
+  return res.status(404).end();
 });
 
-app.get('/thumbnails/:idOrToken.jpg', (req, res) => {
-  const realJobId = resolveVideoJobId(req.params.idOrToken);
-  if (!realJobId) return sendPrivatePortalLocked(req, res);
-  const specificThumb = path.join(thumbsDir, `${realJobId}.jpg`);
+app.get('/thumbnails/:idOrToken.jpg', async (req, res) => {
+  const info = req.resolvedVideoInfo || await resolveVideoInfoAsync(req.params.idOrToken);
+  if (!info) return sendPrivatePortalLocked(req, res);
+  if (info.localThumbPath) {
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.sendFile(info.localThumbPath);
+  }
+  if (info.cloudMeta?.thumb_cdn_url) {
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.redirect(302, info.cloudMeta.thumb_cdn_url);
+  }
   const fallbackThumb = path.join(thumbsDir, '2122421990107900101.jpg');
-  const thumbFile = fs.existsSync(specificThumb) ? specificThumb : fallbackThumb;
-  if (!fs.existsSync(thumbFile)) {
+  if (!fs.existsSync(fallbackThumb)) {
     return res.status(404).end();
   }
   res.setHeader('Content-Type', 'image/jpeg');
   res.setHeader('Cache-Control', 'public, max-age=3600');
-  res.sendFile(thumbFile);
+  res.sendFile(fallbackThumb);
 });
 
-app.get('/oembed', (req, res) => {
+app.get('/oembed', async (req, res) => {
   const rawUrl = String(req.query.url || '');
   const cleanPath = rawUrl.split('?')[0].split('/').filter(Boolean).pop() || '';
-  const matchedId = resolveVideoJobId(cleanPath);
-  const realJobId = matchedId || '2122421990107900101';
-  const outToken = matchedId ? cleanPath : getShareHash(realJobId);
+  const info = await resolveVideoInfoAsync(cleanPath);
+  const realJobId = info?.jobId || '2122421990107900101';
+  const outToken = info ? cleanPath : getShareHash(realJobId);
 
-  const job = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(realJobId);
   const protocol = req.headers['x-forwarded-proto'] || (req.headers['cf-connecting-ip'] ? 'https' : req.protocol) || 'https';
   const baseUrl = `${protocol}://${req.get('host')}`;
-  const title = job?.title ? job.title : 'Quick Video for Your Project';
+  const title = info?.title || 'Quick Video for Your Project';
   const thumbUrl = `${baseUrl}/thumbnails/${outToken}.jpg`;
 
   res.json({
@@ -504,11 +576,12 @@ app.post('/api/bulk-ingest', (req, res) => {
 // API: Single Job Details
 app.get('/api/job/:jobId', async (req, res) => {
   try {
-    const realJobId = resolveVideoJobId(req.params.jobId);
-    if (!realJobId) {
+    const info = req.resolvedVideoInfo || await resolveVideoInfoAsync(req.params.jobId);
+    if (!info) {
       return sendPrivatePortalLocked(req, res);
     }
-    let job = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(realJobId);
+    const realJobId = info.jobId;
+    let job = info.job || db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(realJobId);
     if (!job && realJobId === '2119487430141316904') {
       job = {
         job_id: '2119487430141316904',
@@ -524,20 +597,20 @@ app.get('/api/job/:jobId', async (req, res) => {
     if (!job) {
       job = {
         job_id: realJobId,
-        title: 'Software & Automation Requirements',
-        client_country: 'United States',
+        title: info.title || 'Software & Automation Requirements',
+        client_country: info.clientCountry || 'United States',
         client_hire_rate: 100
       };
     }
-    const videoReady = fs.existsSync(path.join(videosDir, `${realJobId}.mp4`));
-    if (!videoReady) {
+    const videoReady = Boolean(info.hasLocalVideo || info.cloudMeta?.video_cdn_url);
+    if (!videoReady && !IS_RENDER_CLOUD) {
       ensureVideoGenerated(realJobId, false).catch(() => {});
     }
     const visitorTz = await detectVisitorTimezone(req);
     res.json({
       ...job,
       job_id: realJobId,
-      share_id: getShareHash(realJobId),
+      share_id: info.shareId || getShareHash(realJobId),
       video_url: `/videos/${req.params.jobId}.mp4`,
       video_ready: videoReady,
       visitor_tz: visitorTz
@@ -548,21 +621,21 @@ app.get('/api/job/:jobId', async (req, res) => {
 });
 
 // API: Record Client Call Booking (ToS-compliant, zero email/form required)
-app.post('/api/book-call/:jobId', (req, res) => {
+app.post('/api/book-call/:jobId', async (req, res) => {
   try {
-    const realJobId = resolveVideoJobId(req.params.jobId);
-    if (!realJobId) {
+    const vInfo = req.resolvedVideoInfo || await resolveVideoInfoAsync(req.params.jobId);
+    if (!vInfo) {
       return sendPrivatePortalLocked(req, res);
     }
+    const realJobId = vInfo.jobId;
 
     const { selected_date, selected_time, visitor_timezone, client_note } = req.body || {};
     if (!selected_date || !selected_time) {
       return res.status(400).json({ ok: false, error: 'selected_date and selected_time are required' });
     }
 
-    const job = db.prepare('SELECT title FROM jobs WHERE job_id = ?').get(realJobId);
-    const jobTitle = job?.title || 'Upwork Project';
-    const shareId = getShareHash(realJobId);
+    const jobTitle = vInfo.title || 'Upwork Project';
+    const shareId = vInfo.shareId || getShareHash(realJobId);
     const visitorIp = req.headers['cf-connecting-ip'] ||
       (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : '') ||
       req.socket?.remoteAddress ||
@@ -906,19 +979,19 @@ app.post('/api/track-view/:jobId', async (req, res) => {
       return res.json({ ok: true, ignored: 'bot' });
     }
 
-    const realJobId = resolveVideoJobId(req.params.jobId);
-    if (!realJobId) {
+    const vInfo = req.resolvedVideoInfo || await resolveVideoInfoAsync(req.params.jobId);
+    if (!vInfo) {
       return sendPrivatePortalLocked(req, res);
     }
+    const realJobId = vInfo.jobId;
 
     const allowedEvents = new Set(['page_open', 'video_play', 'video_50pct', 'video_completed']);
     const eventType = allowedEvents.has(req.body?.event_type) ? req.body.event_type : 'page_open';
     const watchSeconds = Math.max(0, Math.round(Number(req.body?.watch_seconds || 0)));
 
-    const job = db.prepare('SELECT title, client_country FROM jobs WHERE job_id = ?').get(realJobId);
-    const jobTitle = job?.title || `Upwork Job (${realJobId})`;
-    const jobClientCountry = job?.client_country || '';
-    const shareId = getShareHash(realJobId);
+    const jobTitle = vInfo.title || `Upwork Job (${realJobId})`;
+    const jobClientCountry = vInfo.clientCountry || '';
+    const shareId = vInfo.shareId || getShareHash(realJobId);
     const visitorIp = req.headers['cf-connecting-ip'] ||
       (req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : '') ||
       req.socket?.remoteAddress ||
@@ -1132,16 +1205,15 @@ app.post('/api/generate-loom/:jobId', (req, res) => {
 });
 
 // Route: Loom View Player Page (/share/<32-char-hex> and legacy /loom/:jobId)
-app.get(['/share/:jobId', '/loom/:jobId'], (req, res) => {
-  const realJobId = resolveVideoJobId(req.params.jobId);
-  if (!realJobId) {
+app.get(['/share/:jobId', '/loom/:jobId'], async (req, res) => {
+  const vInfo = req.resolvedVideoInfo || await resolveVideoInfoAsync(req.params.jobId);
+  if (!vInfo) {
     return sendPrivatePortalLocked(req, res);
   }
 
-  const job = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(realJobId);
   const protocol = req.headers['x-forwarded-proto'] || (req.headers['cf-connecting-ip'] ? 'https' : req.protocol) || 'https';
   const baseUrl = `${protocol}://${req.get('host')}`;
-  const rawTitle = job?.title ? job.title : 'Quick Video for Your Project';
+  const rawTitle = vInfo.title ? vInfo.title : 'Quick Video for Your Project';
   const rawDesc = '35 sec video recorded by Sametcan Koksoy (Top Rated · 100% Job Success) · Click to watch';
   const thumbUrl = `${baseUrl}/thumbnails/${req.params.jobId}.jpg`;
   const videoUrl = `${baseUrl}/videos/${req.params.jobId}.mp4`;
@@ -1197,110 +1269,118 @@ const PORT = process.env.PORT || 3050;
 
 // Healthcheck endpoint for UptimeRobot / Cron-job.org / Render keep-alive
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    mode: IS_RENDER_CLOUD ? 'render_loom_portal_only' : 'local_mcp_engine',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
 });
 
 if (require.main === module) {
   app.listen(PORT, () => {
-    console.log(`Upwork Market Intelligence Server running on http://localhost:${PORT}`);
+    console.log(`Upwork Market Intelligence Server running on http://localhost:${PORT} (mode=${IS_RENDER_CLOUD ? 'render_loom_portal_only' : 'local_mcp_engine'})`);
   });
 
-  // Safe Upwork MCP Radar loop: enforces >= 5 minute interval and strictly respects mcp_freeze_until cooldown windows.
-  function scheduleNextUpworkMcpRadar(delayMs = 5000) {
-    setTimeout(async () => {
-      const intervalMs = Math.max(5 * 60 * 1000, Number(getSetting('mcp_radar_interval_ms') || 5 * 60 * 1000));
-      let nextDelay = intervalMs;
-      try {
-        const freezeUntil = Number(getSetting('mcp_freeze_until') || 0);
-        if (freezeUntil > Date.now()) {
-          // Wait until freeze ends (+3s buffer) without touching Upwork MCP
-          nextDelay = Math.min(intervalMs, Math.max(15000, (freezeUntil - Date.now()) + 3000));
-        } else if (getSetting('upwork_mcp_radar_enabled') === true) {
-          const token = await getValidAccessToken();
-          if (token) {
-            const res = await runUpworkMcpRadarCycle();
-            if (res?.newJobsFound > 0) {
-              runAutoProposerCycle(3).catch(err => console.error('[Auto-Proposer] Trigger error:', err));
+  if (IS_RENDER_CLOUD) {
+    console.log('[Render-Portal] Cloud Portal-Only mode active. Upwork MCP radar, auto-proposer, flconsole, and Telegram polling are DISABLED on Render (strictly local PC only).');
+    // Self keep-alive ping every 4 minutes so Render free tier stays warm for client Loom views
+    const externalUrl = process.env.RENDER_EXTERNAL_URL || 'https://upwork-mcp-automation.onrender.com';
+    setInterval(() => {
+      fetch(`${externalUrl}/health`).catch(() => {});
+    }, 4 * 60 * 1000);
+  } else {
+    // Safe Upwork MCP Radar loop: enforces >= 5 minute interval and strictly respects mcp_freeze_until cooldown windows.
+    function scheduleNextUpworkMcpRadar(delayMs = 5000) {
+      setTimeout(async () => {
+        const intervalMs = Math.max(5 * 60 * 1000, Number(getSetting('mcp_radar_interval_ms') || 5 * 60 * 1000));
+        let nextDelay = intervalMs;
+        try {
+          const freezeUntil = Number(getSetting('mcp_freeze_until') || 0);
+          if (freezeUntil > Date.now()) {
+            // Wait until freeze ends (+3s buffer) without touching Upwork MCP
+            nextDelay = Math.min(intervalMs, Math.max(15000, (freezeUntil - Date.now()) + 3000));
+          } else if (getSetting('upwork_mcp_radar_enabled') === true) {
+            const token = await getValidAccessToken();
+            if (token) {
+              const res = await runUpworkMcpRadarCycle();
+              if (res?.newJobsFound > 0) {
+                runAutoProposerCycle(3).catch(err => console.error('[Auto-Proposer] Trigger error:', err));
+              }
             }
           }
+        } catch (err) {
+          console.error('[upwork-mcp-radar] Cycle error:', err);
         }
-      } catch (err) {
-        console.error('[upwork-mcp-radar] Cycle error:', err);
-      }
-      scheduleNextUpworkMcpRadar(nextDelay);
-    }, delayMs);
-  }
-
-  scheduleNextUpworkMcpRadar(5000);
-
-  // Cooldown Freeze Wake-Up Watcher: automatically unfreezes after mcp_freeze_until, resumes 5-min radar + auto-proposer, and sends Telegram status report
-  let freezeWakeupRunning = false;
-  setInterval(async () => {
-    if (freezeWakeupRunning) return;
-    if (getSetting('mcp_freeze_report_pending') !== true) return;
-    const freezeUntil = Number(getSetting('mcp_freeze_until') || 0);
-    if (freezeUntil > Date.now()) return;
-
-    freezeWakeupRunning = true;
-    try {
-      setSetting('mcp_freeze_report_pending', false);
-      setSetting('mcp_freeze_until', 0);
-      setSetting('upwork_mcp_radar_enabled', true);
-      setSetting('auto_proposer_enabled', true);
-      setSetting('mcp_freeze_report_sent_at', new Date().toISOString());
-
-      console.log('[Cooldown-Wakeup] 30-min freeze complete. Resuming 5-min MCP radar & automatic proposals...');
-      const radarRes = await runUpworkMcpRadarCycle().catch(e => ({ ok: false, error: e.message }));
-      const autoRes = await runAutoProposerCycle(1).catch(e => ({ status: 'error', error: e.message }));
-
-      const extra = [
-        `• <b>Post-Freeze Radar Check:</b> ${radarRes?.ok ? `✅ OK (${radarRes.totalReturned || 0} jobs fetched, ${radarRes.newJobsFound || 0} new)` : `⚠️ ${escapeTgHtml(String(radarRes?.error || 'error').slice(0, 100))}`}`,
-        `• <b>Auto-Proposal Check:</b> ${escapeTgHtml(autoRes?.status || 'checked')}${autoRes?.processed ? ` (processed=${autoRes.processed})` : ''}`
-      ];
-
-      const msg = await buildLiveStatusMessage('⏰ <b>24-Hour Cooldown Complete — Automation Resumed!</b>', extra);
-      await sendTelegramMessage(msg);
-      console.log('[Cooldown-Wakeup] Telegram status report dispatched.');
-    } catch (err) {
-      console.error('[Cooldown-Wakeup] Error:', err.message);
-    } finally {
-      freezeWakeupRunning = false;
+        scheduleNextUpworkMcpRadar(nextDelay);
+      }, delayMs);
     }
-  }, 15 * 1000);
 
-  // Start interactive Telegram bot (handles Approve & Retry MCP button + /status, /pause_auto, /resume_auto)
-  startTelegramInteractiveBot();
+    scheduleNextUpworkMcpRadar(5000);
 
-  // Optional flconsole sync loop: DISABLED in Direct Upwork MCP mode (only runs if flconsole_sync_enabled === true)
-  function scheduleNextFlconsoleSync(delayMs = 5000) {
-    setTimeout(async () => {
-      let nextDelay = 61 * 1000;
+    // Cooldown Freeze Wake-Up Watcher: automatically unfreezes after mcp_freeze_until, resumes 5-min radar + auto-proposer, and sends Telegram status report
+    let freezeWakeupRunning = false;
+    setInterval(async () => {
+      if (freezeWakeupRunning) return;
+      if (getSetting('mcp_freeze_report_pending') !== true) return;
+      const freezeUntil = Number(getSetting('mcp_freeze_until') || 0);
+      if (freezeUntil > Date.now()) return;
+
+      freezeWakeupRunning = true;
       try {
-        if (getSetting('flconsole_sync_enabled') === true && getFlconsoleToken()) {
-          const res = await runFlconsoleSyncCycle();
-          if (res?.status === 'throttled') {
-            nextDelay = Math.max(5, Number(res.retry_after_seconds || 30) + 1) * 1000;
-          }
-        }
+        setSetting('mcp_freeze_report_pending', false);
+        setSetting('mcp_freeze_until', 0);
+        setSetting('upwork_mcp_radar_enabled', true);
+        setSetting('auto_proposer_enabled', true);
+        setSetting('mcp_freeze_report_sent_at', new Date().toISOString());
+
+        console.log('[Cooldown-Wakeup] Cooldown complete. Resuming 5-min MCP radar & automatic proposals...');
+        const radarRes = await runUpworkMcpRadarCycle().catch(e => ({ ok: false, error: e.message }));
+        const autoRes = await runAutoProposerCycle(1).catch(e => ({ status: 'error', error: e.message }));
+
+        const extra = [
+          `• <b>Post-Freeze Radar Check:</b> ${radarRes?.ok ? `✅ OK (${radarRes.totalReturned || 0} jobs fetched, ${radarRes.newJobsFound || 0} new)` : `⚠️ ${escapeTgHtml(String(radarRes?.error || 'error').slice(0, 100))}`}`,
+          `• <b>Auto-Proposal Check:</b> ${escapeTgHtml(autoRes?.status || 'checked')}${autoRes?.processed ? ` (processed=${autoRes.processed})` : ''}`
+        ];
+
+        const msg = await buildLiveStatusMessage('⏰ <b>24-Hour Cooldown Complete — Automation Resumed!</b>', extra);
+        await sendTelegramMessage(msg);
+        console.log('[Cooldown-Wakeup] Telegram status report dispatched.');
       } catch (err) {
-        console.error('[flconsole-sync] Cycle error:', err);
+        console.error('[Cooldown-Wakeup] Error:', err.message);
+      } finally {
+        freezeWakeupRunning = false;
       }
-      scheduleNextFlconsoleSync(nextDelay);
-    }, delayMs);
+    }, 15 * 1000);
+
+    // Start interactive Telegram bot (handles Approve & Retry MCP button + /status, /pause_auto, /resume_auto)
+    startTelegramInteractiveBot();
+
+    // Optional flconsole sync loop: DISABLED in Direct Upwork MCP mode (only runs if flconsole_sync_enabled === true)
+    function scheduleNextFlconsoleSync(delayMs = 5000) {
+      setTimeout(async () => {
+        let nextDelay = 61 * 1000;
+        try {
+          if (getSetting('flconsole_sync_enabled') === true && getFlconsoleToken()) {
+            const res = await runFlconsoleSyncCycle();
+            if (res?.status === 'throttled') {
+              nextDelay = Math.max(5, Number(res.retry_after_seconds || 30) + 1) * 1000;
+            }
+          }
+        } catch (err) {
+          console.error('[flconsole-sync] Cycle error:', err);
+        }
+        scheduleNextFlconsoleSync(nextDelay);
+      }, delayMs);
+    }
+
+    scheduleNextFlconsoleSync(5000);
+
+    // Realtime proposal watcher every 40 seconds (strictly respects Upwork MCP freeze & rate limit)
+    setInterval(() => {
+      runAutoProposerCycle(2).catch(err => console.error('[Auto-Proposer] Loop error:', err));
+    }, 40 * 1000);
   }
-
-  scheduleNextFlconsoleSync(5000);
-
-  // Realtime proposal watcher every 40 seconds (strictly respects Upwork MCP rate limit)
-  setInterval(() => {
-    runAutoProposerCycle(2).catch(err => console.error('[Auto-Proposer] Loop error:', err));
-  }, 40 * 1000);
-
-  // Self keep-alive ping every 4 minutes
-  const externalUrl = process.env.RENDER_EXTERNAL_URL || 'https://upwork-mcp-automation.onrender.com';
-  setInterval(() => {
-    fetch(`${externalUrl}/health`).catch(() => {});
-  }, 4 * 60 * 1000);
 }
 
 module.exports = { app };

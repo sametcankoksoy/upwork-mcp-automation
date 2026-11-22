@@ -11,10 +11,12 @@ const { db, getSetting, calculateSniperScore, LEAD_ENRICHMENT_RE, STRICT_CORE_NI
 const { getValidAccessToken } = require('./upwork-oauth');
 const { callUpworkMcpTool, getTalentOrgUid } = require('./upwork-tracker');
 const { evaluateJobFitWithAI } = require('./ai-evaluator');
+const { uploadJobVideoToCloud } = require('./cloud-video-sync');
 
 const execFileAsync = promisify(execFile);
 
 const videosDir = path.join(__dirname, '..', 'public', 'videos');
+const thumbsDir = path.join(__dirname, '..', 'public', 'thumbnails');
 const renderScriptPath = path.join(__dirname, '..', 'scripts', 'render_video_generator.py');
 const PUBLIC_BASE_URL = process.env.PUBLIC_LOOM_URL || 'https://loom.sametcankoksoy.com';
 
@@ -355,6 +357,23 @@ async function ensureVideoGenerated(jobId, strictUnder5 = true) {
       maxBuffer: 1024 * 1024 * 20,
       timeout: 150000
     });
+
+    // Automatically publish rendered video + thumbnail + metadata to cloud CDN so Render serves it 24/7 even when PC is off
+    try {
+      const jobRow = db.prepare('SELECT title, client_country FROM jobs WHERE job_id = ?').get(jobId);
+      const upRes = await uploadJobVideoToCloud(jobId, {
+        videosDir,
+        thumbsDir,
+        title: jobRow?.title || '',
+        clientCountry: jobRow?.client_country || '',
+        shareId: getShareHash(jobId)
+      });
+      if (upRes?.ok) {
+        console.log(`[Cloud-Video] Published ${jobId} (share=${upRes.share_id}) to GitHub CDN for 24/7 Render streaming.`);
+      }
+    } catch (upErr) {
+      console.error(`[Cloud-Video] Upload warning for ${jobId}:`, upErr.message);
+    }
 
     return { generatedNow: true, outPath };
   })();
