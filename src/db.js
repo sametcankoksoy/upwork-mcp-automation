@@ -428,10 +428,17 @@ function calculateSniperScore(job) {
     score = Math.min(score - 70, 30);
   }
 
-  // 4d. Game Development, Native Mobile & Off-Stack Hard Cap (<= 20)
-  // Only reject off-stack CMS/CRM names (WordPress, Salesforce, etc.) when they are the primary role in titleText without AI/Automation/Scraping signals
+  // 4d. Strictly reject WordPress, WooCommerce, Wix, Squarespace, CMS and Theme development
+  // User note: We are NOT WordPress/CMS developers
+  const isCmsOrWpJob = /\b(wordpress|woocommerce|wix|squarespace|shopify theme|drupal|magento|joomla|prestashop)\b/i.test(titleText)
+    || /\b(wordpress (?:developer|expert|specialist|designer|coder|programmer|admin)|woocommerce (?:developer|expert)|wix (?:developer|expert)|squarespace (?:developer|expert))\b/i.test(text);
+  if (isCmsOrWpJob) {
+    score = Math.min(score - 85, 10);
+  }
+
+  // 4e. Game Development, Native Mobile & Off-Stack Hard Cap (<= 20)
   const isGameOrMobileHardware = /\b(game developer|game development|mobile games?|android games?|ios games?|3d games?|2d games?|video games?|playable|game engine|unity|unreal engine|unreal|godot|roblox|fivem|minecraft|gameplay|android developer|ios developer|kotlin|swift|objective-c|xcode|android studio|flutter|react native|embedded|firmware|arduino|blender|maya)\b/i.test(text);
-  const isOffStackTitleRole = /(?:^|[^\w])(c\+\+|c#|\.net)(?!\w)|\b(dotnet|wordpress|wix|squarespace|drupal|magento|laravel|ruby on rails|salesforce)\b/i.test(titleText)
+  const isOffStackTitleRole = /(?:^|[^\w])(c\+\+|c#|\.net)(?!\w)|\b(dotnet|drupal|magento|laravel|ruby on rails|salesforce)\b/i.test(titleText)
     && !/\b(scrape|scraper|scraping|automation|automate|ai|agent|chatbot|voice|bot|n8n|script|python|playwright|selenium)\b/i.test(titleText);
   if (isGameOrMobileHardware || isOffStackTitleRole) {
     score = Math.min(score - 85, 20);

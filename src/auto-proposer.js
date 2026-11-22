@@ -193,8 +193,15 @@ function isConsultingOrNonBuildJob(job) {
     return true;
   }
 
+  // Strictly reject WordPress, WooCommerce, Wix, Squarespace, CMS and Theme development
+  // User note: We are NOT WordPress/CMS developers
+  if (/\b(wordpress|woocommerce|wix|squarespace|shopify theme|drupal|magento|joomla|prestashop)\b/i.test(title)
+    || /\b(wordpress (?:developer|expert|specialist|designer|coder|programmer|admin)|woocommerce (?:developer|expert)|wix (?:developer|expert)|squarespace (?:developer|expert))\b/i.test(text)) {
+    return true;
+  }
+
   // Reject off-stack CMS/CRM/Enterprise roles ONLY when they are the core title role without AI/Scraping/Automation/Bot signals
-  if ((/(?:^|[^\w])(c\+\+|c#|\.net)(?!\w)|\b(dotnet|wordpress|woocommerce|wix|squarespace|shopify theme|drupal|magento|laravel|symfony|ruby on rails|salesforce)\b/i.test(title))
+  if ((/(?:^|[^\w])(c\+\+|c#|\.net)(?!\w)|\b(dotnet|drupal|magento|laravel|symfony|ruby on rails|salesforce)\b/i.test(title))
     && !/\b(scrape|scraper|scraping|automation|automate|ai|agent|chatbot|voice|bot|n8n|script|python|playwright|selenium)\b/i.test(title)) {
     return true;
   }
