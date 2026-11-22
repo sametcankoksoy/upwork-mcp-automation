@@ -266,16 +266,12 @@ function isJobEligibleForAutoProposal(job, options = {}) {
   if (!options.force && isConsultingOrNonBuildJob(job)) return false;
   if (!options.force && !isClientHireRateEligible(job)) return false;
 
-  // Night-Only proposal scheduling: Only submit proposals during night window (01:00 - 07:00 TR time)
+  // 24/7 proposal scheduling (all day, any hour):
+  // Strictly enforce daily limit (max 5 proposals/day) and 100% exact match
   if (!options.force) {
-    const isNight = isNightShiftWindow();
-    if (!isNight) {
-      // Daytime hold-fire: reserve 100% of proposals and connects for night
-      return false;
-    }
-    const maxNight = Number(getSetting('daily_proposal_limit') ?? 10);
-    const nightCount = getNightShiftSubmittedCount();
-    if (nightCount >= maxNight) return false;
+    const maxDaily = Number(getSetting('daily_proposal_limit') ?? 5);
+    const dailyCount = getDailySubmittedCount();
+    if (dailyCount >= maxDaily) return false;
     if (!isTamSametlikJob(job)) return false;
   }
 
@@ -797,15 +793,10 @@ async function runAutoProposerCycle(maxPerCycle = 3) {
   if (getSetting('auto_proposer_enabled') === false) {
     return { status: 'disabled', processed: 0 };
   }
-  const isNight = isNightShiftWindow();
-  const trHour = getCurrentTurkeyHour();
-  if (!isNight) {
-    return { status: 'waiting_for_night_window_01_00', processed: 0, current_tr_hour: trHour };
-  }
-  const maxNight = Number(getSetting('daily_proposal_limit') ?? 10);
-  const nightCount = getNightShiftSubmittedCount();
-  if (nightCount >= maxNight) {
-    return { status: 'night_limit_reached', processed: 0, nightCount, maxNight };
+  const maxDaily = Number(getSetting('daily_proposal_limit') ?? 5);
+  const dailyCount = getDailySubmittedCount();
+  if (dailyCount >= maxDaily) {
+    return { status: 'daily_limit_reached', processed: 0, dailyCount, maxDaily };
   }
   if (isProposerRunning) {
     return { status: 'already_running', processed: 0 };

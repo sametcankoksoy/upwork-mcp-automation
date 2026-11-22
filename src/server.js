@@ -720,21 +720,16 @@ app.get('/api/auto-proposals', (req, res) => {
   try {
     const proposals = db.prepare('SELECT * FROM auto_proposals ORDER BY id DESC LIMIT 100').all();
     const countSubmittedToday = getDailySubmittedCount();
-    const dailyLimit = Number(getSetting('daily_proposal_limit') ?? 10);
+    const dailyLimit = Number(getSetting('daily_proposal_limit') ?? 5);
     const trHour = getCurrentTurkeyHour();
-    const nightShift = isNightShiftWindow();
-    const nightShiftSubmitted = getNightShiftSubmittedCount();
     res.json({
       ok: true,
       enabled: getSetting('auto_proposer_enabled') !== false,
       daily_limit: dailyLimit,
       submitted_today: countSubmittedToday,
-      limit_reached: nightShift ? (nightShiftSubmitted >= dailyLimit) : true,
+      limit_reached: countSubmittedToday >= dailyLimit,
       turkey_hour: trHour,
-      night_shift_active: nightShift,
-      night_shift_submitted: nightShiftSubmitted,
-      night_shift_limit: dailyLimit,
-      proposer_mode: 'night_only_01_00_to_07_00',
+      proposer_mode: '24_7_exact_match_only',
       proposals
     });
   } catch (err) {
