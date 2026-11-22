@@ -106,11 +106,17 @@ function isTamSametlikJob(job) {
   const CORE_BUILDER_STACK_RE = /\b(playwright|selenium|puppeteer|scrapy|beautifulsoup|web scraping|data scraping|scrape|scraper|scrapers|scraping|crawler|crawling|anti-bot|cloudflare bypass|whatsapp bot|telegram bot|discord bot|slack bot|voice agent|voice ai|vapi|retell|twilio|elevenlabs|bland ai|pipecat|livekit|\bn8n\b|make\.com|python script|python automation|automation script|bot developer|custom bot|ai agent|agentic|\bmcp\b|\brag\b|browser automation|account automation|social media automation|multi-account|simulate interactions)\b/i;
   if (!CORE_BUILDER_STACK_RE.test(text)) return false;
 
-  // Enforce tier strictly < 5
+  // Enforce proposal competition:
+  // For Best Match or high-sniper (>=90) jobs, allow up to 15 proposals (5 to 10, 10 to 15) so great matches aren't rejected!
+  // For general marketplace search, enforce tier < 5
+  const isBestMatchOrSniperTop = (job.keyword_matched === 'Best Match' || (job.sniper_score || 0) >= 85);
+  const maxProposals = isBestMatchOrSniperTop ? 15 : 5;
   const propsNum = Number(job.current_proposals_numeric || 0);
   const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
-  const isAllowedTier = /^(less than 5|fewer than 5|<5)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5');
-  if (propsNum >= 5 || !isAllowedTier) return false;
+  const isAllowedTier = isBestMatchOrSniperTop
+    ? (/^(less than 5|fewer than 5|5 to 10|5-10|10 to 15|10-15|<5|<10|<15)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5') || propsTier.includes('5 to 10') || propsTier.includes('10 to 15'))
+    : (/^(less than 5|fewer than 5|<5)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5'));
+  if (propsNum > maxProposals || !isAllowedTier) return false;
 
   // Enforce solid rate (Hourly >= $35 or Fixed >= $200)
   const isHourly = (job.job_type || '').toLowerCase() === 'hourly';
@@ -280,11 +286,15 @@ function isJobEligibleForAutoProposal(job, options = {}) {
     if (!isTamSametlikJob(job)) return false;
   }
 
-  // Enforce proposals limit (Strictly Less than 5 only, reject 5+)
+  // Enforce proposals limit (Allow up to 15 for Best Match / Sniper >= 85, strictly < 5 for general search)
+  const isBestMatchOrSniperTop = (job.keyword_matched === 'Best Match' || (job.sniper_score || 0) >= 85);
+  const maxProps = isBestMatchOrSniperTop ? 15 : 5;
   const propsNum = Number(job.current_proposals_numeric || 0);
   const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
-  const isAllowedTier = /^(less than 5|fewer than 5|<5)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5');
-  if (propsNum >= 5 || !isAllowedTier) {
+  const isAllowedTier = isBestMatchOrSniperTop
+    ? (/^(less than 5|fewer than 5|5 to 10|5-10|10 to 15|10-15|<5|<10|<15)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5') || propsTier.includes('5 to 10') || propsTier.includes('10 to 15'))
+    : (/^(less than 5|fewer than 5|<5)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5'));
+  if (propsNum > maxProps || !isAllowedTier) {
     return false;
   }
 
@@ -405,12 +415,16 @@ async function submitAutoProposalForJob(job, options = {}) {
       recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_consulting_or_non_dev', null, 'Consulting, coaching, or non-development listing rejected');
       return { ok: false, status: 'skipped_consulting_or_non_dev', job_id: job.job_id };
     }
+    const isBestMatchOrSniperTop = (job.keyword_matched === 'Best Match' || (job.sniper_score || 0) >= 85);
+    const maxProps = isBestMatchOrSniperTop ? 15 : 5;
     const propsNum = Number(job.current_proposals_numeric || 0);
     const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
-    const isAllowedTier = /^(less than 5|fewer than 5|<5)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5');
-    if (propsNum >= 5 || !isAllowedTier) {
-      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_5_proposals', null, `DB tier=${job.current_proposals_tier} (${propsNum})`);
-      return { ok: false, status: 'skipped_over_5_proposals', job_id: job.job_id };
+    const isAllowedTier = isBestMatchOrSniperTop
+      ? (/^(less than 5|fewer than 5|5 to 10|5-10|10 to 15|10-15|<5|<10|<15)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5') || propsTier.includes('5 to 10') || propsTier.includes('10 to 15'))
+      : (/^(less than 5|fewer than 5|<5)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5'));
+    if (propsNum > maxProps || !isAllowedTier) {
+      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_proposals_limit', null, `DB tier=${job.current_proposals_tier} (${propsNum}) limit=${maxProps}`);
+      return { ok: false, status: 'skipped_over_proposals_limit', job_id: job.job_id };
     }
     if (job.posted_at) {
       const minsSincePosted = (Date.now() - new Date(job.posted_at).getTime()) / 60000;
@@ -441,36 +455,8 @@ async function submitAutoProposalForJob(job, options = {}) {
       console.warn(`[Auto-Proposer] getJobDetails verification warning for ${job.job_id}: ${detErr.message}`);
     }
 
-    if (!detJob) {
-      try {
-        const { callUpworkMcpTool, getTalentOrgUid } = require('./upwork-tracker');
-        const { getValidAccessToken } = require('./upwork-oauth');
-        const token = await getValidAccessToken();
-        const orgUid = await getTalentOrgUid(token);
-        const detail = await callUpworkMcpTool('upwork__find_jobs', {
-          action: 'get',
-          org_uid: orgUid,
-          params: { job_id: job.job_id }
-        }, token);
-        const posting = detail?.data?.marketplaceJobPosting?.content;
-        if (posting?.description) {
-          job.description = posting.description.replace(/<\/?untrusted_participant_content>/g, '').trim();
-        }
-        const cr = detail?.client_record;
-        if (cr) {
-          job.client_total_posted = cr.jobs_posted ?? job.client_total_posted;
-          job.client_total_hires = cr.jobs_with_hires ?? cr.contracts_total ?? job.client_total_hires;
-          if (cr.hire_rate_percent !== undefined) {
-            job.client_hire_rate = cr.hire_rate_percent;
-          }
-          if (cr.spend_total) {
-            job.client_total_spent = typeof cr.spend_total === 'number' ? cr.spend_total : (parseFloat(String(cr.spend_total).replace(/[^0-9.]/g, '')) || 0);
-          }
-        }
-      } catch (mcpDetErr) {
-        console.warn(`[Auto-Proposer] MCP get fallback note for ${job.job_id}: ${mcpDetErr.message}`);
-      }
-    }
+    // Skip MCP action: 'get' fallback to prevent triggering Upwork's JOB_BROWSE_COOLDOWN (403 denial)
+    // The description and client metadata from radar search / flconsole are already populated.
 
     job.sniper_score = calculateSniperScore(job);
     db.prepare(`

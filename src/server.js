@@ -930,10 +930,10 @@ if (require.main === module) {
 
   scheduleNextFlconsoleSync(2000);
 
-  // High-priority realtime proposal watcher every 10 seconds
+  // Realtime proposal watcher every 20 seconds (strictly respects Upwork MCP ~12 req/min rate limit)
   setInterval(() => {
-    runAutoProposerCycle(3).catch(err => console.error('[Auto-Proposer] Loop error:', err));
-  }, 10 * 1000);
+    runAutoProposerCycle(2).catch(err => console.error('[Auto-Proposer] Loop error:', err));
+  }, 20 * 1000);
 
   // Self keep-alive ping every 4 minutes
   const externalUrl = process.env.RENDER_EXTERNAL_URL || 'https://upwork-mcp-automation.onrender.com';
