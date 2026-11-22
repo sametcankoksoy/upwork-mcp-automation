@@ -316,9 +316,10 @@ function isWesternClientCountry(country) {
 function isClientGeoAndHistoryEligible(job) {
   const country = String(job?.client_country || '').trim();
   if (isBlockedClientCountry(country)) return false;
+  // Strictly require Western countries only
+  if (!isWesternClientCountry(country)) return false;
 
   const isTier1 = isTier1FirstPostCountry(country);
-  const isWestern = isWesternClientCountry(country);
   const verified = Boolean(job?.client_payment_verified);
   const posted = Number(job?.client_total_posted || 0);
   const spent = Number(job?.client_total_spent || 0);
@@ -336,14 +337,9 @@ function isClientGeoAndHistoryEligible(job) {
   if (!verified) return false;
 
   // Rule 2: Western payment-verified client who is NOT a habitual ghost-job poster
-  if (isWestern) {
-    if (posted <= 1 && spent === 0 && hires === 0 && hireRate === 0) return true;
-    if (posted === 2 && hires >= 1) return true;
-    return hireRate >= 50;
-  }
-
-  // Rule 3: Non-Western, non-blocked countries require verified + >= 60% hire rate
-  return hireRate >= 60;
+  if (posted <= 1 && spent === 0 && hires === 0 && hireRate === 0) return true;
+  if (posted === 2 && hires >= 1) return true;
+  return hireRate >= 50;
 }
 
 const LEAD_ENRICHMENT_RE = /\b(lead enrichment|enrich lead|enrich leads|b2b leads?|lead list|email list|contact list|cold email|apollo\.io|clay\.com|clayagent|linkedin leads?|yellow pages|skip tracing|extract contact information|email (?:address )?extraction|extract emails?|extract email addresses?|email scraper|scraping emails?)\b/i;

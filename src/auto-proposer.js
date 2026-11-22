@@ -7,7 +7,7 @@ const crypto = require('node:crypto');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 
-const { db, getSetting, calculateSniperScore, LEAD_ENRICHMENT_RE, STRICT_CORE_NICHE_RE, isClientGeoAndHistoryEligible, isBlockedClientCountry } = require('./db');
+const { db, getSetting, calculateSniperScore, LEAD_ENRICHMENT_RE, STRICT_CORE_NICHE_RE, isClientGeoAndHistoryEligible, isBlockedClientCountry, isWesternClientCountry } = require('./db');
 const { getValidAccessToken } = require('./upwork-oauth');
 const { callUpworkMcpTool, getTalentOrgUid } = require('./upwork-tracker');
 const { evaluateJobFitWithAI } = require('./ai-evaluator');
@@ -295,10 +295,11 @@ function isJobEligibleForAutoProposal(job, options = {}) {
     return false;
   }
 
-  // Enforce freshness window (strictly <= 10 minutes since posted) unless forced manually
+  // Enforce freshness window (strictly <= 20 minutes for Best Match, <= 10 minutes for general) unless forced manually
   if (!options.force && job.posted_at) {
     const minsSincePosted = (Date.now() - new Date(job.posted_at).getTime()) / 60000;
-    if (minsSincePosted > 10) return false;
+    const maxMins = job.keyword_matched === 'Best Match' ? 20 : 10;
+    if (minsSincePosted > maxMins) return false;
   }
 
   const isHourly = (job.job_type || '').toLowerCase() === 'hourly';
@@ -424,9 +425,10 @@ async function submitAutoProposalForJob(job, options = {}) {
     }
     if (job.posted_at) {
       const minsSincePosted = (Date.now() - new Date(job.posted_at).getTime()) / 60000;
-      if (minsSincePosted > 10) {
-        recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_10_minutes', null, `Posted ${Math.round(minsSincePosted)}m ago (>10m freshness limit)`);
-        return { ok: false, status: 'skipped_over_10_minutes', job_id: job.job_id };
+      const maxMins = job.keyword_matched === 'Best Match' ? 20 : 10;
+      if (minsSincePosted > maxMins) {
+        recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_freshness_limit', null, `Posted ${Math.round(minsSincePosted)}m ago (>${maxMins}m freshness limit)`);
+        return { ok: false, status: 'skipped_over_freshness_limit', job_id: job.job_id };
       }
     }
 

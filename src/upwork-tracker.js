@@ -292,9 +292,8 @@ async function runTrackerCycle(options = {}) {
 
 const RADAR_TARGETS = [
   { action: 'smart_search', params: { mode: 'best_match', limit: 10 }, label: 'Best Match' },
-  { action: 'smart_search', params: { mode: 'most_recent', limit: 10 }, label: 'Most Recent (Smart)' },
-  { action: 'search', params: { query: 'Python OR Automation OR Scraping OR "AI Agent" OR Bot', sort: 'recency', limit: 10 }, label: 'Marketplace (Python/Agents)' },
-  { action: 'search', params: { query: '"Voice Agent" OR Retell OR Vapi OR n8n OR "Make.com" OR Chatbot OR Playwright OR Selenium', sort: 'recency', limit: 10 }, label: 'Marketplace (Voice/Automation)' }
+  { action: 'smart_search', params: { mode: 'best_match', limit: 10 }, label: 'Best Match' },
+  { action: 'search', params: { query: 'Python OR Automation OR Scraping OR "AI Agent" OR Bot', sort: 'recency', limit: 10 }, label: 'Marketplace (Python/Agents)' }
 ];
 let currentRadarTargetIndex = 0;
 
