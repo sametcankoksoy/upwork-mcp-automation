@@ -107,16 +107,14 @@ function isTamSametlikJob(job) {
   if (!CORE_BUILDER_STACK_RE.test(text)) return false;
 
   // Enforce proposal competition:
-  // For Best Match or high-sniper (>=90) jobs, allow up to 15 proposals (5 to 10, 10 to 15) so great matches aren't rejected!
-  // For general marketplace search, enforce tier < 5
-  const isBestMatchOrSniperTop = (job.keyword_matched === 'Best Match' || (job.sniper_score || 0) >= 85);
-  const maxProposals = isBestMatchOrSniperTop ? 15 : 5;
+  // Enforce proposals limit: strictly allow 'Less than 5' and '5 to 10' (max 10 proposals)
   const propsNum = Number(job.current_proposals_numeric || 0);
   const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
-  const isAllowedTier = isBestMatchOrSniperTop
-    ? (/^(less than 5|fewer than 5|5 to 10|5-10|10 to 15|10-15|<5|<10|<15)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5') || propsTier.includes('5 to 10') || propsTier.includes('10 to 15'))
-    : (/^(less than 5|fewer than 5|<5)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5'));
-  if (propsNum > maxProposals || !isAllowedTier) return false;
+  const isAllowedTier = /^(less than 5|fewer than 5|5 to 10|5-10|<5|<10)$/i.test(propsTier)
+    || propsTier.includes('less than 5')
+    || propsTier.includes('fewer than 5')
+    || propsTier.includes('5 to 10');
+  if (propsNum > 10 || !isAllowedTier) return false;
 
   // Enforce solid rate (Hourly >= $35 or Fixed >= $200)
   const isHourly = (job.job_type || '').toLowerCase() === 'hourly';
@@ -286,15 +284,14 @@ function isJobEligibleForAutoProposal(job, options = {}) {
     if (!isTamSametlikJob(job)) return false;
   }
 
-  // Enforce proposals limit (Allow up to 15 for Best Match / Sniper >= 85, strictly < 5 for general search)
-  const isBestMatchOrSniperTop = (job.keyword_matched === 'Best Match' || (job.sniper_score || 0) >= 85);
-  const maxProps = isBestMatchOrSniperTop ? 15 : 5;
+  // Enforce proposals limit: allow 'Less than 5' and '5 to 10' (max 10 proposals, reject 10+)
   const propsNum = Number(job.current_proposals_numeric || 0);
   const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
-  const isAllowedTier = isBestMatchOrSniperTop
-    ? (/^(less than 5|fewer than 5|5 to 10|5-10|10 to 15|10-15|<5|<10|<15)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5') || propsTier.includes('5 to 10') || propsTier.includes('10 to 15'))
-    : (/^(less than 5|fewer than 5|<5)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5'));
-  if (propsNum > maxProps || !isAllowedTier) {
+  const isAllowedTier = /^(less than 5|fewer than 5|5 to 10|5-10|<5|<10)$/i.test(propsTier)
+    || propsTier.includes('less than 5')
+    || propsTier.includes('fewer than 5')
+    || propsTier.includes('5 to 10');
+  if (propsNum > 10 || !isAllowedTier) {
     return false;
   }
 
@@ -415,16 +412,15 @@ async function submitAutoProposalForJob(job, options = {}) {
       recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_consulting_or_non_dev', null, 'Consulting, coaching, or non-development listing rejected');
       return { ok: false, status: 'skipped_consulting_or_non_dev', job_id: job.job_id };
     }
-    const isBestMatchOrSniperTop = (job.keyword_matched === 'Best Match' || (job.sniper_score || 0) >= 85);
-    const maxProps = isBestMatchOrSniperTop ? 15 : 5;
     const propsNum = Number(job.current_proposals_numeric || 0);
     const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
-    const isAllowedTier = isBestMatchOrSniperTop
-      ? (/^(less than 5|fewer than 5|5 to 10|5-10|10 to 15|10-15|<5|<10|<15)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5') || propsTier.includes('5 to 10') || propsTier.includes('10 to 15'))
-      : (/^(less than 5|fewer than 5|<5)$/i.test(propsTier) || propsTier.includes('less than 5') || propsTier.includes('fewer than 5'));
-    if (propsNum > maxProps || !isAllowedTier) {
-      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_proposals_limit', null, `DB tier=${job.current_proposals_tier} (${propsNum}) limit=${maxProps}`);
-      return { ok: false, status: 'skipped_over_proposals_limit', job_id: job.job_id };
+    const isAllowedTier = /^(less than 5|fewer than 5|5 to 10|5-10|<5|<10)$/i.test(propsTier)
+      || propsTier.includes('less than 5')
+      || propsTier.includes('fewer than 5')
+      || propsTier.includes('5 to 10');
+    if (propsNum > 10 || !isAllowedTier) {
+      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_10_proposals', null, `DB tier=${job.current_proposals_tier} (${propsNum})`);
+      return { ok: false, status: 'skipped_over_10_proposals', job_id: job.job_id };
     }
     if (job.posted_at) {
       const minsSincePosted = (Date.now() - new Date(job.posted_at).getTime()) / 60000;
