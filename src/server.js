@@ -738,22 +738,35 @@ app.post('/api/book-call/:jobId', async (req, res) => {
     );
 
     console.log(`[CALL BOOKED] #${info.lastInsertRowid} | Job: ${realJobId} (${jobTitle}) | ${selected_date} at ${selected_time} | ${visitor_timezone || 'N/A'} | IP: ${visitorIp}`);
-    notifyVideoActivity({
-      title: '📞 New Meeting Booked on Upwork!',
-      subtitle: `${jobTitle}`,
-      bodyText: `${selected_date} at ${selected_time} | ${visitor_timezone || visitorIp}`
-    });
-    const publicBaseUrl = process.env.PUBLIC_LOOM_URL || 'https://loom.sametcankoksoy.com';
-    sendBookingEmail({
-      jobId: realJobId,
-      jobTitle,
-      selectedDate: selected_date,
-      selectedTime: selected_time,
+
+    const isTurkeyOrLocalBooking = isVisitorFromTurkeyOrLocal({
+      visitorCountry: '',
       visitorTimezone: visitor_timezone,
-      visitorIp,
-      clientNote: client_note,
-      shareUrl: `${publicBaseUrl}/share/${shareId}`
-    }).catch(err => console.error('[Email-Notifier] Booking email error:', err.message));
+      visitorLocation: '',
+      visitorIp: String(visitorIp),
+      cfCountry: req.headers['cf-ipcountry']
+    });
+
+    if (!isTurkeyOrLocalBooking) {
+      notifyVideoActivity({
+        title: '📞 New Meeting Booked on Upwork!',
+        subtitle: `${jobTitle}`,
+        bodyText: `${selected_date} at ${selected_time} | ${visitor_timezone || visitorIp}`
+      });
+      const publicBaseUrl = process.env.PUBLIC_LOOM_URL || 'https://loom.sametcankoksoy.com';
+      sendBookingEmail({
+        jobId: realJobId,
+        jobTitle,
+        selectedDate: selected_date,
+        selectedTime: selected_time,
+        visitorTimezone: visitor_timezone,
+        visitorIp,
+        clientNote: client_note,
+        shareUrl: `${publicBaseUrl}/share/${shareId}`
+      }).catch(err => console.error('[Email-Notifier] Booking email error:', err.message));
+    } else {
+      console.log(`[CALL BOOKED] Skipped notification for Turkey/local test booking.`);
+    }
     res.json({ ok: true, booking_id: Number(info.lastInsertRowid), job_id: realJobId });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
@@ -1118,9 +1131,38 @@ function startTelegramInteractiveBot() {
 // Consolidated Watch Session Tracker: avoids notification spam by aggregating viewing activity per visitor
 const activeWatchSessions = new Map();
 
-function getOrCreateWatchSession({ realJobId, jobTitle, jobClientCountry, shareId, shareUrl, visitorLocation, visitorTimezone, tzInfo, visitorIp, userAgent }) {
+function isVisitorFromTurkeyOrLocal({ visitorCountry, visitorTimezone, visitorLocation, visitorIp, cfCountry }) {
+  const code = String(cfCountry || '').trim().toUpperCase();
+  if (code === 'TR') return true;
+
+  const c = String(visitorCountry || '').trim().toLowerCase();
+  if (['tr', 'turkey', 'türkiye', 'turkiye'].includes(c)) return true;
+
+  const tz = String(visitorTimezone || '').toLowerCase();
+  if (tz.includes('istanbul') || tz.includes('turkey')) return true;
+
+  const loc = String(visitorLocation || '').toLowerCase();
+  if (loc.includes('turkey') || loc.includes('türkiye') || loc.includes('istanbul') || loc.includes('ankara') || loc.includes('izmir')) return true;
+
+  const cleanIp = String(visitorIp || '').replace(/^::ffff:/, '').trim();
+  if (!cleanIp || cleanIp === '127.0.0.1' || cleanIp === '::1' || cleanIp.startsWith('192.168.') || cleanIp.startsWith('10.') || cleanIp.startsWith('172.')) {
+    return true;
+  }
+
+  return false;
+}
+
+function getOrCreateWatchSession({ realJobId, jobTitle, jobClientCountry, shareId, shareUrl, visitorLocation, visitorTimezone, tzInfo, visitorIp, userAgent, cfCountry }) {
   const sessionKey = `${realJobId}_${visitorIp || 'anon'}`;
   let session = activeWatchSessions.get(sessionKey);
+  const isTurkeyOrLocal = isVisitorFromTurkeyOrLocal({
+    visitorCountry: tzInfo?.country,
+    visitorTimezone: tzInfo?.timezone || visitorTimezone,
+    visitorLocation,
+    visitorIp,
+    cfCountry
+  });
+
   if (!session) {
     session = {
       key: sessionKey,
@@ -1137,6 +1179,7 @@ function getOrCreateWatchSession({ realJobId, jobTitle, jobClientCountry, shareI
       utcOffset: tzInfo?.utc_offset || '',
       visitorIp,
       userAgent,
+      isTurkeyOrLocal,
       maxPercent: 0,
       maxSeconds: 0,
       hasPlayed: false,
@@ -1151,6 +1194,7 @@ function getOrCreateWatchSession({ realJobId, jobTitle, jobClientCountry, shareI
     session.lastSeenAt = Date.now();
     if (jobTitle && (!session.jobTitle || session.jobTitle.startsWith('Upwork Job ('))) session.jobTitle = jobTitle;
     if (visitorLocation && session.visitorLocation === 'Unknown Location') session.visitorLocation = visitorLocation;
+    if (isTurkeyOrLocal) session.isTurkeyOrLocal = true;
   }
   return session;
 }
@@ -1174,6 +1218,15 @@ async function dispatchConsolidatedWatchAlert(session) {
   const actionText = isWatched
     ? `client opened proposal page and watched ${pct}% of video`
     : `client opened proposal page (did not play video)`;
+
+  // If viewer is from Turkey or local test IP, suppress notifications (user testing / checking)
+  if (session.isTurkeyOrLocal) {
+    console.log(`[WATCH CONSOLIDATED] Skipped notification for Turkey/local viewer: Job ${session.jobId} | ${actionText} | ${session.visitorLocation} (${session.visitorIp})`);
+    setTimeout(() => {
+      activeWatchSessions.delete(session.key);
+    }, 30 * 60 * 1000);
+    return;
+  }
 
   console.log(`[WATCH CONSOLIDATED] Job ${session.jobId} | ${actionText} | ${session.visitorLocation} | ${session.maxSeconds}s`);
 
@@ -1289,7 +1342,8 @@ app.post('/api/track-view/:jobId', async (req, res) => {
       visitorTimezone,
       tzInfo,
       visitorIp: String(visitorIp),
-      userAgent
+      userAgent,
+      cfCountry: req.headers['cf-ipcountry']
     });
 
     session.maxSeconds = Math.max(session.maxSeconds, watchSeconds);
