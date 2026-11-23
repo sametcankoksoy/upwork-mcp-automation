@@ -706,7 +706,7 @@ app.get('/api/job/:jobId', async (req, res) => {
       job = {
         job_id: realJobId,
         title: info.title || 'Software & Automation Requirements',
-        client_country: info.clientCountry || 'United States',
+        client_country: info.clientCountry || '',
         client_hire_rate: 100
       };
     }

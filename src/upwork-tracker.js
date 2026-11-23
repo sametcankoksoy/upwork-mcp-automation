@@ -152,7 +152,7 @@ async function fetchLiveJobsForKeyword(keyword, accessToken, orgUid, enrichLimit
     const existing = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(jobId);
 
     let clientHireRate = existing?.client_hire_rate ?? null;
-    let clientTotalPosted = existing?.client_total_posted ?? (j.client?.total_posted_jobs || 1);
+    let clientTotalPosted = existing?.client_total_posted ?? (j.client?.total_posted_jobs || 0);
     let clientTotalHires = existing?.client_total_hires ?? 0;
     let clientTotalSpent = existing?.client_total_spent ?? parseMoneyString(j.client?.total_spent);
 
@@ -207,7 +207,7 @@ async function fetchLiveJobsForKeyword(keyword, accessToken, orgUid, enrichLimit
       hourly_max: hourlyMax,
       posted_at: j.published_date || j.created_date || new Date().toISOString(),
       checked_at: new Date().toISOString(),
-      client_country: j.client?.country || 'United States',
+      client_country: j.client?.country || j.client?.location?.country || '',
       client_total_spent: clientTotalSpent,
       client_hire_rate: clientHireRate,
       client_total_posted: clientTotalPosted,
@@ -332,7 +332,7 @@ async function runUpworkMcpRadarCycle() {
       const { budget, hourlyMin, hourlyMax } = parseBudgetField(j.budget, j.job_type);
       const activity = j.job_activity || {};
       const clientTotalSpent = parseMoneyString(j.client?.total_spent);
-      const clientTotalPosted = j.client?.total_posted_jobs || 1;
+      const clientTotalPosted = j.client?.total_posted_jobs || 0;
       const reviews = j.client?.total_reviews || 0;
       const totalHires = j.client?.total_hires ?? reviews;
       const clientHireRate = clientTotalPosted > 0
@@ -350,7 +350,7 @@ async function runUpworkMcpRadarCycle() {
         hourly_max: hourlyMax,
         posted_at: j.published_date || j.created_date || new Date().toISOString(),
         checked_at: new Date().toISOString(),
-        client_country: j.client?.country || 'United States',
+        client_country: j.client?.country || j.client?.location?.country || '',
         client_total_spent: clientTotalSpent,
         client_hire_rate: clientHireRate,
         client_total_posted: clientTotalPosted,

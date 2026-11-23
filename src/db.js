@@ -39,7 +39,7 @@ db.exec(`
     last_checked_at TEXT NOT NULL,
     
     -- Client metrics at posting time
-    client_country TEXT DEFAULT 'United States',
+    client_country TEXT DEFAULT '',
     client_total_spent REAL DEFAULT 0,
     client_hire_rate REAL DEFAULT 0, -- 0 to 100
     client_total_posted INTEGER DEFAULT 0,
@@ -560,13 +560,13 @@ function upsertJobAndSnapshot(jobData) {
       postedDate.getUTCDay(),
       nowIso,
       nowIso,
-      jobData.client_country || 'United States',
+      jobData.client_country || '',
       jobData.client_total_spent || 0,
       jobData.client_hire_rate || 0,
-      jobData.client_total_posted || 1,
+      jobData.client_total_posted || 0,
       jobData.client_total_hires || 0,
-      jobData.client_payment_verified !== undefined ? (jobData.client_payment_verified ? 1 : 0) : 1,
-      jobData.client_rating || 4.9,
+      jobData.client_payment_verified !== undefined ? (jobData.client_payment_verified ? 1 : 0) : 0,
+      Number(jobData.client_rating) || 0,
       jobData.current_proposals_tier || 'Less than 5',
       proposalsNumeric,
       jobData.interviewing_count || 0,
