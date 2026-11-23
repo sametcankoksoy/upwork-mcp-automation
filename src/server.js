@@ -883,10 +883,18 @@ function notifyVideoActivity({ title, subtitle, bodyText, shareUrl }) {
   notifyDesktopAndTelegram({ logTag: 'VIDEO WATCHED', title, subtitle, bodyText, shareUrl });
 }
 
+const CONNECT_PRICE_USD = 0.18;
+
+function formatConnectsWithUsd(connectsCost) {
+  const c = Math.max(0, Number(connectsCost || 0));
+  const usd = (c * CONNECT_PRICE_USD).toFixed(2);
+  return `${c} ($${usd})`;
+}
+
 function formatClientDetailedSummary(job) {
   const fullJob = (job?.job_id ? db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(job.job_id) : null) || job || {};
   const isVerified = Boolean(fullJob.client_payment_verified);
-  const verifiedText = isVerified ? 'True (✅ Onaylı)' : 'False (⚠️ Onaysız)';
+  const verifiedText = isVerified ? 'True' : 'False';
   const country = fullJob.client_country || 'Unknown';
   const totalHires = Number(fullJob.client_total_hires || 0);
   const totalPosted = Number(fullJob.client_total_posted || 0);
@@ -900,25 +908,25 @@ function formatClientDetailedSummary(job) {
 
   const avgSpent = totalHires > 0 ? Math.round(totalSpent / totalHires) : 0;
   const avgFormatted = avgSpent > 0
-    ? `$${avgSpent.toLocaleString('en-US')} / kişi`
+    ? `$${avgSpent.toLocaleString('en-US')} / hire`
     : 'N/A';
 
   let maxPaidFormatted = 'N/A';
   if (totalHires === 1 && totalSpent > 0) {
-    maxPaidFormatted = `$${Math.round(totalSpent).toLocaleString('en-US')} (Tek iş)`;
+    maxPaidFormatted = `$${Math.round(totalSpent).toLocaleString('en-US')} (Single job)`;
   } else if (fullJob.client_max_paid && Number(fullJob.client_max_paid) > 0) {
     maxPaidFormatted = `$${Math.round(Number(fullJob.client_max_paid)).toLocaleString('en-US')}`;
   } else if (totalHires > 1 && totalSpent > 0) {
-    maxPaidFormatted = `~$${Math.round(Math.max(avgSpent * 2.2, totalSpent * 0.2)).toLocaleString('en-US')} (Tahmini en büyük)`;
+    maxPaidFormatted = `~$${Math.round(Math.max(avgSpent * 2.2, totalSpent * 0.2)).toLocaleString('en-US')} (Est. highest)`;
   }
 
   return [
     `🌍 <b>Client Country:</b> ${escapeTgHtml(country)}${rating > 0 ? ` (⭐ ${rating.toFixed(1)})` : ''}`,
-    `💳 <b>Payment Verified:</b> <code>${verifiedText}</code>`,
-    `🤝 <b>Kaç Kişi Hire Etmiş:</b> <b>${totalHires} kişi</b>${totalPosted > 0 ? ` (${totalPosted} ilanda %${hireRate} hire rate)` : ''}`,
-    `💰 <b>Toplam Harcama:</b> <b>${spentFormatted}</b>`,
-    `📊 <b>Ortalama Ödeme:</b> <b>${avgFormatted}</b>`,
-    `🔝 <b>En Çok Ödediği Kişi:</b> <b>${maxPaidFormatted}</b>`
+    `💳 <b>Payment Verified:</b> ${verifiedText}`,
+    `🤝 <b>Total Hires:</b> <b>${totalHires}</b>${totalPosted > 0 ? ` (${hireRate}% hire rate across ${totalPosted} jobs)` : ''}`,
+    `💰 <b>Total Spent:</b> <b>${spentFormatted}</b>`,
+    `📊 <b>Avg Paid:</b> <b>${avgFormatted}</b>`,
+    `🔝 <b>Highest Paid:</b> <b>${maxPaidFormatted}</b>`
   ].join('\n');
 }
 
@@ -927,11 +935,12 @@ setProposalNotificationHandler(async ({ job, shareUrl, chargedAmount, connectsCo
   const rateLabel = (job?.job_type || '').toLowerCase() === 'hourly' ? `$${chargedAmount}/hr` : `$${chargedAmount}`;
   const upworkUrl = `https://www.upwork.com/jobs/~02${cleanId}`;
   const clientBlock = formatClientDetailedSummary(job);
+  const connectsLabel = formatConnectsWithUsd(connectsCost);
 
   const text = `🔥 <b>New Proposal Submitted!</b>\n\n` +
     `📌 <b>Job:</b> <a href="${upworkUrl}">${escapeTgHtml(job?.title || 'Upwork Job')}</a>\n` +
-    `💰 <b>Rate:</b> ${rateLabel} | <b>Connects:</b> ${connectsCost || 0} (Boost: 0)\n\n` +
-    `📋 <b>Client Profili & Harcama Detayları:</b>\n` +
+    `💰 <b>Rate:</b> ${rateLabel} | <b>Connects:</b> ${connectsLabel} (Boost: 0)\n\n` +
+    `📋 <b>Client Profile &amp; Spending Details:</b>\n` +
     `${clientBlock}\n\n` +
     `👉 <a href="${shareUrl}">Click here to watch video</a>`;
 
@@ -947,7 +956,7 @@ setProposalNotificationHandler(async ({ job, shareUrl, chargedAmount, connectsCo
   };
 
   await sendTelegramMessage(text, { replyMarkup: inlineKeyboard, disablePreview: false });
-  showWindowsBalloon('🔥 New Proposal Submitted!', `${job?.title || ''}\n${rateLabel} | ${connectsCost} Connects`);
+  showWindowsBalloon('🔥 New Proposal Submitted!', `${job?.title || ''}\n${rateLabel} | Connects: ${connectsLabel}`);
 });
 
 function buildUpworkApplyUrl(jobId) {
@@ -967,9 +976,9 @@ setProposalFallbackHandler(async ({ job, coverLetter, shareUrl, chargedAmount, c
 
   const text = `⚡ <b>Proposal Ready — 1-Click Apply</b>\n\n` +
     `📌 <b>Job:</b> ${escapeTgHtml(job?.title || job?.job_id)}\n` +
-    `💰 <b>Rate:</b> ${rateLabel}${connectsCost ? ` | <b>Connects:</b> ${connectsCost}` : ''}\n` +
+    `💰 <b>Rate:</b> ${rateLabel}${connectsCost ? ` | <b>Connects:</b> ${formatConnectsWithUsd(connectsCost)} (Boost: 0)` : ''}\n` +
     `⚠️ <b>MCP Status:</b> <code>${escapeTgHtml(errSummary)}</code>\n\n` +
-    `📋 <b>Client Profili & Harcama Detayları:</b>\n` +
+    `📋 <b>Client Profile &amp; Spending Details:</b>\n` +
     `${clientBlock}\n\n` +
     `📝 <b>Cover Letter (Tap to copy):</b>\n` +
     `<code>${escapeTgHtml(coverLetter || '')}</code>\n\n` +
@@ -1108,7 +1117,7 @@ function startTelegramInteractiveBot() {
                 .then(async (res) => {
                   if (res?.ok) {
                     await sendTelegramMessage(
-                      `✅ <b>Approved &amp; Submitted via Upwork MCP!</b>\n\n📌 ${escapeTgHtml(job.title)}\n💰 $${res.charged_amount} | ${res.connects_cost} Connects\n🎥 ${escapeTgHtml(res.share_url)}`,
+                      `✅ <b>Approved &amp; Submitted via Upwork MCP!</b>\n\n📌 ${escapeTgHtml(job.title)}\n💰 $${res.charged_amount} | Connects: ${formatConnectsWithUsd(res.connects_cost)} (Boost: 0)\n👉 <a href="${res.share_url}">Click here to watch video</a>`,
                       { chatId }
                     );
                   } else {
@@ -1244,18 +1253,18 @@ function detectDeviceLabel(userAgent) {
 
   const bSuffix = browser ? ` · ${browser}` : '';
 
-  if (isIPhone) return `📱 Telefon (iPhone${bSuffix})`;
+  if (isIPhone) return `📱 Mobile (iPhone${bSuffix})`;
   if (isIPad) return `📱 Tablet (iPad${bSuffix})`;
   if (isAndroid) {
-    return /Mobile/i.test(ua) ? `📱 Telefon (Android${bSuffix})` : `📱 Tablet (Android${bSuffix})`;
+    return /Mobile/i.test(ua) ? `📱 Mobile (Android${bSuffix})` : `📱 Tablet (Android${bSuffix})`;
   }
-  if (isMobileGeneric) return `📱 Telefon (Mobile${bSuffix})`;
+  if (isMobileGeneric) return `📱 Mobile${bSuffix ? ` (${browser})` : ''}`;
 
-  if (/Windows/i.test(ua)) return `💻 PC (Windows${bSuffix})`;
-  if (/Macintosh|Mac OS X/i.test(ua)) return `💻 PC (Mac${bSuffix})`;
-  if (/CrOS/i.test(ua)) return `💻 PC (Chromebook${bSuffix})`;
-  if (/Linux/i.test(ua)) return `💻 PC (Linux${bSuffix})`;
-  return `💻 PC (Desktop${bSuffix})`;
+  if (/Windows/i.test(ua)) return `💻 Desktop (Windows${bSuffix})`;
+  if (/Macintosh|Mac OS X/i.test(ua)) return `💻 Desktop (Mac${bSuffix})`;
+  if (/CrOS/i.test(ua)) return `💻 Desktop (Chromebook${bSuffix})`;
+  if (/Linux/i.test(ua)) return `💻 Desktop (Linux${bSuffix})`;
+  return `💻 Desktop${bSuffix ? ` (${browser})` : ''}`;
 }
 
 async function dispatchConsolidatedWatchAlert(session) {
@@ -1294,7 +1303,7 @@ async function dispatchConsolidatedWatchAlert(session) {
   const cleanId = String(session.jobId || '').trim().replace(/^~?02/, '');
   const upworkUrl = `https://www.upwork.com/jobs/~02${cleanId}`;
   const jobRow = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(session.jobId);
-  const clientBlock = jobRow ? `\n\n📋 <b>Client Detayları:</b>\n` + formatClientDetailedSummary(jobRow) : '';
+  const clientBlock = jobRow ? `\n\n📋 <b>Client Details:</b>\n` + formatClientDetailedSummary(jobRow) : '';
 
   const tgText = `👁️ <b>Client Activity on Proposal</b>\n\n` +
     `📌 <b>Job:</b> <a href="${upworkUrl}">${escapeTgHtml(session.jobTitle)}</a>\n` +
