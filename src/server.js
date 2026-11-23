@@ -5,6 +5,8 @@ const express = require('express');
 const cors = require('cors');
 const path = require('node:path');
 const fs = require('node:fs');
+const os = require('node:os');
+const { Readable } = require('node:stream');
 const { execFile } = require('node:child_process');
 require('dotenv').config();
 
@@ -32,6 +34,12 @@ if (!fs.existsSync(videosDir)) {
 const thumbsDir = path.join(__dirname, '..', 'public', 'thumbnails');
 if (!fs.existsSync(thumbsDir)) {
   fs.mkdirSync(thumbsDir, { recursive: true });
+}
+
+// Temporary on-disk video and thumbnail cache for fast streaming & mobile range playback on cloud
+const tmpVideoDir = path.join(os.tmpdir(), 'loom_video_cache');
+if (!fs.existsSync(tmpVideoDir)) {
+  try { fs.mkdirSync(tmpVideoDir, { recursive: true }); } catch {}
 }
 
 function escapeHtml(str) {
@@ -310,12 +318,55 @@ app.use(async (req, res, next) => {
 app.get('/videos/:idOrToken.mp4', async (req, res) => {
   const info = req.resolvedVideoInfo || await resolveVideoInfoAsync(req.params.idOrToken);
   if (!info) return sendPrivatePortalLocked(req, res);
-  if (info.hasLocalVideo && info.localVideoPath) {
+  if (info.hasLocalVideo && info.localVideoPath && fs.existsSync(info.localVideoPath)) {
     return res.sendFile(info.localVideoPath);
   }
+
+  // Check on-disk cache for fast local delivery
+  const cachedVideoFile = path.join(tmpVideoDir, `${info.shareId}.mp4`);
+  if (fs.existsSync(cachedVideoFile)) {
+    return res.sendFile(cachedVideoFile);
+  }
+
   if (info.cloudMeta?.video_cdn_url) {
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    return res.redirect(302, info.cloudMeta.video_cdn_url);
+    const cdnUrl = info.cloudMeta.video_cdn_url;
+    try {
+      const headers = {};
+      if (req.headers.range) {
+        headers['Range'] = req.headers.range;
+      }
+      const remoteResp = await fetch(cdnUrl, { headers });
+      if (!remoteResp.ok && remoteResp.status !== 206) {
+        return res.status(remoteResp.status).end();
+      }
+
+      res.status(remoteResp.status);
+      res.setHeader('Content-Type', 'video/mp4');
+      res.setHeader('Content-Disposition', 'inline');
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+
+      if (remoteResp.headers.get('content-range')) {
+        res.setHeader('Content-Range', remoteResp.headers.get('content-range'));
+      }
+      if (remoteResp.headers.get('content-length')) {
+        res.setHeader('Content-Length', remoteResp.headers.get('content-length'));
+      }
+
+      // Cache file locally in background if this was a full (non-range) request
+      if (!req.headers.range && !fs.existsSync(cachedVideoFile)) {
+        fetch(cdnUrl)
+          .then(r => r.arrayBuffer())
+          .then(buf => fs.promises.writeFile(cachedVideoFile, Buffer.from(buf)))
+          .catch(() => {});
+      }
+
+      const nodeStream = Readable.fromWeb(remoteResp.body);
+      return nodeStream.pipe(res);
+    } catch (streamErr) {
+      console.error('[Video-Stream] Proxy error:', streamErr.message);
+      return res.redirect(302, cdnUrl);
+    }
   }
   return res.status(404).end();
 });
@@ -323,22 +374,50 @@ app.get('/videos/:idOrToken.mp4', async (req, res) => {
 app.get('/thumbnails/:idOrToken.jpg', async (req, res) => {
   const info = req.resolvedVideoInfo || await resolveVideoInfoAsync(req.params.idOrToken);
   if (!info) return sendPrivatePortalLocked(req, res);
-  if (info.localThumbPath) {
+  if (info.localThumbPath && fs.existsSync(info.localThumbPath)) {
     res.setHeader('Content-Type', 'image/jpeg');
-    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
     return res.sendFile(info.localThumbPath);
   }
+
+  const cachedThumbFile = path.join(tmpVideoDir, `${info.shareId}.jpg`);
+  if (fs.existsSync(cachedThumbFile)) {
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.sendFile(cachedThumbFile);
+  }
+
   if (info.cloudMeta?.thumb_cdn_url) {
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    return res.redirect(302, info.cloudMeta.thumb_cdn_url);
+    const cdnUrl = info.cloudMeta.thumb_cdn_url;
+    try {
+      const remoteResp = await fetch(cdnUrl);
+      if (remoteResp.ok) {
+        res.setHeader('Content-Type', 'image/jpeg');
+        res.setHeader('Content-Disposition', 'inline');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+
+        fetch(cdnUrl)
+          .then(r => r.arrayBuffer())
+          .then(buf => fs.promises.writeFile(cachedThumbFile, Buffer.from(buf)))
+          .catch(() => {});
+
+        const nodeStream = Readable.fromWeb(remoteResp.body);
+        return nodeStream.pipe(res);
+      }
+    } catch {}
+    return res.redirect(302, cdnUrl);
   }
+
   const fallbackThumb = path.join(thumbsDir, '2122421990107900101.jpg');
-  if (!fs.existsSync(fallbackThumb)) {
-    return res.status(404).end();
+  if (fs.existsSync(fallbackThumb)) {
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.sendFile(fallbackThumb);
   }
-  res.setHeader('Content-Type', 'image/jpeg');
-  res.setHeader('Cache-Control', 'public, max-age=3600');
-  res.sendFile(fallbackThumb);
+  return res.status(404).end();
 });
 
 app.get('/oembed', async (req, res) => {

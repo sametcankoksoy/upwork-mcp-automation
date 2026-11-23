@@ -38,7 +38,7 @@
     <!-- 1. VIDEO PLAYER CONTAINER -->
     <div class="relative bg-black rounded-2xl sm:rounded-3xl overflow-hidden shadow-lg border border-gray-200 aspect-[16/10] flex items-center justify-center group">
       <!-- Video Element -->
-      <video id="loomVideo" class="w-full h-full object-contain cursor-pointer" playsinline preload="auto">
+      <video id="loomVideo" class="w-full h-full object-contain cursor-pointer" playsinline webkit-playsinline x5-playsinline controlslist="nodownload" preload="auto">
         <source id="videoSrc" src="" type="video/mp4">
         Your browser does not support the video tag.
       </video>
@@ -338,6 +338,10 @@
     }
 
     function togglePlay() {
+      if (!video.src || video.src === window.location.href) {
+        video.src = `/videos/${jobId}.mp4`;
+        video.load();
+      }
       if (video.paused || video.ended) {
         centerPlayBtn.classList.add('hidden');
         if (video.readyState < 3 && bufferingSpinner) {
@@ -363,6 +367,12 @@
         centerPlayBtn.classList.remove('hidden');
       }
     }
+
+    video.addEventListener('error', (e) => {
+      console.warn('Video error event:', video.error);
+      if (bufferingSpinner) bufferingSpinner.classList.add('hidden');
+      centerPlayBtn.classList.remove('hidden');
+    });
 
     video.addEventListener('click', togglePlay);
 
@@ -665,7 +675,9 @@
                 clearInterval(pollTimer);
                 prepBanner.classList.add('hidden');
                 centerPlayBtn.classList.remove('hidden');
-                document.getElementById('videoSrc').src = updated.video_url || videoSrc;
+                const newSrc = updated.video_url || videoSrc;
+                video.src = newSrc;
+                document.getElementById('videoSrc').src = newSrc;
                 video.load();
                 video.play().then(() => {
                   playIcon.classList.add('hidden');
@@ -681,7 +693,8 @@
             video.poster = job.thumb_url || `/thumbnails/${jobId}.jpg`;
           }
           const srcEl = document.getElementById('videoSrc');
-          if (!srcEl.src || (!srcEl.src.endsWith(videoSrc) && !srcEl.src.includes(videoSrc))) {
+          if (!video.src || (!video.src.endsWith(videoSrc) && !video.src.includes(videoSrc))) {
+            video.src = videoSrc;
             srcEl.src = videoSrc;
             video.load();
           }
@@ -689,7 +702,8 @@
       } catch (err) {
         // Fallback
         const srcEl = document.getElementById('videoSrc');
-        if (!srcEl.src) {
+        if (!video.src) {
+          video.src = `/videos/${jobId}.mp4`;
           srcEl.src = `/videos/${jobId}.mp4`;
           video.load();
         }
