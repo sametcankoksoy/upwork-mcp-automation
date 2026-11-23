@@ -255,6 +255,9 @@ function extractValidExternalJobId(reqPath) {
   const loomMatch = reqPath.match(/^\/loom\/([^/]+)$/);
   if (loomMatch) return loomMatch[1];
 
+  const lMatch = reqPath.match(/^\/l\/([^/]+)$/);
+  if (lMatch) return lMatch[1];
+
   const apiMatch = reqPath.match(/^\/api\/job\/([^/]+)$/);
   if (apiMatch) return apiMatch[1];
 
@@ -1467,8 +1470,8 @@ app.post('/api/generate-loom/:jobId', (req, res) => {
   });
 });
 
-// Route: Loom View Player Page (/share/<32-char-hex> and legacy /loom/:jobId)
-app.get(['/share/:jobId', '/loom/:jobId'], async (req, res) => {
+// Route: Loom View Player Page (/share/<32-char-hex> and legacy /loom/:jobId or /l/:jobId)
+app.get(['/share/:jobId', '/loom/:jobId', '/l/:jobId'], async (req, res) => {
   const vInfo = req.resolvedVideoInfo || await resolveVideoInfoAsync(req.params.jobId);
   if (!vInfo) {
     return sendPrivatePortalLocked(req, res);
@@ -1520,8 +1523,8 @@ app.get(['/share/:jobId', '/loom/:jobId'], async (req, res) => {
 
   let html = fs.readFileSync(path.join(__dirname, '..', 'public', 'loom.html'), 'utf8');
   html = html.replace('<title id="pageTitle">Video Message | Upwork</title>', metaTags);
-  html = html.replace('<video id="loomVideo" class="w-full h-full object-contain cursor-pointer" playsinline preload="auto">', `<video id="loomVideo" poster="${safeThumbUrl}" class="w-full h-full object-contain cursor-pointer" playsinline preload="auto">`);
-  html = html.replace('<source id="videoSrc" src="" type="video/mp4">', `<source id="videoSrc" src="${safeVideoUrl}" type="video/mp4">`);
+  html = html.replace('<video id="loomVideo"', `<video id="loomVideo" src="${safeVideoUrl}" poster="${safeThumbUrl}"`);
+  html = html.replace('<source id="videoSrc" src=""', `<source id="videoSrc" src="${safeVideoUrl}"`);
 
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
