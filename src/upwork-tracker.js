@@ -334,8 +334,9 @@ async function runUpworkMcpRadarCycle() {
       const clientTotalSpent = parseMoneyString(j.client?.total_spent);
       const clientTotalPosted = j.client?.total_posted_jobs || 1;
       const reviews = j.client?.total_reviews || 0;
+      const totalHires = j.client?.total_hires ?? reviews;
       const clientHireRate = clientTotalPosted > 0
-        ? Math.min(100, Math.round((Math.max(reviews, clientTotalSpent > 500 ? 1 : 0) / clientTotalPosted) * 100))
+        ? Math.min(100, Math.round((Math.max(totalHires, clientTotalSpent > 500 ? 1 : 0) / clientTotalPosted) * 100))
         : 0;
 
       const jobRecord = {
@@ -353,8 +354,8 @@ async function runUpworkMcpRadarCycle() {
         client_total_spent: clientTotalSpent,
         client_hire_rate: clientHireRate,
         client_total_posted: clientTotalPosted,
-        client_total_hires: reviews,
-        client_payment_verified: j.client?.verification_status === 'VERIFIED' ? 1 : 0,
+        client_total_hires: totalHires,
+        client_payment_verified: (j.client?.verification_status === 'VERIFIED' || j.client?.payment_verified === true) ? 1 : 0,
         client_rating: j.client?.rating || 0,
         current_proposals_tier: j.proposals_tier || 'Less than 5',
         interviewing_count: activity.invited_to_interview || 0,

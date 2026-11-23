@@ -760,15 +760,56 @@ function notifyVideoActivity({ title, subtitle, bodyText, shareUrl }) {
   notifyDesktopAndTelegram({ logTag: 'VIDEO WATCHED', title, subtitle, bodyText, shareUrl });
 }
 
+function formatClientDetailedSummary(job) {
+  const fullJob = (job?.job_id ? db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(job.job_id) : null) || job || {};
+  const isVerified = Boolean(fullJob.client_payment_verified);
+  const verifiedText = isVerified ? 'True (✅ Onaylı)' : 'False (⚠️ Onaysız)';
+  const country = fullJob.client_country || 'Unknown';
+  const totalHires = Number(fullJob.client_total_hires || 0);
+  const totalPosted = Number(fullJob.client_total_posted || 0);
+  const hireRate = Number(fullJob.client_hire_rate || 0);
+  const totalSpent = Number(fullJob.client_total_spent || 0);
+  const rating = Number(fullJob.client_rating || 0);
+
+  const spentFormatted = totalSpent >= 1000
+    ? `$${Math.round(totalSpent).toLocaleString('en-US')}`
+    : `$${Math.round(totalSpent)}`;
+
+  const avgSpent = totalHires > 0 ? Math.round(totalSpent / totalHires) : 0;
+  const avgFormatted = avgSpent > 0
+    ? `$${avgSpent.toLocaleString('en-US')} / kişi`
+    : 'N/A';
+
+  let maxPaidFormatted = 'N/A';
+  if (totalHires === 1 && totalSpent > 0) {
+    maxPaidFormatted = `$${Math.round(totalSpent).toLocaleString('en-US')} (Tek iş)`;
+  } else if (fullJob.client_max_paid && Number(fullJob.client_max_paid) > 0) {
+    maxPaidFormatted = `$${Math.round(Number(fullJob.client_max_paid)).toLocaleString('en-US')}`;
+  } else if (totalHires > 1 && totalSpent > 0) {
+    maxPaidFormatted = `~$${Math.round(Math.max(avgSpent * 2.2, totalSpent * 0.2)).toLocaleString('en-US')} (Tahmini en büyük)`;
+  }
+
+  return [
+    `🌍 <b>Client Country:</b> ${escapeTgHtml(country)}${rating > 0 ? ` (⭐ ${rating.toFixed(1)})` : ''}`,
+    `💳 <b>Payment Verified:</b> <code>${verifiedText}</code>`,
+    `🤝 <b>Kaç Kişi Hire Etmiş:</b> <b>${totalHires} kişi</b>${totalPosted > 0 ? ` (${totalPosted} ilanda %${hireRate} hire rate)` : ''}`,
+    `💰 <b>Toplam Harcama:</b> <b>${spentFormatted}</b>`,
+    `📊 <b>Ortalama Ödeme:</b> <b>${avgFormatted}</b>`,
+    `🔝 <b>En Çok Ödediği Kişi:</b> <b>${maxPaidFormatted}</b>`
+  ].join('\n');
+}
+
 setProposalNotificationHandler(async ({ job, shareUrl, chargedAmount, connectsCost }) => {
   const cleanId = String(job?.job_id || '').trim().replace(/^~?02/, '');
   const rateLabel = (job?.job_type || '').toLowerCase() === 'hourly' ? `$${chargedAmount}/hr` : `$${chargedAmount}`;
   const upworkUrl = `https://www.upwork.com/jobs/~02${cleanId}`;
+  const clientBlock = formatClientDetailedSummary(job);
 
   const text = `🔥 <b>New Proposal Submitted!</b>\n\n` +
     `📌 <b>Job:</b> <a href="${upworkUrl}">${escapeTgHtml(job?.title || 'Upwork Job')}</a>\n` +
-    `💰 <b>Rate:</b> ${rateLabel} | <b>Connects:</b> ${connectsCost || 0} (Boost: 0)\n` +
-    `🌍 <b>Client:</b> ${escapeTgHtml(job?.client_country || 'Unknown')}\n\n` +
+    `💰 <b>Rate:</b> ${rateLabel} | <b>Connects:</b> ${connectsCost || 0} (Boost: 0)\n\n` +
+    `📋 <b>Client Profili & Harcama Detayları:</b>\n` +
+    `${clientBlock}\n\n` +
     `👉 <a href="${shareUrl}">Click here to watch video</a>`;
 
   const inlineKeyboard = {
@@ -796,6 +837,7 @@ setProposalFallbackHandler(async ({ job, coverLetter, shareUrl, chargedAmount, c
   const rateLabel = (job?.job_type || '').toLowerCase() === 'hourly' ? `$${chargedAmount}/hr` : `$${chargedAmount}`;
   const applyUrl = buildUpworkApplyUrl(job?.job_id);
   const errSummary = String(typeof error === 'object' ? JSON.stringify(error) : (error || 'UNEXPECTED_ERROR')).slice(0, 180);
+  const clientBlock = formatClientDetailedSummary(job);
 
   console.log(`[AUTO-PROPOSAL FALLBACK] Job ${job?.job_id} | Dispatching 1-Click Apply + MCP Approve button to Telegram`);
   showWindowsBalloon('⚠️ Upwork Proposal Ready (1-Click)', `${job?.title || job?.job_id}\n1-Click application & MCP retry sent to Telegram.`);
@@ -804,7 +846,9 @@ setProposalFallbackHandler(async ({ job, coverLetter, shareUrl, chargedAmount, c
     `📌 <b>Job:</b> ${escapeTgHtml(job?.title || job?.job_id)}\n` +
     `💰 <b>Rate:</b> ${rateLabel}${connectsCost ? ` | <b>Connects:</b> ${connectsCost}` : ''}\n` +
     `⚠️ <b>MCP Status:</b> <code>${escapeTgHtml(errSummary)}</code>\n\n` +
-    `📋 <b>Cover Letter (Tap to copy):</b>\n` +
+    `📋 <b>Client Profili & Harcama Detayları:</b>\n` +
+    `${clientBlock}\n\n` +
+    `📝 <b>Cover Letter (Tap to copy):</b>\n` +
     `<code>${escapeTgHtml(coverLetter || '')}</code>\n\n` +
     `👉 <a href="${shareUrl}">Click here to watch video</a>\n\n` +
     `👇 <i>Tap 1-Click Apply to submit safely in your browser, or tap Approve &amp; Retry MCP once cooldown clears.</i>`;
@@ -1054,12 +1098,15 @@ async function dispatchConsolidatedWatchAlert(session) {
   // 1. Telegram Alert with clickable link & inline button
   const cleanId = String(session.jobId || '').trim().replace(/^~?02/, '');
   const upworkUrl = `https://www.upwork.com/jobs/~02${cleanId}`;
+  const jobRow = db.prepare('SELECT * FROM jobs WHERE job_id = ?').get(session.jobId);
+  const clientBlock = jobRow ? `\n\n📋 <b>Client Detayları:</b>\n` + formatClientDetailedSummary(jobRow) : '';
 
   const tgText = `👁️ <b>Client Activity on Proposal</b>\n\n` +
     `📌 <b>Job:</b> <a href="${upworkUrl}">${escapeTgHtml(session.jobTitle)}</a>\n` +
     `👤 <b>${escapeTgHtml(actionText)}</b>\n` +
     `📍 <b>Location:</b> ${escapeTgHtml(session.visitorLocation)}${session.utcOffset ? ` (${escapeTgHtml(session.utcOffset)})` : ''}\n` +
-    `⏱️ <b>Watch Duration:</b> ${session.maxSeconds}s\n\n` +
+    `⏱️ <b>Watch Duration:</b> ${session.maxSeconds}s` +
+    `${clientBlock}\n\n` +
     `👉 <a href="${session.shareUrl}">Click here to watch video</a>`;
 
   const inlineKeyboard = {
