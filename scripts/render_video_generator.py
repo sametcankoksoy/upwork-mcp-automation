@@ -184,7 +184,7 @@ def generate_proposal_video(url, out_video_path, proxy=None, strict_under_5=Fals
     
     filter_concat = (
         f"[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[cv][ca];"
-        f"[cv]setpts=PTS/{SPEED},ass='{escaped_ass}'[v];"
+        f"[cv]setpts=PTS/{SPEED},fps=30,ass='{escaped_ass}'[v];"
         f"[ca]atempo={SPEED}[a]"
     )
     cmd_concat = [
@@ -194,8 +194,11 @@ def generate_proposal_video(url, out_video_path, proxy=None, strict_under_5=Fals
         "-filter_complex", filter_concat,
         "-map", "[v]",
         "-map", "[a]",
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "22", "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "192k",
+        "-r", "30",
+        "-video_track_timescale", "30000",
+        "-c:v", "libx264", "-profile:v", "main", "-level:v", "4.0",
+        "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "128k",
         "-movflags", "+faststart",
         out_video_path
     ]

@@ -318,6 +318,19 @@ app.use(async (req, res, next) => {
   return sendPrivatePortalLocked(req, res);
 });
 
+function getVideoCacheVersion(info) {
+  try {
+    if (info?.hasLocalVideo && info?.localVideoPath && fs.existsSync(info.localVideoPath)) {
+      return String(Math.floor(fs.statSync(info.localVideoPath).mtimeMs / 1000));
+    }
+    if (info?.cloudMeta?.uploaded_at) {
+      const t = Date.parse(info.cloudMeta.uploaded_at);
+      if (!Number.isNaN(t)) return String(Math.floor(t / 1000));
+    }
+  } catch {}
+  return '2';
+}
+
 app.get('/videos/:idOrToken.mp4', async (req, res) => {
   const info = req.resolvedVideoInfo || await resolveVideoInfoAsync(req.params.idOrToken);
   if (!info) return sendPrivatePortalLocked(req, res);
@@ -325,16 +338,19 @@ app.get('/videos/:idOrToken.mp4', async (req, res) => {
     res.setHeader('Content-Type', 'video/mp4');
     res.setHeader('Content-Disposition', 'inline');
     res.setHeader('Accept-Ranges', 'bytes');
-    return res.sendFile(info.localVideoPath);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.sendFile(info.localVideoPath, { etag: false, lastModified: true, acceptRanges: true });
   }
 
-  // Check on-disk cache for fast local delivery
-  const cachedVideoFile = path.join(tmpVideoDir, `${info.shareId}.mp4`);
+  // Check on-disk cache for fast local delivery (versioned to prevent stale cache after re-encode)
+  const videoVer = getVideoCacheVersion(info);
+  const cachedVideoFile = path.join(tmpVideoDir, `${info.shareId}_${videoVer}.mp4`);
   if (fs.existsSync(cachedVideoFile)) {
     res.setHeader('Content-Type', 'video/mp4');
     res.setHeader('Content-Disposition', 'inline');
     res.setHeader('Accept-Ranges', 'bytes');
-    return res.sendFile(cachedVideoFile);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.sendFile(cachedVideoFile, { etag: false, lastModified: true, acceptRanges: true });
   }
 
   if (info.cloudMeta?.video_cdn_url) {
@@ -344,7 +360,7 @@ app.get('/videos/:idOrToken.mp4', async (req, res) => {
       if (req.headers.range) {
         headers['Range'] = req.headers.range;
       }
-      const remoteResp = await fetch(cdnUrl, { headers });
+      const remoteResp = await fetch(cdnUrl, { method: req.method === 'HEAD' ? 'HEAD' : 'GET', headers });
       if (!remoteResp.ok && remoteResp.status !== 206) {
         return res.status(remoteResp.status).end();
       }
@@ -360,6 +376,10 @@ app.get('/videos/:idOrToken.mp4', async (req, res) => {
       }
       if (remoteResp.headers.get('content-length')) {
         res.setHeader('Content-Length', remoteResp.headers.get('content-length'));
+      }
+
+      if (req.method === 'HEAD') {
+        return res.end();
       }
 
       // Cache file locally in background if this was a full (non-range) request
@@ -694,12 +714,13 @@ app.get('/api/job/:jobId', async (req, res) => {
     if (!videoReady && !IS_RENDER_CLOUD) {
       ensureVideoGenerated(realJobId, false).catch(() => {});
     }
+    const videoVer = getVideoCacheVersion(info);
     const visitorTz = await detectVisitorTimezone(req);
     res.json({
       ...job,
       job_id: realJobId,
       share_id: info.shareId || getShareHash(realJobId),
-      video_url: `/videos/${req.params.jobId}.mp4`,
+      video_url: `/videos/${req.params.jobId}.mp4?v=${videoVer}`,
       video_ready: videoReady,
       visitor_tz: visitorTz
     });
@@ -1541,8 +1562,9 @@ app.get(['/share/:jobId', '/loom/:jobId', '/l/:jobId'], async (req, res) => {
   const baseUrl = `${protocol}://${req.get('host')}`;
   const rawTitle = vInfo.title ? vInfo.title : 'Quick Video for Your Project';
   const rawDesc = '35 sec video recorded by Sametcan Koksoy (Top Rated · 100% Job Success) · Click to watch';
+  const videoVer = getVideoCacheVersion(vInfo);
   const thumbUrl = `${baseUrl}/thumbnails/${req.params.jobId}.jpg`;
-  const videoUrl = `${baseUrl}/videos/${req.params.jobId}.mp4`;
+  const videoUrl = `${baseUrl}/videos/${req.params.jobId}.mp4?v=${videoVer}`;
   const pageUrl = `${baseUrl}${req.originalUrl}`;
   const oembedUrl = `${baseUrl}/oembed?url=${encodeURIComponent(pageUrl)}&format=json`;
 
