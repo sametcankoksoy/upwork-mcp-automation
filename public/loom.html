@@ -311,21 +311,28 @@
     const timeDisplay = document.getElementById('timeDisplay');
     const speedBtn = document.getElementById('speedBtn');
 
-    const speeds = [1, 1.25, 1.5, 2];
+    let speeds = [1, 1.25, 1.5, 2];
     let currentSpeedIdx = 0;
     let hasTrackedOpen = false;
     let hasTrackedPlay = false;
-    let hasTracked50Pct = false;
-    let hasTrackedCompleted = false;
+    let maxWatchedPct = 0;
+    let maxWatchSecs = 0;
+    let lastProgressSentAt = 0;
 
-    function sendViewEvent(eventType, watchSeconds = 0) {
+    function sendViewEvent(eventType, watchSeconds = 0, watchPercent = 0) {
+      const sec = Math.max(maxWatchSecs, Math.round(Number(watchSeconds) || 0));
+      const pct = Math.min(100, Math.max(maxWatchedPct, Math.round(Number(watchPercent) || 0)));
+      maxWatchSecs = sec;
+      maxWatchedPct = pct;
+
       fetch(`/api/track-view/${encodeURIComponent(jobId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         keepalive: true,
         body: JSON.stringify({
           event_type: eventType,
-          watch_seconds: Math.round(Number(watchSeconds) || 0)
+          watch_seconds: maxWatchSecs,
+          watch_percent: maxWatchedPct
         })
       }).catch(() => {});
     }
@@ -384,17 +391,30 @@
     video.addEventListener('play', () => {
       if (!hasTrackedPlay) {
         hasTrackedPlay = true;
-        sendViewEvent('video_play', video.currentTime || 0);
+        sendViewEvent('video_play', video.currentTime || 0, maxWatchedPct);
       }
     });
 
     video.addEventListener('timeupdate', () => {
-      const pct = (video.currentTime / video.duration) * 100 || 0;
+      const dur = video.duration || 35;
+      const cur = video.currentTime || 0;
+      const pct = Math.min(100, Math.max(0, Math.round((cur / dur) * 100)));
       progressBar.style.width = `${pct}%`;
-      timeDisplay.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration || 35)}`;
-      if (!hasTracked50Pct && video.duration && video.currentTime >= video.duration * 0.5) {
-        hasTracked50Pct = true;
-        sendViewEvent('video_50pct', video.currentTime);
+      timeDisplay.textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
+
+      maxWatchedPct = Math.max(maxWatchedPct, pct);
+      maxWatchSecs = Math.max(maxWatchSecs, Math.round(cur));
+
+      const now = Date.now();
+      if (now - lastProgressSentAt >= 4000 && maxWatchedPct > 5) {
+        lastProgressSentAt = now;
+        sendViewEvent('video_progress', maxWatchSecs, maxWatchedPct);
+      }
+    });
+
+    video.addEventListener('pause', () => {
+      if (!video.ended && maxWatchedPct > 0) {
+        sendViewEvent('video_pause', maxWatchSecs, maxWatchedPct);
       }
     });
 
@@ -402,9 +422,13 @@
       playIcon.classList.remove('hidden');
       pauseIcon.classList.add('hidden');
       centerPlayBtn.classList.remove('hidden');
-      if (!hasTrackedCompleted) {
-        hasTrackedCompleted = true;
-        sendViewEvent('video_completed', video.duration || video.currentTime || 35);
+      maxWatchedPct = 100;
+      sendViewEvent('video_completed', video.duration || maxWatchSecs || 35, 100);
+    });
+
+    window.addEventListener('beforeunload', () => {
+      if (maxWatchedPct > 0) {
+        sendViewEvent('page_leave', maxWatchSecs, maxWatchedPct);
       }
     });
 

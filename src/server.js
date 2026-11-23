@@ -709,41 +709,6 @@ function showWindowsBalloon(title, bodyText) {
   );
 }
 
-function notifyDesktopAndTelegram({ logTag = 'NOTIFY', title, subtitle, bodyText }) {
-  console.log(`[${logTag}] ${title} | ${subtitle} | ${bodyText}`);
-  showWindowsBalloon(title, `${subtitle}\n${bodyText}`);
-
-  const tgToken = process.env.TELEGRAM_BOT_TOKEN || getSetting('telegram_bot_token');
-  const tgChatId = process.env.TELEGRAM_CHAT_ID || getSetting('telegram_chat_id');
-  if (tgToken && tgChatId) {
-    const msg = `${title}\n${subtitle}\n${bodyText}`;
-    fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: tgChatId, text: msg })
-    }).catch(() => {});
-  }
-}
-
-function notifyVideoActivity({ title, subtitle, bodyText }) {
-  notifyDesktopAndTelegram({ logTag: 'VIDEO WATCHED', title, subtitle, bodyText });
-}
-
-setProposalNotificationHandler(({ job, shareUrl, chargedAmount, connectsCost }) => {
-  const rateLabel = (job?.job_type || '').toLowerCase() === 'hourly' ? `$${chargedAmount}/hr` : `$${chargedAmount}`;
-  notifyDesktopAndTelegram({
-    logTag: 'AUTO-PROPOSAL SENT',
-    title: '🔥 New Proposal Submitted!',
-    subtitle: job?.title || `Upwork Job (${job?.job_id || ''})`,
-    bodyText: `${rateLabel} | ${connectsCost} Connects | ${shareUrl}`
-  });
-});
-
-function buildUpworkApplyUrl(jobId) {
-  const cleanId = String(jobId || '').trim().replace(/^~?02/, '');
-  return `https://www.upwork.com/ab/proposals/job/~02${cleanId}/apply/`;
-}
-
 function escapeTgHtml(str) {
   return String(str || '')
     .replace(/&/g, '&amp;')
@@ -774,6 +739,58 @@ async function sendTelegramMessage(text, options = {}) {
   }
 }
 
+function notifyDesktopAndTelegram({ logTag = 'NOTIFY', title, subtitle, bodyText, shareUrl }) {
+  console.log(`[${logTag}] ${title} | ${subtitle} | ${bodyText}`);
+  showWindowsBalloon(title, `${subtitle}\n${bodyText}`);
+
+  const linkBlock = shareUrl ? `\n\n👉 <a href="${shareUrl}">Click here to watch video</a>` : '';
+  const msg = `<b>${escapeTgHtml(title)}</b>\n${escapeTgHtml(subtitle)}\n${escapeTgHtml(bodyText)}${linkBlock}`;
+  sendTelegramMessage(msg, {
+    parseMode: 'HTML',
+    disablePreview: true,
+    ...(shareUrl ? {
+      replyMarkup: {
+        inline_keyboard: [[{ text: '🎥 Click here to watch video', url: shareUrl }]]
+      }
+    } : {})
+  }).catch(() => {});
+}
+
+function notifyVideoActivity({ title, subtitle, bodyText, shareUrl }) {
+  notifyDesktopAndTelegram({ logTag: 'VIDEO WATCHED', title, subtitle, bodyText, shareUrl });
+}
+
+setProposalNotificationHandler(async ({ job, shareUrl, chargedAmount, connectsCost }) => {
+  const cleanId = String(job?.job_id || '').trim().replace(/^~?02/, '');
+  const rateLabel = (job?.job_type || '').toLowerCase() === 'hourly' ? `$${chargedAmount}/hr` : `$${chargedAmount}`;
+  const upworkUrl = `https://www.upwork.com/jobs/~02${cleanId}`;
+
+  const text = `🔥 <b>New Proposal Submitted!</b>\n\n` +
+    `📌 <b>Job:</b> <a href="${upworkUrl}">${escapeTgHtml(job?.title || 'Upwork Job')}</a>\n` +
+    `💰 <b>Rate:</b> ${rateLabel} | <b>Connects:</b> ${connectsCost || 0} (Boost: 0)\n` +
+    `🌍 <b>Client:</b> ${escapeTgHtml(job?.client_country || 'Unknown')}\n\n` +
+    `👉 <a href="${shareUrl}">Click here to watch video</a>`;
+
+  const inlineKeyboard = {
+    inline_keyboard: [
+      [
+        { text: '🎥 Click here to watch video', url: shareUrl }
+      ],
+      [
+        { text: '💼 View Job on Upwork', url: upworkUrl }
+      ]
+    ]
+  };
+
+  await sendTelegramMessage(text, { replyMarkup: inlineKeyboard, disablePreview: false });
+  showWindowsBalloon('🔥 New Proposal Submitted!', `${job?.title || ''}\n${rateLabel} | ${connectsCost} Connects`);
+});
+
+function buildUpworkApplyUrl(jobId) {
+  const cleanId = String(jobId || '').trim().replace(/^~?02/, '');
+  return `https://www.upwork.com/ab/proposals/job/~02${cleanId}/apply/`;
+}
+
 setProposalFallbackHandler(async ({ job, coverLetter, shareUrl, chargedAmount, connectsCost, error }) => {
   const cleanId = String(job?.job_id || '').trim().replace(/^~?02/, '');
   const rateLabel = (job?.job_type || '').toLowerCase() === 'hourly' ? `$${chargedAmount}/hr` : `$${chargedAmount}`;
@@ -789,6 +806,7 @@ setProposalFallbackHandler(async ({ job, coverLetter, shareUrl, chargedAmount, c
     `⚠️ <b>MCP Status:</b> <code>${escapeTgHtml(errSummary)}</code>\n\n` +
     `📋 <b>Cover Letter (Tap to copy):</b>\n` +
     `<code>${escapeTgHtml(coverLetter || '')}</code>\n\n` +
+    `👉 <a href="${shareUrl}">Click here to watch video</a>\n\n` +
     `👇 <i>Tap 1-Click Apply to submit safely in your browser, or tap Approve &amp; Retry MCP once cooldown clears.</i>`;
 
   const inlineKeyboard = {
@@ -798,7 +816,7 @@ setProposalFallbackHandler(async ({ job, coverLetter, shareUrl, chargedAmount, c
       ],
       [
         { text: '✅ Approve & Retry via MCP', callback_data: `mcp_retry:${cleanId}` },
-        { text: '🎥 Watch Loom Video', url: shareUrl }
+        { text: '🎥 Click here to watch video', url: shareUrl }
       ]
     ]
   };
@@ -808,7 +826,7 @@ setProposalFallbackHandler(async ({ job, coverLetter, shareUrl, chargedAmount, c
 
 async function buildLiveStatusMessage(header = '🤖 <b>Upwork Automation Live Status</b>', extraLines = []) {
   const mcpRadarOn = getSetting('upwork_mcp_radar_enabled') === true;
-  const intervalMin = Math.round(Math.max(300000, Number(getSetting('mcp_radar_interval_ms') || 300000)) / 60000);
+  const intervalMin = Math.round(Math.max(120000, Number(getSetting('mcp_radar_interval_ms') || 120000)) / 60000);
   const autoPropOn = getSetting('auto_proposer_enabled') !== false;
   const dailyCount = getDailySubmittedCount();
   const maxDaily = Number(getSetting('daily_proposal_limit') ?? 5);
@@ -971,6 +989,119 @@ function startTelegramInteractiveBot() {
   setTimeout(pollOnce, 2500);
 }
 
+// Consolidated Watch Session Tracker: avoids notification spam by aggregating viewing activity per visitor
+const activeWatchSessions = new Map();
+
+function getOrCreateWatchSession({ realJobId, jobTitle, jobClientCountry, shareId, shareUrl, visitorLocation, visitorTimezone, tzInfo, visitorIp, userAgent }) {
+  const sessionKey = `${realJobId}_${visitorIp || 'anon'}`;
+  let session = activeWatchSessions.get(sessionKey);
+  if (!session) {
+    session = {
+      key: sessionKey,
+      jobId: realJobId,
+      jobTitle,
+      jobClientCountry,
+      shareId,
+      shareUrl,
+      visitorLocation,
+      visitorTimezone,
+      visitorCountry: tzInfo?.country || '',
+      visitorCity: tzInfo?.city || '',
+      visitorRegion: tzInfo?.region || '',
+      utcOffset: tzInfo?.utc_offset || '',
+      visitorIp,
+      userAgent,
+      maxPercent: 0,
+      maxSeconds: 0,
+      hasPlayed: false,
+      hasCompleted: false,
+      firstSeenAt: Date.now(),
+      lastSeenAt: Date.now(),
+      timer: null,
+      notifiedPercent: -1
+    };
+    activeWatchSessions.set(sessionKey, session);
+  } else {
+    session.lastSeenAt = Date.now();
+    if (jobTitle && (!session.jobTitle || session.jobTitle.startsWith('Upwork Job ('))) session.jobTitle = jobTitle;
+    if (visitorLocation && session.visitorLocation === 'Unknown Location') session.visitorLocation = visitorLocation;
+  }
+  return session;
+}
+
+async function dispatchConsolidatedWatchAlert(session) {
+  if (!session) return;
+  if (session.timer) {
+    clearTimeout(session.timer);
+    session.timer = null;
+  }
+
+  // Prevent duplicate spam if watch percent did not increase meaningfully (+15% or to 100%)
+  if (session.notifiedPercent >= 0) {
+    if (session.maxPercent <= session.notifiedPercent) return;
+    if (session.maxPercent < 95 && (session.maxPercent - session.notifiedPercent) < 15) return;
+  }
+  session.notifiedPercent = session.maxPercent;
+
+  const pct = session.maxPercent;
+  const isWatched = pct > 0 || session.hasPlayed;
+  const actionText = isWatched
+    ? `client opened proposal page and watched ${pct}% of video`
+    : `client opened proposal page (did not play video)`;
+
+  console.log(`[WATCH CONSOLIDATED] Job ${session.jobId} | ${actionText} | ${session.visitorLocation} | ${session.maxSeconds}s`);
+
+  // 1. Telegram Alert with clickable link & inline button
+  const cleanId = String(session.jobId || '').trim().replace(/^~?02/, '');
+  const upworkUrl = `https://www.upwork.com/jobs/~02${cleanId}`;
+
+  const tgText = `👁️ <b>Client Activity on Proposal</b>\n\n` +
+    `📌 <b>Job:</b> <a href="${upworkUrl}">${escapeTgHtml(session.jobTitle)}</a>\n` +
+    `👤 <b>${escapeTgHtml(actionText)}</b>\n` +
+    `📍 <b>Location:</b> ${escapeTgHtml(session.visitorLocation)}${session.utcOffset ? ` (${escapeTgHtml(session.utcOffset)})` : ''}\n` +
+    `⏱️ <b>Watch Duration:</b> ${session.maxSeconds}s\n\n` +
+    `👉 <a href="${session.shareUrl}">Click here to watch video</a>`;
+
+  const inlineKeyboard = {
+    inline_keyboard: [
+      [
+        { text: '🎥 Click here to watch video', url: session.shareUrl }
+      ],
+      [
+        { text: '💼 View Job on Upwork', url: upworkUrl }
+      ]
+    ]
+  };
+
+  sendTelegramMessage(tgText, { replyMarkup: inlineKeyboard, disablePreview: false }).catch(() => {});
+  showWindowsBalloon('👁️ Client Video Activity', `${actionText}\n${session.jobTitle}`);
+
+  // 2. Consolidated Email Alert via Resend / SMTP
+  sendVideoWatchEmail({
+    jobId: session.jobId,
+    jobTitle: session.jobTitle,
+    jobClientCountry: session.jobClientCountry,
+    eventType: isWatched ? (pct >= 95 ? 'video_completed' : 'video_50pct') : 'page_open',
+    eventLabel: actionText,
+    watchSeconds: session.maxSeconds,
+    visitorCountry: session.visitorCountry,
+    visitorCity: session.visitorCity,
+    visitorRegion: session.visitorRegion,
+    visitorLocation: session.visitorLocation,
+    visitorTimezone: session.visitorTimezone,
+    utcOffset: session.utcOffset,
+    visitorIp: session.visitorIp,
+    userAgent: session.userAgent,
+    shareUrl: session.shareUrl
+  }).then(r => {
+    if (r?.ok) console.log(`[Email-Notifier] Consolidated watch email sent for ${session.jobId} (${actionText})`);
+  }).catch(err => console.error('[Email-Notifier] Watch email error:', err.message));
+
+  setTimeout(() => {
+    activeWatchSessions.delete(session.key);
+  }, 30 * 60 * 1000);
+}
+
 // API: Real-Time Video Watch Tracking & Notifications
 app.post('/api/track-view/:jobId', async (req, res) => {
   try {
@@ -985,9 +1116,10 @@ app.post('/api/track-view/:jobId', async (req, res) => {
     }
     const realJobId = vInfo.jobId;
 
-    const allowedEvents = new Set(['page_open', 'video_play', 'video_50pct', 'video_completed']);
+    const allowedEvents = new Set(['page_open', 'video_play', 'video_progress', 'video_pause', 'video_50pct', 'video_completed', 'page_leave']);
     const eventType = allowedEvents.has(req.body?.event_type) ? req.body.event_type : 'page_open';
     const watchSeconds = Math.max(0, Math.round(Number(req.body?.watch_seconds || 0)));
+    const watchPercent = Math.min(100, Math.max(0, Math.round(Number(req.body?.watch_percent || 0))));
 
     const jobTitle = vInfo.title || `Upwork Job (${realJobId})`;
     const jobClientCountry = vInfo.clientCountry || '';
@@ -1015,43 +1147,48 @@ app.post('/api/track-view/:jobId', async (req, res) => {
       userAgent.slice(0, 300)
     );
 
-    const eventLabels = {
-      page_open: 'Opened Proposal Page',
-      video_play: 'Started Watching Video',
-      video_50pct: 'Watched 50% of Video',
-      video_completed: 'Finished Video (100%)'
-    };
-
-    notifyVideoActivity({
-      title: `Client ${eventLabels[eventType]}`,
-      subtitle: jobTitle,
-      bodyText: `${visitorLocation}${tzInfo?.utc_offset ? ` (${tzInfo.utc_offset})` : ''} | Duration: ${watchSeconds}s`
-    });
-
     const publicBaseUrl = process.env.PUBLIC_LOOM_URL || 'https://loom.sametcankoksoy.com';
-    sendVideoWatchEmail({
-      jobId: realJobId,
+    const shareUrl = `${publicBaseUrl}/share/${shareId}`;
+
+    const session = getOrCreateWatchSession({
+      realJobId,
       jobTitle,
       jobClientCountry,
-      eventType,
-      eventLabel: eventLabels[eventType],
-      watchSeconds,
-      visitorCountry: tzInfo?.country || '',
-      visitorCity: tzInfo?.city || '',
-      visitorRegion: tzInfo?.region || '',
+      shareId,
+      shareUrl,
       visitorLocation,
       visitorTimezone,
-      utcOffset: tzInfo?.utc_offset || '',
+      tzInfo,
       visitorIp: String(visitorIp),
-      userAgent,
-      shareUrl: `${publicBaseUrl}/share/${shareId}`
-    })
-      .then(r => {
-        if (r?.ok) console.log(`[Email-Notifier] Watch alert sent via ${r.provider} for ${realJobId} (${eventType}, ${visitorLocation})`);
-      })
-      .catch(err => console.error('[Email-Notifier] Watch email error:', err.message));
+      userAgent
+    });
 
-    res.json({ ok: true, view_id: Number(info.lastInsertRowid), event_type: eventType });
+    session.maxSeconds = Math.max(session.maxSeconds, watchSeconds);
+    session.maxPercent = Math.max(session.maxPercent, watchPercent);
+    if (eventType === 'video_play' || session.maxPercent > 0) {
+      session.hasPlayed = true;
+    }
+    if (eventType === 'video_completed' || session.maxPercent >= 98) {
+      session.hasCompleted = true;
+      session.maxPercent = 100;
+    }
+
+    if (session.timer) {
+      clearTimeout(session.timer);
+      session.timer = null;
+    }
+
+    // If client finished the video (100%) or explicitly left the page, dispatch immediately
+    if (session.hasCompleted || (eventType === 'page_leave' && session.maxPercent > 0)) {
+      dispatchConsolidatedWatchAlert(session);
+    } else {
+      // Debounce: wait 12 seconds for client to finish or pause before sending single consolidated alert
+      session.timer = setTimeout(() => {
+        dispatchConsolidatedWatchAlert(session);
+      }, 12000);
+    }
+
+    res.json({ ok: true, view_id: Number(info.lastInsertRowid), event_type: eventType, max_percent: session.maxPercent });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -1290,10 +1427,10 @@ if (require.main === module) {
       fetch(`${externalUrl}/health`).catch(() => {});
     }, 4 * 60 * 1000);
   } else {
-    // Safe Upwork MCP Radar loop: enforces >= 5 minute interval and strictly respects mcp_freeze_until cooldown windows.
+    // Safe Upwork MCP Radar loop: enforces >= 2 minute interval and strictly respects mcp_freeze_until cooldown windows.
     function scheduleNextUpworkMcpRadar(delayMs = 5000) {
       setTimeout(async () => {
-        const intervalMs = Math.max(5 * 60 * 1000, Number(getSetting('mcp_radar_interval_ms') || 5 * 60 * 1000));
+        const intervalMs = Math.max(2 * 60 * 1000, Number(getSetting('mcp_radar_interval_ms') || 2 * 60 * 1000));
         let nextDelay = intervalMs;
         try {
           const freezeUntil = Number(getSetting('mcp_freeze_until') || 0);

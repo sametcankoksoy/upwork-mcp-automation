@@ -39,7 +39,7 @@ const TERMINAL_PROPOSAL_STATUSES = new Set([
   'error_confirm'
 ]);
 
-const TRANSIENT_MCP_ERR_RE = /(fetch failed|econnreset|etimedout|socket hang up|\b502\b|\b503\b|\b504\b)/i;
+const TRANSIENT_MCP_ERR_RE = /(fetch failed|econnreset|etimedout|socket hang up|\b502\b|\b503\b|\b504\b|could not read this job's payment terms|try again)/i;
 
 let isProposerRunning = false;
 let onProposalSubmitted = null;
@@ -109,15 +109,13 @@ function isTamSametlikJob(job) {
   const CORE_BUILDER_STACK_RE = /\b(playwright|selenium|puppeteer|scrapy|beautifulsoup|web scraping|data scraping|scrape|scraper|scrapers|scraping|crawler|crawling|anti-bot|cloudflare bypass|whatsapp bot|telegram bot|discord bot|slack bot|voice agent|voice ai|vapi|retell|twilio|elevenlabs|bland ai|pipecat|livekit|\bn8n\b|make\.com|python script|python automation|automation script|bot developer|custom bot|ai agent|agentic|\bmcp\b|\brag\b|conversational ai|ai backend|chat api|langgraph|langchain|crewai|browser automation|account automation|social media automation|multi-account|simulate interactions)\b/i;
   if (!CORE_BUILDER_STACK_RE.test(text)) return false;
 
-  // Enforce proposal competition:
-  // Enforce proposals limit: strictly allow 'Less than 5' and '5 to 10' (max 10 proposals)
+  // Enforce proposal competition: strictly less than 5 proposals per user mandate
   const propsNum = Number(job.current_proposals_numeric || 0);
   const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
-  const isAllowedTier = /^(less than 5|fewer than 5|5 to 10|5-10|<5|<10)$/i.test(propsTier)
+  const isUnder5Tier = /^(less than 5|fewer than 5|<5|< 5)$/i.test(propsTier)
     || propsTier.includes('less than 5')
-    || propsTier.includes('fewer than 5')
-    || propsTier.includes('5 to 10');
-  if (propsNum > 10 || !isAllowedTier) return false;
+    || propsTier.includes('fewer than 5');
+  if (propsNum > 5 || !isUnder5Tier) return false;
 
   // Enforce solid rate (Hourly >= $35 or Fixed >= $200)
   const isHourly = (job.job_type || '').toLowerCase() === 'hourly';
@@ -172,8 +170,11 @@ function buildUpworkJobUrl(jobId) {
   return `https://www.upwork.com/jobs/~02${id}`;
 }
 
-function toNumericJobRef(jobId) {
-  return String(jobId).trim().replace(/^~?02/, '');
+function formatUpworkJobRef(jobId) {
+  const id = String(jobId || '').trim();
+  if (id.startsWith('~')) return id;
+  if (id.startsWith('02') && id.length >= 20) return `~${id}`;
+  return `~02${id.replace(/^~?02/, '')}`;
 }
 
 const CORE_PORTFOLIO_PROJECT_IDS = [
@@ -291,14 +292,13 @@ function isJobEligibleForAutoProposal(job, options = {}) {
     if (!isTamSametlikJob(job)) return false;
   }
 
-  // Enforce proposals limit: allow 'Less than 5' and '5 to 10' (max 10 proposals, reject 10+)
+  // Enforce proposals limit: strictly less than 5 proposals per user mandate
   const propsNum = Number(job.current_proposals_numeric || 0);
   const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
-  const isAllowedTier = /^(less than 5|fewer than 5|5 to 10|5-10|<5|<10)$/i.test(propsTier)
+  const isUnder5Tier = /^(less than 5|fewer than 5|<5|< 5)$/i.test(propsTier)
     || propsTier.includes('less than 5')
-    || propsTier.includes('fewer than 5')
-    || propsTier.includes('5 to 10');
-  if (propsNum > 10 || !isAllowedTier) {
+    || propsTier.includes('fewer than 5');
+  if (propsNum > 5 || !isUnder5Tier) {
     return false;
   }
 
@@ -439,13 +439,12 @@ async function submitAutoProposalForJob(job, options = {}) {
     }
     const propsNum = Number(job.current_proposals_numeric || 0);
     const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
-    const isAllowedTier = /^(less than 5|fewer than 5|5 to 10|5-10|<5|<10)$/i.test(propsTier)
+    const isUnder5Tier = /^(less than 5|fewer than 5|<5|< 5)$/i.test(propsTier)
       || propsTier.includes('less than 5')
-      || propsTier.includes('fewer than 5')
-      || propsTier.includes('5 to 10');
-    if (propsNum > 10 || !isAllowedTier) {
-      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_10_proposals', null, `DB tier=${job.current_proposals_tier} (${propsNum})`);
-      return { ok: false, status: 'skipped_over_10_proposals', job_id: job.job_id };
+      || propsTier.includes('fewer than 5');
+    if (propsNum > 5 || !isUnder5Tier) {
+      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_5_proposals', null, `DB tier=${job.current_proposals_tier} (${propsNum})`);
+      return { ok: false, status: 'skipped_over_5_proposals', job_id: job.job_id };
     }
     if (job.posted_at) {
       const minsSincePosted = (Date.now() - new Date(job.posted_at).getTime()) / 60000;
@@ -558,7 +557,7 @@ async function submitAutoProposalForJob(job, options = {}) {
     console.warn(`[Auto-Proposer] Policy ack warning: ${ackErr.message}`);
   }
 
-  const numericJobRef = toNumericJobRef(job.job_id);
+  const numericJobRef = formatUpworkJobRef(job.job_id);
   const coverLetter = buildRyanCoverLetter(job, shareUrl);
 
   const createParams = {
@@ -807,6 +806,7 @@ async function runAutoProposerCycle(maxPerCycle = 3) {
         AND is_ghost_job = 0
         AND sniper_score >= 80
         AND datetime(posted_at) >= datetime('now', '-30 minutes')
+        AND (current_proposals_tier LIKE '%less than 5%' OR current_proposals_tier LIKE '%fewer than 5%' OR current_proposals_numeric <= 5)
         AND job_id NOT IN (
           SELECT job_id FROM auto_proposals
           WHERE status IN (${terminalStatusList})
