@@ -322,12 +322,18 @@ app.get('/videos/:idOrToken.mp4', async (req, res) => {
   const info = req.resolvedVideoInfo || await resolveVideoInfoAsync(req.params.idOrToken);
   if (!info) return sendPrivatePortalLocked(req, res);
   if (info.hasLocalVideo && info.localVideoPath && fs.existsSync(info.localVideoPath)) {
+    res.setHeader('Content-Type', 'video/mp4');
+    res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('Accept-Ranges', 'bytes');
     return res.sendFile(info.localVideoPath);
   }
 
   // Check on-disk cache for fast local delivery
   const cachedVideoFile = path.join(tmpVideoDir, `${info.shareId}.mp4`);
   if (fs.existsSync(cachedVideoFile)) {
+    res.setHeader('Content-Type', 'video/mp4');
+    res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('Accept-Ranges', 'bytes');
     return res.sendFile(cachedVideoFile);
   }
 

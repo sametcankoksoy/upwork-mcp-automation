@@ -26,6 +26,10 @@
       background: #e5e7eb;
       border-radius: 4px;
     }
+    @media (max-width: 768px) {
+      .mobile-native-player #centerPlayBtn { display: none !important; }
+      .mobile-native-player #videoControls { display: none !important; }
+    }
   </style>
 </head>
 <body class="min-h-screen bg-[#f3f4f6] text-[#111827] antialiased selection:bg-[#14a800]/20 pb-16">
@@ -44,7 +48,7 @@
       </video>
 
       <!-- Center Big Play Button (when paused) -->
-      <button id="centerPlayBtn" onclick="togglePlay()" class="absolute inset-0 m-auto w-20 h-20 rounded-full bg-black/60 hover:bg-[#14a800] text-white flex items-center justify-center transition-all transform hover:scale-110 shadow-2xl backdrop-blur-sm z-20">
+      <button id="centerPlayBtn" onclick="togglePlay(event)" type="button" class="absolute inset-0 m-auto w-20 h-20 rounded-full bg-black/60 hover:bg-[#14a800] text-white flex items-center justify-center transition-all transform hover:scale-110 shadow-2xl backdrop-blur-sm z-20">
         <svg class="w-9 h-9 ml-1 fill-current" viewBox="0 0 24 24">
           <path d="M8 5v14l11-7z"/>
         </svg>
@@ -337,13 +341,30 @@
       }).catch(() => {});
     }
 
-    function togglePlay() {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (window.innerWidth < 768 && ('ontouchstart' in window || navigator.maxTouchPoints > 0));
+
+    if (isMobile) {
+      document.body.classList.add('mobile-native-player');
+      video.controls = true;
+      video.setAttribute('controls', '');
+      video.setAttribute('playsinline', '');
+      video.setAttribute('webkit-playsinline', '');
+    }
+
+    let isToggling = false;
+    function togglePlay(e) {
+      if (e) {
+        try { e.preventDefault(); e.stopPropagation(); } catch {}
+      }
+      if (isToggling) return;
+      isToggling = true;
+      setTimeout(() => { isToggling = false; }, 350);
+
       if (!video.src || video.src === window.location.href) {
         video.src = `/videos/${jobId}.mp4`;
         video.load();
       }
       if (video.paused || video.ended) {
-        centerPlayBtn.classList.add('hidden');
         if (video.readyState < 3 && bufferingSpinner) {
           bufferingSpinner.classList.remove('hidden');
         }
@@ -353,6 +374,7 @@
             if (bufferingSpinner) bufferingSpinner.classList.add('hidden');
             playIcon.classList.add('hidden');
             pauseIcon.classList.remove('hidden');
+            centerPlayBtn.classList.add('hidden');
           }).catch(err => {
             if (bufferingSpinner) bufferingSpinner.classList.add('hidden');
             centerPlayBtn.classList.remove('hidden');
@@ -374,7 +396,9 @@
       centerPlayBtn.classList.remove('hidden');
     });
 
-    video.addEventListener('click', togglePlay);
+    if (!isMobile) {
+      video.addEventListener('click', togglePlay);
+    }
 
     video.addEventListener('waiting', () => {
       if (!video.paused && bufferingSpinner) bufferingSpinner.classList.remove('hidden');
