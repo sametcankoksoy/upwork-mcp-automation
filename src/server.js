@@ -775,10 +775,11 @@ app.post('/api/book-call/:jobId', async (req, res) => {
     });
 
     if (!isTurkeyOrLocalBooking) {
+      const bookDevice = detectDeviceLabel(req.headers['user-agent']);
       notifyVideoActivity({
         title: '📞 New Meeting Booked on Upwork!',
         subtitle: `${jobTitle}`,
-        bodyText: `${selected_date} at ${selected_time} | ${visitor_timezone || visitorIp}`
+        bodyText: `${selected_date} at ${selected_time} | ${bookDevice} | ${visitor_timezone || visitorIp}`
       });
       const publicBaseUrl = process.env.PUBLIC_LOOM_URL || 'https://loom.sametcankoksoy.com';
       sendBookingEmail({
@@ -1226,6 +1227,37 @@ function getOrCreateWatchSession({ realJobId, jobTitle, jobClientCountry, shareI
   return session;
 }
 
+function detectDeviceLabel(userAgent) {
+  const ua = String(userAgent || '');
+  if (!ua) return '❓ Unknown Device';
+
+  const isIPad = /iPad/i.test(ua) || (/Macintosh/i.test(ua) && /Mobile/i.test(ua));
+  const isIPhone = /iPhone|iPod/i.test(ua);
+  const isAndroid = /Android/i.test(ua);
+  const isMobileGeneric = /Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+
+  let browser = '';
+  if (/EdgA?|EdgiOS/i.test(ua)) browser = 'Edge';
+  else if (/CriOS|Chrome/i.test(ua)) browser = 'Chrome';
+  else if (/FxiOS|Firefox/i.test(ua)) browser = 'Firefox';
+  else if (/Safari/i.test(ua)) browser = 'Safari';
+
+  const bSuffix = browser ? ` · ${browser}` : '';
+
+  if (isIPhone) return `📱 Telefon (iPhone${bSuffix})`;
+  if (isIPad) return `📱 Tablet (iPad${bSuffix})`;
+  if (isAndroid) {
+    return /Mobile/i.test(ua) ? `📱 Telefon (Android${bSuffix})` : `📱 Tablet (Android${bSuffix})`;
+  }
+  if (isMobileGeneric) return `📱 Telefon (Mobile${bSuffix})`;
+
+  if (/Windows/i.test(ua)) return `💻 PC (Windows${bSuffix})`;
+  if (/Macintosh|Mac OS X/i.test(ua)) return `💻 PC (Mac${bSuffix})`;
+  if (/CrOS/i.test(ua)) return `💻 PC (Chromebook${bSuffix})`;
+  if (/Linux/i.test(ua)) return `💻 PC (Linux${bSuffix})`;
+  return `💻 PC (Desktop${bSuffix})`;
+}
+
 async function dispatchConsolidatedWatchAlert(session) {
   if (!session) return;
   if (session.timer) {
@@ -1255,7 +1287,8 @@ async function dispatchConsolidatedWatchAlert(session) {
     return;
   }
 
-  console.log(`[WATCH CONSOLIDATED] Job ${session.jobId} | ${actionText} | ${session.visitorLocation} | ${session.maxSeconds}s`);
+  const deviceLabel = detectDeviceLabel(session.userAgent);
+  console.log(`[WATCH CONSOLIDATED] Job ${session.jobId} | ${actionText} | ${deviceLabel} | ${session.visitorLocation} | ${session.maxSeconds}s`);
 
   // 1. Telegram Alert with clickable link & inline button
   const cleanId = String(session.jobId || '').trim().replace(/^~?02/, '');
@@ -1266,6 +1299,7 @@ async function dispatchConsolidatedWatchAlert(session) {
   const tgText = `👁️ <b>Client Activity on Proposal</b>\n\n` +
     `📌 <b>Job:</b> <a href="${upworkUrl}">${escapeTgHtml(session.jobTitle)}</a>\n` +
     `👤 <b>${escapeTgHtml(actionText)}</b>\n` +
+    `🖥️ <b>Device:</b> ${escapeTgHtml(deviceLabel)}\n` +
     `📍 <b>Location:</b> ${escapeTgHtml(session.visitorLocation)}${session.utcOffset ? ` (${escapeTgHtml(session.utcOffset)})` : ''}\n` +
     `⏱️ <b>Watch Duration:</b> ${session.maxSeconds}s` +
     `${clientBlock}\n\n` +
