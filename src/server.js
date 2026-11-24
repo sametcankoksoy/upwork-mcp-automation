@@ -12,7 +12,7 @@ require('dotenv').config();
 
 const { db, upsertJobAndSnapshot, getSetting, setSetting } = require('./db');
 const { getFullMarketAnalytics } = require('./analytics');
-const { runTrackerCycle, runUpworkMcpRadarCycle, UPWORK_MCP_URL } = require('./upwork-tracker');
+const { runTrackerCycle, runUpworkMcpRadarCycle, UPWORK_MCP_URL, rateLimiter, UPWORK_LIMITS } = require('./upwork-tracker');
 const { getFlconsoleToken, setFlconsoleToken, runFlconsoleSyncCycle } = require('./flconsole-tracker');
 const { getShareHash, buildRyanCoverLetter, submitAutoProposalForJob, runAutoProposerCycle, setProposalNotificationHandler, setProposalFallbackHandler, ensureVideoGenerated, getDailySubmittedCount, getCurrentTurkeyHour, isNightShiftWindow, getNightShiftSubmittedCount } = require('./auto-proposer');
 const { createAuthorizationUrl, exchangeCodeForTokens, getValidAccessToken } = require('./upwork-oauth');
@@ -1002,7 +1002,7 @@ setProposalFallbackHandler(async ({ job, coverLetter, shareUrl, chargedAmount, c
 
 async function buildLiveStatusMessage(header = '🤖 <b>Upwork Automation Live Status</b>', extraLines = []) {
   const mcpRadarOn = getSetting('upwork_mcp_radar_enabled') === true;
-  const intervalMin = Math.round(Math.max(120000, Number(getSetting('mcp_radar_interval_ms') || 120000)) / 60000);
+  const intervalMin = Math.round(Math.max(180000, Number(getSetting('mcp_radar_interval_ms') || 180000)) / 60000);
   const autoPropOn = getSetting('auto_proposer_enabled') !== false;
   const dailyCount = getDailySubmittedCount();
   const maxDaily = Number(getSetting('daily_proposal_limit') ?? 5);
@@ -1017,6 +1017,11 @@ async function buildLiveStatusMessage(header = '🤖 <b>Upwork Automation Live S
   let cooldownText = isFrozen ? `❄️ Frozen for ${freezeRemainingLabel} (resting Upwork MCP)` : 'Unknown (no token)';
   let connectsText = 'N/A';
 
+  const diag = rateLimiter.getDiagnostics();
+  const searchQuota = diag.categories.search ? diag.categories.search.today_utc.split(' ')[0] : '0/600';
+  const propQuota = diag.categories.proposal ? diag.categories.proposal.today_utc.split(' ')[0] : '0/50';
+  const readQuota = diag.categories.read ? diag.categories.read.today_utc.split(' ')[0] : '0/650';
+
   if (!isFrozen) {
     try {
       const token = await getValidAccessToken();
@@ -1025,18 +1030,16 @@ async function buildLiveStatusMessage(header = '🤖 <b>Upwork Automation Live S
         const orgUid = await getTalentOrgUid(token);
         const dash = await callUpworkMcpTool('upwork__get_freelancer_dashboard', { action: 'check', org_uid: orgUid }, token).catch(() => null);
         connectsText = String(dash?.data?.connects?.balance?.connectsBalance ?? 'N/A');
-        const sample = db.prepare(`SELECT job_id FROM jobs ORDER BY posted_at DESC LIMIT 1`).get();
-        if (sample) {
-          try {
-            await callUpworkMcpTool('upwork__find_jobs', {
-              action: 'get',
-              org_uid: orgUid,
-              params: { job_id: String(sample.job_id).replace(/^~?02/, '') }
-            }, token);
-            cooldownText = '✅ CLEAR (Upwork MCP Ready)';
-          } catch (e) {
-            cooldownText = `⏳ STILL ACTIVE (${String(e.message || '').slice(0, 90)})`;
-          }
+        
+        // Check rate limiter status without wasting profile-view quota
+        const searchCounts = rateLimiter.getCounts('search');
+        if (searchCounts.dayCount >= UPWORK_LIMITS.search.safe.day) {
+          cooldownText = '⚠️ Daily search quota reached (resting until 00:00 UTC)';
+        } else if (rateLimiter.cooldownUntilByCategory['search'] > Date.now()) {
+          const waitSec = Math.round((rateLimiter.cooldownUntilByCategory['search'] - Date.now()) / 1000);
+          cooldownText = `⏳ Backoff active (${waitSec}s remaining)`;
+        } else {
+          cooldownText = '✅ CLEAR (Upwork MCP Ready & Rate-Limited)';
         }
       }
     } catch (e) {
@@ -1052,6 +1055,7 @@ async function buildLiveStatusMessage(header = '🤖 <b>Upwork Automation Live S
     `• <b>flconsole Sync:</b> ${flcEnabled ? `✅ Active (${escapeTgHtml(lastFlc?.details || 'waiting')})` : '⛔ Disabled (Direct MCP Mode)'}`,
     `• <b>Auto-Proposer (0 Boost, Auto-Confirm):</b> ${isFrozen ? `❄️ Frozen (${freezeRemainingLabel} left)` : (autoPropOn ? '✅ Enabled' : '⏸️ Paused')} (${dailyCount}/${maxDaily} today)`,
     `• <b>Connects Balance:</b> ${connectsText}`,
+    `• <b>Upwork MCP Daily Quota (00:00 UTC):</b> Search: ${searchQuota} · Proposals: ${propQuota} · Reads: ${readQuota}`,
     `• <b>Upwork Cooldown Check:</b> ${escapeTgHtml(cooldownText)}`,
     ...extraLines,
     '',
@@ -1681,16 +1685,20 @@ if (require.main === module) {
       fetch(`${externalUrl}/health`).catch(() => {});
     }, 4 * 60 * 1000);
   } else {
-    // Safe Upwork MCP Radar loop: enforces >= 2 minute interval and strictly respects mcp_freeze_until cooldown windows.
+    // Safe Upwork MCP Radar loop: enforces >= 3 minute interval, respects daily quotas and mcp_freeze_until cooldown windows.
     function scheduleNextUpworkMcpRadar(delayMs = 5000) {
       setTimeout(async () => {
-        const intervalMs = Math.max(2 * 60 * 1000, Number(getSetting('mcp_radar_interval_ms') || 2 * 60 * 1000));
+        const intervalMs = Math.max(3 * 60 * 1000, Number(getSetting('mcp_radar_interval_ms') || 3 * 60 * 1000));
         let nextDelay = intervalMs;
         try {
           const freezeUntil = Number(getSetting('mcp_freeze_until') || 0);
+          const searchCounts = rateLimiter.getCounts('search');
           if (freezeUntil > Date.now()) {
             // Wait until freeze ends (+3s buffer) without touching Upwork MCP
             nextDelay = Math.min(intervalMs, Math.max(15000, (freezeUntil - Date.now()) + 3000));
+          } else if (searchCounts.dayCount >= UPWORK_LIMITS.search.safe.day) {
+            console.log(`[upwork-mcp-radar] Daily search quota reached (${searchCounts.dayCount}/${UPWORK_LIMITS.search.safe.day}). Resting radar until 00:00 UTC.`);
+            nextDelay = 15 * 60 * 1000;
           } else if (getSetting('upwork_mcp_radar_enabled') === true) {
             const token = await getValidAccessToken();
             if (token) {

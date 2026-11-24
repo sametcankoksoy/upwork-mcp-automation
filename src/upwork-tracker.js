@@ -3,6 +3,7 @@ try { dns.setDefaultResultOrder('ipv4first'); } catch {}
 
 const { db, upsertJobAndSnapshot, getSetting, setSetting } = require('./db');
 const { getValidAccessToken } = require('./upwork-oauth');
+const { rateLimiter, UPWORK_LIMITS } = require('./mcp-rate-limiter');
 
 const UPWORK_MCP_URL = process.env.UPWORK_MCP_URL || 'https://mcp.upwork.com/mcp';
 
@@ -35,7 +36,7 @@ async function initMcpSession(accessToken) {
   return cachedSessionId;
 }
 
-async function callUpworkMcpTool(toolName, args, accessToken, retry = true) {
+async function rawMcpFetch(toolName, args, accessToken, retry = true) {
   if (!cachedSessionId) {
     await initMcpSession(accessToken);
   }
@@ -62,7 +63,7 @@ async function callUpworkMcpTool(toolName, args, accessToken, retry = true) {
   if (!res.ok && retry) {
     cachedSessionId = null;
     await initMcpSession(accessToken);
-    return callUpworkMcpTool(toolName, args, accessToken, false);
+    return rawMcpFetch(toolName, args, accessToken, false);
   }
 
   const text = await res.text();
@@ -84,13 +85,18 @@ async function callUpworkMcpTool(toolName, args, accessToken, retry = true) {
   }
   if (parsed.status === 'error') {
     if (parsed.error_code === 'SENSITIVE_RATE_LIMIT_EXCEEDED' && retry) {
-      console.log('Upwork MCP rate limit encountered, waiting 5.5s before retry...');
-      await new Promise(r => setTimeout(r, 5500));
-      return callUpworkMcpTool(toolName, args, accessToken, false);
+      console.warn('[Upwork MCP] SENSITIVE_RATE_LIMIT_EXCEEDED received, applying 15s backoff cooldown before single retry...');
+      rateLimiter.notifyRateLimitError(rateLimiter.classifyCall(toolName, args), 'SENSITIVE_RATE_LIMIT_EXCEEDED', 15);
+      await new Promise(r => setTimeout(r, 15000));
+      return rawMcpFetch(toolName, args, accessToken, false);
     }
     throw new Error(`${parsed.error_code}: ${parsed.reason}`);
   }
   return parsed;
+}
+
+async function callUpworkMcpTool(toolName, args, accessToken, retry = true) {
+  return rateLimiter.execute(toolName, args, () => rawMcpFetch(toolName, args, accessToken, retry));
 }
 
 async function getTalentOrgUid(accessToken) {
@@ -232,10 +238,10 @@ async function runTrackerCycle(options = {}) {
 
   let newJobsFound = 0;
   let jobsUpdated = 0;
-  let mode = accessToken ? 'live_upwork_mcp' : 'lifecycle_poll_simulation';
+  let mode = (accessToken && !options.simulateStep) ? 'live_upwork_mcp' : 'lifecycle_poll_simulation';
 
   try {
-    if (accessToken) {
+    if (accessToken && !options.simulateStep) {
       const orgUid = await getTalentOrgUid(accessToken);
       for (const kw of activeKeywords) {
         const fetched = await fetchLiveJobsForKeyword(kw, accessToken, orgUid, 5);
@@ -414,5 +420,7 @@ module.exports = {
   getTalentOrgUid,
   parseBudgetField,
   parseMoneyString,
-  UPWORK_MCP_URL
+  UPWORK_MCP_URL,
+  rateLimiter,
+  UPWORK_LIMITS
 };
