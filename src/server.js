@@ -14,7 +14,7 @@ const { db, upsertJobAndSnapshot, getSetting, setSetting } = require('./db');
 const { getFullMarketAnalytics } = require('./analytics');
 const { runTrackerCycle, runUpworkMcpRadarCycle, UPWORK_MCP_URL, rateLimiter, UPWORK_LIMITS } = require('./upwork-tracker');
 const { getFlconsoleToken, setFlconsoleToken, runFlconsoleSyncCycle } = require('./flconsole-tracker');
-const { getShareHash, buildRyanCoverLetter, submitAutoProposalForJob, runAutoProposerCycle, setProposalNotificationHandler, setProposalFallbackHandler, ensureVideoGenerated, getDailySubmittedCount, getCurrentTurkeyHour, isNightShiftWindow, getNightShiftSubmittedCount } = require('./auto-proposer');
+const { getShareHash, buildRyanCoverLetter, submitAutoProposalForJob, runAutoProposerCycle, setProposalNotificationHandler, setProposalFallbackHandler, ensureVideoGenerated, getDailySubmittedCount, getCurrentTurkeyHour, isNightShiftWindow, isAutoProposalWindowActive, getNightShiftSubmittedCount } = require('./auto-proposer');
 const { createAuthorizationUrl, exchangeCodeForTokens, getValidAccessToken } = require('./upwork-oauth');
 const { sendVideoWatchEmail, sendBookingEmail, sendAlertEmail, isEmailConfigured } = require('./email-notifier');
 const { resolveCloudVideoMeta, uploadJobVideoToCloud } = require('./cloud-video-sync');
@@ -1048,12 +1048,20 @@ async function buildLiveStatusMessage(header = '🤖 <b>Upwork Automation Live S
   }
 
   const flcEnabled = getSetting('flconsole_sync_enabled') === true;
+  const isWindowActive = isAutoProposalWindowActive();
+  const currentTrHour = getCurrentTurkeyHour();
+  const autoPropStatus = autoPropOn
+    ? (isWindowActive
+        ? `🌙 ACTIVE (Night Shift 00:00–06:00 · ${dailyCount}/${maxDaily} today)`
+        : `💤 Window Paused (Active 00:00–06:00 TR · Now: ${String(currentTrHour).padStart(2, '0')}:00 · ${dailyCount}/${maxDaily} today)`)
+    : '⏸️ Paused';
+
   const lines = [
     header,
     '',
     `• <b>Direct Upwork MCP Radar:</b> ${isFrozen ? `❄️ Frozen (${freezeRemainingLabel} left → resumes every ${intervalMin}m)` : (mcpRadarOn ? `✅ Active (every ${intervalMin} min)` : '🛡️ PAUSED')}`,
     `• <b>flconsole Sync:</b> ${flcEnabled ? `✅ Active (${escapeTgHtml(lastFlc?.details || 'waiting')})` : '⛔ Disabled (Direct MCP Mode)'}`,
-    `• <b>Auto-Proposer (0 Boost, Auto-Confirm):</b> ${isFrozen ? `❄️ Frozen (${freezeRemainingLabel} left)` : (autoPropOn ? '✅ Enabled' : '⏸️ Paused')} (${dailyCount}/${maxDaily} today)`,
+    `• <b>Auto-Proposer (0 Boost, Auto-Confirm):</b> ${isFrozen ? `❄️ Frozen (${freezeRemainingLabel} left)` : autoPropStatus}`,
     `• <b>Connects Balance:</b> ${connectsText}`,
     `• <b>Upwork MCP Daily Quota (00:00 UTC):</b> Search: ${searchQuota} · Proposals: ${propQuota} · Reads: ${readQuota}`,
     `• <b>Upwork Cooldown Check:</b> ${escapeTgHtml(cooldownText)}`,

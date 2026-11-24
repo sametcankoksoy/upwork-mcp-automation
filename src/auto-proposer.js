@@ -52,9 +52,23 @@ function getCurrentTurkeyHour() {
   return trDate.getUTCHours();
 }
 
+function isAutoProposalWindowActive() {
+  const windowEnabled = getSetting('auto_proposal_window_enabled') !== false;
+  if (!windowEnabled) return true; // if disabled, 24/7
+
+  const startHour = Number(getSetting('auto_proposal_window_start') ?? 0); // 0 = 00:00 (gece 12)
+  const endHour = Number(getSetting('auto_proposal_window_end') ?? 6);     // 6 = 06:00 (sabah 6)
+  const currentHour = getCurrentTurkeyHour();
+
+  if (startHour <= endHour) {
+    return currentHour >= startHour && currentHour < endHour;
+  } else {
+    return currentHour >= startHour || currentHour < endHour;
+  }
+}
+
 function isNightShiftWindow() {
-  const trHour = getCurrentTurkeyHour();
-  return trHour >= 1 && trHour < 7;
+  return isAutoProposalWindowActive();
 }
 
 function getNightShiftSubmittedCount() {
@@ -62,8 +76,8 @@ function getNightShiftSubmittedCount() {
     SELECT count(1) as cnt FROM auto_proposals
     WHERE status = 'submitted'
       AND date(created_at, '+3 hours') = date('now', '+3 hours')
-      AND CAST(strftime('%H', created_at, '+3 hours') AS INTEGER) >= 1
-      AND CAST(strftime('%H', created_at, '+3 hours') AS INTEGER) < 7
+      AND CAST(strftime('%H', created_at, '+3 hours') AS INTEGER) >= 0
+      AND CAST(strftime('%H', created_at, '+3 hours') AS INTEGER) < 6
   `).get();
   return Number(row?.cnt || 0);
 }
@@ -283,9 +297,10 @@ function isJobEligibleForAutoProposal(job, options = {}) {
   if (!options.force && isConsultingOrNonBuildJob(job)) return false;
   if (!options.force && !isClientHireRateEligible(job)) return false;
 
-  // 24/7 proposal scheduling (all day, any hour):
+  // Night shift proposal scheduling: strictly active between 00:00 and 06:00 Turkey time
   // Strictly enforce daily limit (max 5 proposals/day) and 100% exact match
   if (!options.force) {
+    if (!isAutoProposalWindowActive()) return false;
     const maxDaily = Number(getSetting('daily_proposal_limit') ?? 5);
     const dailyCount = getDailySubmittedCount();
     if (dailyCount >= maxDaily) return false;
@@ -318,6 +333,7 @@ function isJobEligibleForAutoProposal(job, options = {}) {
 
   const existingProp = db.prepare('SELECT status FROM auto_proposals WHERE job_id = ?').get(job.job_id);
   if (existingProp && TERMINAL_PROPOSAL_STATUSES.has(existingProp.status)) return false;
+  if (!options.force && isInErrorBackoff(job.job_id)) return false;
 
   return true;
 }
@@ -386,7 +402,31 @@ async function ensureVideoGenerated(jobId, strictUnder5 = true) {
   }
 }
 
+// Error-retry guard: failed jobs (error_*) are retried at most MAX_ERROR_ATTEMPTS times, spaced by ERROR_RETRY_COOLDOWN_MS,
+// and the Telegram fallback alert is sent only ONCE per job (previously every 40s cycle re-sent it => notification spam).
+const MAX_ERROR_ATTEMPTS = 2;
+const ERROR_RETRY_COOLDOWN_MS = 5 * 60 * 1000;
+const errorAttempts = new Map();
+const fallbackNotifiedJobs = new Set();
+
+function notifyFallbackOnce(payload) {
+  const id = payload?.job?.job_id;
+  if (!id || fallbackNotifiedJobs.has(id)) return;
+  fallbackNotifiedJobs.add(id);
+  Promise.resolve(onProposalFallbackReady(payload)).catch(() => {});
+}
+
+function isInErrorBackoff(jobId) {
+  const a = errorAttempts.get(jobId);
+  if (!a) return false;
+  return a.count >= MAX_ERROR_ATTEMPTS || (Date.now() - a.last) < ERROR_RETRY_COOLDOWN_MS;
+}
+
 function recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, connectsCost, status, previewId = null, details = '') {
+  if (String(status).startsWith('error_')) {
+    const a = errorAttempts.get(job.job_id) || { count: 0, last: 0 };
+    errorAttempts.set(job.job_id, { count: a.count + 1, last: Date.now() });
+  }
   db.prepare(`
     INSERT INTO auto_proposals (job_id, job_title, share_id, share_url, charged_amount, connects_cost, status, preview_id, details)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -586,24 +626,44 @@ async function submitAutoProposalForJob(job, options = {}) {
       accessToken
     );
   } catch (createErr) {
-    const msg = String(createErr.message || '');
-    if (msg.includes('VJ-JA-10') || msg.toLowerCase().includes('already')) {
-      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_already_applied', null, msg);
-      return { ok: false, status: 'skipped_already_applied', job_id: job.job_id };
+    let msg = String(createErr.message || '');
+    // "Could not read this job's payment terms": retry once without explicit payment_mode/estimated_duration so Upwork infers terms itself
+    if (/payment terms/i.test(msg) && !isHourly) {
+      try {
+        const relaxed = { ...createParams };
+        delete relaxed.payment_mode;
+        delete relaxed.estimated_duration;
+        previewRes = await callUpworkMcpWithRetry(
+          'upwork__manage_proposals',
+          { action: 'create', org_uid: orgUid, params: relaxed },
+          accessToken
+        );
+        delete createParams.payment_mode;
+        delete createParams.estimated_duration;
+        msg = '';
+      } catch (retryErr) {
+        msg = String(retryErr.message || msg);
+      }
     }
-    recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'error_preview', null, msg);
-    if (onProposalFallbackReady && !options.skipFallbackNotify) {
-      Promise.resolve(onProposalFallbackReady({ job, coverLetter, shareUrl, chargedAmount, connectsCost: 0, error: msg })).catch(() => {});
+    if (msg !== '') {
+      if (msg.includes('VJ-JA-10') || msg.toLowerCase().includes('already')) {
+        recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_already_applied', null, msg);
+        return { ok: false, status: 'skipped_already_applied', job_id: job.job_id };
+      }
+      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'error_preview', null, msg);
+      if (onProposalFallbackReady && !options.skipFallbackNotify) {
+        notifyFallbackOnce({ job, coverLetter, shareUrl, chargedAmount, connectsCost: 0, error: msg });
+      }
+      ensureVideoGenerated(job.job_id, false).catch(() => {});
+      return { ok: false, status: 'error_preview', error: msg, job_id: job.job_id };
     }
-    ensureVideoGenerated(job.job_id, false).catch(() => {});
-    return { ok: false, status: 'error_preview', error: msg, job_id: job.job_id };
   }
 
   if (typeof previewRes === 'string' || !previewRes?.preview_id) {
     const errText = typeof previewRes === 'string' ? previewRes : JSON.stringify(previewRes);
     recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'error_preview', null, errText);
     if (onProposalFallbackReady && !options.skipFallbackNotify) {
-      Promise.resolve(onProposalFallbackReady({ job, coverLetter, shareUrl, chargedAmount, connectsCost: 0, error: errText })).catch(() => {});
+      notifyFallbackOnce({ job, coverLetter, shareUrl, chargedAmount, connectsCost: 0, error: errText });
     }
     ensureVideoGenerated(job.job_id, false).catch(() => {});
     return { ok: false, status: 'error_preview', error: errText, job_id: job.job_id };
@@ -649,7 +709,7 @@ async function submitAutoProposalForJob(job, options = {}) {
     } catch (createErr2) {
       recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, baseConnectsCost, 'error_screening_answers', null, createErr2.message);
       if (onProposalFallbackReady && !options.skipFallbackNotify) {
-        Promise.resolve(onProposalFallbackReady({ job, coverLetter, shareUrl, chargedAmount, connectsCost: baseConnectsCost, error: createErr2.message })).catch(() => {});
+        notifyFallbackOnce({ job, coverLetter, shareUrl, chargedAmount, connectsCost: baseConnectsCost, error: createErr2.message });
       }
       ensureVideoGenerated(job.job_id, false).catch(() => {});
       return { ok: false, status: 'error_screening_answers', error: createErr2.message, job_id: job.job_id };
@@ -660,7 +720,7 @@ async function submitAutoProposalForJob(job, options = {}) {
     const errText = typeof previewRes === 'string' ? previewRes : JSON.stringify(previewRes);
     recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, baseConnectsCost, 'error_preview', null, errText);
     if (onProposalFallbackReady && !options.skipFallbackNotify) {
-      Promise.resolve(onProposalFallbackReady({ job, coverLetter, shareUrl, chargedAmount, connectsCost: baseConnectsCost, error: errText })).catch(() => {});
+      notifyFallbackOnce({ job, coverLetter, shareUrl, chargedAmount, connectsCost: baseConnectsCost, error: errText });
     }
     ensureVideoGenerated(job.job_id, false).catch(() => {});
     return { ok: false, status: 'error_preview', error: errText, job_id: job.job_id };
@@ -750,7 +810,7 @@ async function submitAutoProposalForJob(job, options = {}) {
         .catch(err => console.error(`[Auto-Proposer] Background video render error for ${job.job_id}:`, err.stderr || err.message));
     } else if (status === 'error_confirm') {
       if (onProposalFallbackReady && !options.skipFallbackNotify) {
-        Promise.resolve(onProposalFallbackReady({ job, coverLetter, shareUrl, chargedAmount, connectsCost, error: confirmRes })).catch(() => {});
+        notifyFallbackOnce({ job, coverLetter, shareUrl, chargedAmount, connectsCost, error: confirmRes });
       }
       ensureVideoGenerated(job.job_id, false)
         .then(r => console.log(`[Auto-Proposer] Background fallback video render completed for ${job.job_id}`))
@@ -771,7 +831,7 @@ async function submitAutoProposalForJob(job, options = {}) {
   } catch (confirmErr) {
     recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, connectsCost, 'error_confirm', previewRes?.preview_id, confirmErr.message);
     if (onProposalFallbackReady && !options.skipFallbackNotify) {
-      Promise.resolve(onProposalFallbackReady({ job, coverLetter, shareUrl, chargedAmount, connectsCost, error: confirmErr.message })).catch(() => {});
+      notifyFallbackOnce({ job, coverLetter, shareUrl, chargedAmount, connectsCost, error: confirmErr.message });
     }
     ensureVideoGenerated(job.job_id, false)
       .then(r => console.log(`[Auto-Proposer] Background fallback video render completed for ${job.job_id}`))
@@ -787,6 +847,15 @@ async function runAutoProposerCycle(maxPerCycle = 3) {
   const freezeUntil = Number(getSetting('mcp_freeze_until') || 0);
   if (freezeUntil > Date.now()) {
     return { status: 'frozen_cooldown', processed: 0, freezeUntil };
+  }
+  if (!isAutoProposalWindowActive()) {
+    const curH = getCurrentTurkeyHour();
+    return {
+      status: 'outside_window',
+      processed: 0,
+      currentHour: curH,
+      message: `Outside auto-proposal window (Active only 00:00 - 06:00 TR time. Current TR hour: ${curH}:00)`
+    };
   }
   const maxDaily = Number(getSetting('daily_proposal_limit') ?? 5);
   const dailyCount = getDailySubmittedCount();
@@ -896,6 +965,7 @@ module.exports = {
   getShareHash,
   getCurrentTurkeyHour,
   isNightShiftWindow,
+  isAutoProposalWindowActive,
   getNightShiftSubmittedCount,
   getDailySubmittedCount,
   isTamSametlikJob,
