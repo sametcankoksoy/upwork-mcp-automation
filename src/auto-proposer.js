@@ -991,8 +991,8 @@ function buildRyanCoverLetter(job, shareUrl) {
     : 'specifically for your project showing how I would handle this';
 
   return [
-    `☺️ Recorded a quick 35s Loom ${hookTarget}:`,
-    `👉 ${shareUrl}`,
+    `Hey there, made you a quick 35s Loom ${hookTarget}:`,
+    `${shareUrl}`,
     ``,
     `I've done this exact style of project before. I've built similar ${deliverable}, so I can help you get this built and running smoothly.`,
     ``,
