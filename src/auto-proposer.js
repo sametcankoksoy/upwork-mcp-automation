@@ -101,29 +101,22 @@ function isTamSametlikJob(job) {
   if (isBlockedClientCountry(job.client_country)) return false;
   if (isConsultingOrNonBuildJob(job)) return false;
   if (!isClientGeoAndHistoryEligible(job)) return false;
-  if ((job.sniper_score || 0) < 85) return false;
 
   const text = `${job.title || ''}\n${job.description || ''}`;
-  if (!STRICT_CORE_NICHE_RE.test(text)) return false;
   if (LEAD_ENRICHMENT_RE.test(text)) return false;
 
-  // Strict rejection of WordPress, CMS, SEO, Marketing, Copywriting, Translation, Manual VA, and Cold calling across title & full description
-  if (/\b(wordpress|woocommerce|wix|squarespace|shopify|drupal|magento|joomla|prestashop|elementor|divi|webflow)\b/i.test(text)) {
+  // Reject pure CMS/SEO/Ads/Translation/Manual VA/Cold calling noise; let AI judge real engineering fit from full description
+  if (/\b(wordpress|woocommerce|wix|squarespace|drupal|magento|joomla|prestashop|elementor|divi|webflow)\b/i.test(text)) {
     return false;
   }
-  if (/\b(seo|sem|search engine optimization|google search console|semrush|ahrefs|keyword research|backlinks?|link building|hreflang|copywriting|copywriter|content writer|article writer|blog writer|spanish|french|german|italian|portuguese|translation|translator|bilingual|meta ads|facebook ads|google ads|ppc specialist|media buyer)\b/i.test(text)) {
+  if (/\b(seo|sem|search engine optimization|google search console|semrush|ahrefs|keyword research|backlinks?|link building|hreflang|copywriting|copywriter|content writer|article writer|blog writer|translation|translator|meta ads|facebook ads|google ads|ppc specialist|media buyer)\b/i.test(text)) {
     return false;
   }
   if (/\b(virtual assistant|appointment setter|cold call|cold calling|telemarketing|manual data entry|data entry|copy paste|lead enrichment|enrich leads|customer service|customer support)\b/i.test(text)) {
     return false;
   }
 
-  // Require positive match on Sametcan's REAL core builder stack:
-  // AI Automation/Integration, Scrapers (Playwright/Selenium/Puppeteer/BeautifulSoup), Bots & Chatbots, Voice Agents (Vapi/Retell/Twilio), Python/n8n/Make/Zapier Automations, AI Agents (MCP/RAG/LLM), Full-Stack API/Backend
-  const CORE_BUILDER_STACK_RE = /\b(ai automation|automation engineer|workflow automation|business automation|process automation|ai workflow|ai integration|ai chatbot|chatbot|chatbots|playwright|selenium|puppeteer|scrapy|beautifulsoup|web scraping|data scraping|scrape|scraper|scrapers|scraping|crawler|crawling|anti-bot|cloudflare bypass|whatsapp bot|telegram bot|discord bot|slack bot|voice agent|voice ai|vapi|retell|twilio|elevenlabs|bland ai|pipecat|livekit|\bn8n\b|make\.com|zapier|airtable|python script|python automation|python developer|automation script|bot developer|custom bot|ai agent|ai agents|agentic|\bmcp\b|\brag\b|conversational ai|ai backend|chat api|openai|anthropic|claude|langgraph|langchain|crewai|api integration|browser automation|account automation|social media automation|multi-account|simulate interactions)\b/i;
-  if (!CORE_BUILDER_STACK_RE.test(text)) return false;
-
-  // Enforce proposal competition: strictly less than 5 proposals per user mandate
+  // Enforce proposal competition: strictly less than 5 proposals
   const propsNum = Number(job.current_proposals_numeric || 0);
   const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
   const isUnder5Tier = /^(less than 5|fewer than 5|<5|< 5)$/i.test(propsTier)
@@ -293,7 +286,6 @@ function isJobEligibleForAutoProposal(job, options = {}) {
   if (job.job_status && job.job_status !== 'open') return false;
   if (job.is_ghost_job) return false;
   if (isBlockedClientCountry(job.client_country)) return false;
-  if ((job.sniper_score || 0) < 80) return false;
   if (!options.force && isConsultingOrNonBuildJob(job)) return false;
   if (!options.force && !isClientHireRateEligible(job)) return false;
 
@@ -915,7 +907,7 @@ async function runAutoProposerCycle(maxPerCycle = 3) {
       SELECT * FROM jobs
       WHERE job_status = 'open'
         AND is_ghost_job = 0
-        AND sniper_score >= 80
+        AND client_payment_verified = 1
         AND datetime(posted_at) >= datetime('now', '-30 minutes')
         AND (current_proposals_tier LIKE '%less than 5%' OR current_proposals_tier LIKE '%fewer than 5%' OR current_proposals_numeric <= 5)
         AND job_id NOT IN (
