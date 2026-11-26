@@ -518,8 +518,45 @@ async function submitAutoProposalForJob(job, options = {}) {
       }
     }
 
-    // Skip MCP action: 'get' fallback to prevent triggering Upwork's JOB_BROWSE_COOLDOWN (403 denial)
-    // The description and client metadata from radar search / flconsole are already populated.
+    // Verify real client_record (jobs_posted, hire_rate_percent) via rate-limited Upwork MCP action:'get'
+    // so incomplete smart_search summaries (e.g. posted=0/1) never slip past the ghost-client filter.
+    if (!detJob) {
+      try {
+        const preToken = await getValidAccessToken();
+        if (preToken) {
+          const preOrgUid = await getTalentOrgUid(preToken);
+          const mcpDet = await callUpworkMcpWithRetry(
+            'upwork__find_jobs',
+            { action: 'get', org_uid: preOrgUid, params: { job_id: String(job.job_id).replace(/^~?02/, '') } },
+            preToken,
+            1
+          );
+          const cr = mcpDet?.client_record;
+          const mjp = mcpDet?.data?.marketplaceJobPosting;
+          if (cr) {
+            job.client_total_posted = cr.jobs_posted ?? job.client_total_posted;
+            job.client_total_hires = cr.jobs_with_hires ?? cr.contracts_total ?? job.client_total_hires;
+            if (cr.hire_rate_percent !== undefined) {
+              job.client_hire_rate = cr.hire_rate_percent;
+            } else if (job.client_total_posted > 0) {
+              job.client_hire_rate = Math.min(100, Math.round((job.client_total_hires / job.client_total_posted) * 100));
+            }
+            if (cr.spend_total !== undefined) {
+              const parsedSpent = Number(String(cr.spend_total).replace(/[^0-9.]/g, '')) || 0;
+              job.client_total_spent = parsedSpent;
+            }
+          }
+          if (mjp?.content?.description) {
+            job.description = String(mjp.content.description).replace(/<\/?untrusted_participant_content>/g, '').trim();
+          }
+          if (mjp?.clientCompanyPublic?.country?.name) {
+            job.client_country = mjp.clientCompanyPublic.country.name;
+          }
+        }
+      } catch (mcpDetErr) {
+        console.warn(`[Auto-Proposer] MCP action:get verification warning for ${job.job_id}: ${mcpDetErr.message}`);
+      }
+    }
 
     job.sniper_score = calculateSniperScore(job);
     db.prepare(`
