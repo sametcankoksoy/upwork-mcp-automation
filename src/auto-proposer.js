@@ -984,17 +984,12 @@ function inferClientDeliverable(job) {
 
 function buildRyanCoverLetter(job, shareUrl) {
   const deliverable = inferClientDeliverable(job);
-  const text = `${job?.title || ''}\n${job?.description || ''}`;
-  const isProblemJob = /\b(bug|fix|issue|error|fail|failing|broken|debug|block|blocked|captcha|cloudflare|slow|troubleshoot)\b/i.test(text);
-  const hookTarget = isProblemJob
-    ? 'specifically for your problem showing how I would solve this'
-    : 'specifically for your project showing how I would handle this';
 
   return [
-    `Hey there, made you a quick 35s Loom ${hookTarget}:`,
+    `I've done this exact style of project before, made you a quick Loom:`,
     `${shareUrl}`,
     ``,
-    `I've done this exact style of project before. I've built similar ${deliverable}, so I can help you get this built and running smoothly.`,
+    `I've built similar ${deliverable}, so I can help you get this built and running smoothly.`,
     ``,
     `P.S. I've never had a bad review and only five stars on Upwork. So you're in safe hands.`,
     ``,
