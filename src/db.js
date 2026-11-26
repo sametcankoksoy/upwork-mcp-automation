@@ -328,6 +328,10 @@ function isClientGeoAndHistoryEligible(job) {
   const hires = Number(job?.client_total_hires || 0);
   const hireRate = Number(job?.client_hire_rate || 0);
 
+  // When smart_search omits total_posted_jobs (posted === 0) on an active paying/hiring client,
+  // allow pre-filter pass so submitAutoProposalForJob verifies real jobs_posted & hire_rate via action:'get'.
+  if (posted === 0 && (hires >= 1 || spent > 0)) return true;
+
   // Western payment-verified client who is NOT a habitual ghost-job poster
   if (posted <= 1 && spent === 0 && hires === 0 && hireRate === 0) return true;
   if (posted === 2 && hires >= 1) return true;
