@@ -53,8 +53,8 @@ function getCurrentTurkeyHour() {
 }
 
 function isAutoProposalWindowActive() {
-  const windowEnabled = getSetting('auto_proposal_window_enabled') !== false;
-  if (!windowEnabled) return true; // if disabled, 24/7
+  const windowEnabled = getSetting('auto_proposal_window_enabled') === true;
+  if (!windowEnabled) return true; // 24/7 mode active by default
 
   const startHour = Number(getSetting('auto_proposal_window_start') ?? 0); // 0 = 00:00 (gece 12)
   const endHour = Number(getSetting('auto_proposal_window_end') ?? 6);     // 6 = 06:00 (sabah 6)

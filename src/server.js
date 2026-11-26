@@ -1048,12 +1048,15 @@ async function buildLiveStatusMessage(header = '🤖 <b>Upwork Automation Live S
   }
 
   const flcEnabled = getSetting('flconsole_sync_enabled') === true;
+  const windowEnabled = getSetting('auto_proposal_window_enabled') === true;
   const isWindowActive = isAutoProposalWindowActive();
   const currentTrHour = getCurrentTurkeyHour();
   const autoPropStatus = autoPropOn
-    ? (isWindowActive
-        ? `🌙 ACTIVE (Night Shift 00:00–06:00 · ${dailyCount}/${maxDaily} today)`
-        : `💤 Window Paused (Active 00:00–06:00 TR · Now: ${String(currentTrHour).padStart(2, '0')}:00 · ${dailyCount}/${maxDaily} today)`)
+    ? (!windowEnabled
+        ? `✅ Active (24/7 · ${dailyCount}/${maxDaily} today)`
+        : (isWindowActive
+            ? `🌙 ACTIVE (Night Shift 00:00–06:00 · ${dailyCount}/${maxDaily} today)`
+            : `💤 Window Paused (Active 00:00–06:00 TR · Now: ${String(currentTrHour).padStart(2, '0')}:00 · ${dailyCount}/${maxDaily} today)`))
     : '⏸️ Paused';
 
   const lines = [
