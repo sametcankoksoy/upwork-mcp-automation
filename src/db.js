@@ -319,23 +319,13 @@ function isClientGeoAndHistoryEligible(job) {
   // Strictly require Western countries only
   if (!isWesternClientCountry(country)) return false;
 
-  // Strictly require payment_verified for ALL clients (user mandate)
+  // User mandate: ignore posted count; strictly require payment_verified + actual spending/hiring history
   const verified = Boolean(job?.client_payment_verified);
   if (!verified) return false;
 
-  const posted = Number(job?.client_total_posted || 0);
   const spent = Number(job?.client_total_spent || 0);
   const hires = Number(job?.client_total_hires || 0);
-  const hireRate = Number(job?.client_hire_rate || 0);
-
-  // When smart_search omits total_posted_jobs (posted === 0) on an active paying/hiring client,
-  // allow pre-filter pass so submitAutoProposalForJob verifies real jobs_posted & hire_rate via action:'get'.
-  if (posted === 0 && (hires >= 1 || spent > 0)) return true;
-
-  // Western payment-verified client who is NOT a habitual ghost-job poster
-  if (posted <= 1 && spent === 0 && hires === 0 && hireRate === 0) return true;
-  if (posted === 2 && hires >= 1) return true;
-  return hireRate >= 50;
+  return spent > 0 || hires >= 1;
 }
 
 const LEAD_ENRICHMENT_RE = /\b(lead enrichment|enrich lead|enrich leads|b2b leads?|lead list|email list|contact list|cold email|apollo\.io|clay\.com|clayagent|linkedin leads?|yellow pages|skip tracing|extract contact information|email (?:address )?extraction|extract emails?|extract email addresses?|email scraper|scraping emails?)\b/i;
