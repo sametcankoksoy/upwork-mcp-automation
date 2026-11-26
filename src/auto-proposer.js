@@ -320,7 +320,7 @@ function isJobEligibleForAutoProposal(job, options = {}) {
   // Enforce freshness window (strictly <= 20 minutes for Best Match, <= 10 minutes for general) unless forced manually
   if (!options.force && job.posted_at) {
     const minsSincePosted = (Date.now() - new Date(job.posted_at).getTime()) / 60000;
-    const maxMins = job.keyword_matched === 'Best Match' ? 20 : 10;
+    const maxMins = (job.keyword_matched === 'Best Match' || job.keyword_matched === 'Most Recent') ? 20 : 10;
     if (minsSincePosted > maxMins) return false;
   }
 
@@ -488,7 +488,7 @@ async function submitAutoProposalForJob(job, options = {}) {
     }
     if (job.posted_at) {
       const minsSincePosted = (Date.now() - new Date(job.posted_at).getTime()) / 60000;
-      const maxMins = job.keyword_matched === 'Best Match' ? 20 : 10;
+      const maxMins = (job.keyword_matched === 'Best Match' || job.keyword_matched === 'Most Recent') ? 20 : 10;
       if (minsSincePosted > maxMins) {
         recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_freshness_limit', null, `Posted ${Math.round(minsSincePosted)}m ago (>${maxMins}m freshness limit)`);
         return { ok: false, status: 'skipped_over_freshness_limit', job_id: job.job_id };

@@ -297,7 +297,7 @@ async function runTrackerCycle(options = {}) {
 }
 
 const RADAR_TARGETS = [
-  { action: 'smart_search', params: { mode: 'best_match', limit: 10 }, label: 'Best Match' }
+  { action: 'smart_search', params: { mode: 'most_recent', limit: 10 }, label: 'Most Recent' }
 ];
 let currentRadarTargetIndex = 0;
 
@@ -349,7 +349,7 @@ async function runUpworkMcpRadarCycle() {
         job_id: jobId,
         title: j.title,
         description: (j.description || j.description_snippet || '').replace(/<\/?untrusted_participant_content>/g, '').trim(),
-        keyword_matched: target.action === 'smart_search' ? 'Best Match' : (target.params.query?.split(' ')[0] || 'Automation'),
+        keyword_matched: target.action === 'smart_search' ? (target.label || 'Most Recent') : (target.params.query?.split(' ')[0] || 'Automation'),
         job_type: j.job_type === 'hourly' ? 'Hourly' : 'Fixed',
         budget,
         hourly_min: hourlyMin,
