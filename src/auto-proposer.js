@@ -119,8 +119,8 @@ function isTamSametlikJob(job) {
   }
 
   // Require positive match on Sametcan's REAL core builder stack:
-  // Scrapers (Playwright/Selenium/Puppeteer/BeautifulSoup), Bots (WhatsApp/Telegram/Discord), Voice Agents (Vapi/Retell/Twilio), Python/n8n Automations, AI Agents (MCP/RAG), Conversational AI
-  const CORE_BUILDER_STACK_RE = /\b(playwright|selenium|puppeteer|scrapy|beautifulsoup|web scraping|data scraping|scrape|scraper|scrapers|scraping|crawler|crawling|anti-bot|cloudflare bypass|whatsapp bot|telegram bot|discord bot|slack bot|voice agent|voice ai|vapi|retell|twilio|elevenlabs|bland ai|pipecat|livekit|\bn8n\b|make\.com|python script|python automation|automation script|bot developer|custom bot|ai agent|agentic|\bmcp\b|\brag\b|conversational ai|ai backend|chat api|langgraph|langchain|crewai|browser automation|account automation|social media automation|multi-account|simulate interactions)\b/i;
+  // AI Automation/Integration, Scrapers (Playwright/Selenium/Puppeteer/BeautifulSoup), Bots & Chatbots, Voice Agents (Vapi/Retell/Twilio), Python/n8n/Make/Zapier Automations, AI Agents (MCP/RAG/LLM), Full-Stack API/Backend
+  const CORE_BUILDER_STACK_RE = /\b(ai automation|automation engineer|workflow automation|business automation|process automation|ai workflow|ai integration|ai chatbot|chatbot|chatbots|playwright|selenium|puppeteer|scrapy|beautifulsoup|web scraping|data scraping|scrape|scraper|scrapers|scraping|crawler|crawling|anti-bot|cloudflare bypass|whatsapp bot|telegram bot|discord bot|slack bot|voice agent|voice ai|vapi|retell|twilio|elevenlabs|bland ai|pipecat|livekit|\bn8n\b|make\.com|zapier|airtable|python script|python automation|python developer|automation script|bot developer|custom bot|ai agent|ai agents|agentic|\bmcp\b|\brag\b|conversational ai|ai backend|chat api|openai|anthropic|claude|langgraph|langchain|crewai|api integration|browser automation|account automation|social media automation|multi-account|simulate interactions)\b/i;
   if (!CORE_BUILDER_STACK_RE.test(text)) return false;
 
   // Enforce proposal competition: strictly less than 5 proposals per user mandate
