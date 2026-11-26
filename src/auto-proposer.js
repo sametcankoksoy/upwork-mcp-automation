@@ -131,10 +131,10 @@ function isTamSametlikJob(job) {
     || propsTier.includes('fewer than 5');
   if (propsNum > 5 || !isUnder5Tier) return false;
 
-  // Enforce solid rate (Hourly >= $35 or Fixed >= $200)
+  // Enforce solid rate (Hourly >= $30 or Fixed >= $200)
   const isHourly = (job.job_type || '').toLowerCase() === 'hourly';
   if (isHourly) {
-    if (job.hourly_max > 0 && job.hourly_max < 35) return false;
+    if (job.hourly_max > 0 && job.hourly_max < 30) return false;
   } else {
     if (job.budget > 0 && job.budget < 200) return false;
   }
@@ -457,7 +457,7 @@ async function submitAutoProposalForJob(job, options = {}) {
   const shareUrl = `${PUBLIC_BASE_URL}/share/${shareId}`;
   const isHourly = (job.job_type || '').toLowerCase() === 'hourly';
   const chargedAmount = isHourly
-    ? Math.min(50, Math.max(35, Number(job.hourly_max) || 45))
+    ? Math.min(50, Math.max(30, Number(job.hourly_max) || 45))
     : (Number(job.budget) >= 150 ? Number(job.budget) : 450);
 
   if (!options.force) {
