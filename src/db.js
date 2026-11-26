@@ -319,24 +319,16 @@ function isClientGeoAndHistoryEligible(job) {
   // Strictly require Western countries only
   if (!isWesternClientCountry(country)) return false;
 
-  const isTier1 = isTier1FirstPostCountry(country);
+  // Strictly require payment_verified for ALL clients (user mandate)
   const verified = Boolean(job?.client_payment_verified);
+  if (!verified) return false;
+
   const posted = Number(job?.client_total_posted || 0);
   const spent = Number(job?.client_total_spent || 0);
   const hires = Number(job?.client_total_hires || 0);
   const hireRate = Number(job?.client_hire_rate || 0);
 
-  // Rule 1: Tier-1 (US, Canada, UK, Australia, Austria) strictly 1st job only
-  // Must be their VERY FIRST job post (posted <= 1, spent === 0, hires === 0, hireRate === 0)
-  // Strictly rejects spam ghost posters with 2+ jobs and 0 spent/hires
-  if (isTier1 && posted <= 1 && spent === 0 && hires === 0 && hireRate === 0) {
-    return true;
-  }
-
-  // All other cases strictly require payment_verified
-  if (!verified) return false;
-
-  // Rule 2: Western payment-verified client who is NOT a habitual ghost-job poster
+  // Western payment-verified client who is NOT a habitual ghost-job poster
   if (posted <= 1 && spent === 0 && hires === 0 && hireRate === 0) return true;
   if (posted === 2 && hires >= 1) return true;
   return hireRate >= 50;

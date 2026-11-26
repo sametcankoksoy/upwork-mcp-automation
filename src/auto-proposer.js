@@ -545,6 +545,11 @@ async function submitAutoProposalForJob(job, options = {}) {
               const parsedSpent = Number(String(cr.spend_total).replace(/[^0-9.]/g, '')) || 0;
               job.client_total_spent = parsedSpent;
             }
+            if (cr.payment_verified !== undefined) {
+              job.client_payment_verified = cr.payment_verified ? 1 : 0;
+            } else if (cr.verification_status !== undefined) {
+              job.client_payment_verified = cr.verification_status === 'VERIFIED' ? 1 : 0;
+            }
           }
           if (mjp?.content?.description) {
             job.description = String(mjp.content.description).replace(/<\/?untrusted_participant_content>/g, '').trim();
