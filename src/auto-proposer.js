@@ -116,13 +116,14 @@ function isTamSametlikJob(job) {
     return false;
   }
 
-  // Enforce proposal competition: strictly less than 5 proposals
+  // Enforce proposal competition: Less than 5 or 5 to 10 proposals
   const propsNum = Number(job.current_proposals_numeric || 0);
   const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
-  const isUnder5Tier = /^(less than 5|fewer than 5|<5|< 5)$/i.test(propsTier)
+  const isUnder10Tier = /^(less than 5|fewer than 5|<5|< 5|5 to 10|5-10)$/i.test(propsTier)
     || propsTier.includes('less than 5')
-    || propsTier.includes('fewer than 5');
-  if (propsNum > 5 || !isUnder5Tier) return false;
+    || propsTier.includes('fewer than 5')
+    || propsTier.includes('5 to 10');
+  if (propsNum > 10 || !isUnder10Tier) return false;
 
   // Enforce solid rate (Hourly >= $30 or Fixed >= $200)
   const isHourly = (job.job_type || '').toLowerCase() === 'hourly';
@@ -299,13 +300,14 @@ function isJobEligibleForAutoProposal(job, options = {}) {
     if (!isTamSametlikJob(job)) return false;
   }
 
-  // Enforce proposals limit: strictly less than 5 proposals per user mandate
+  // Enforce proposals limit: Less than 5 or 5 to 10 proposals
   const propsNum = Number(job.current_proposals_numeric || 0);
   const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
-  const isUnder5Tier = /^(less than 5|fewer than 5|<5|< 5)$/i.test(propsTier)
+  const isUnder10Tier = /^(less than 5|fewer than 5|<5|< 5|5 to 10|5-10)$/i.test(propsTier)
     || propsTier.includes('less than 5')
-    || propsTier.includes('fewer than 5');
-  if (propsNum > 5 || !isUnder5Tier) {
+    || propsTier.includes('fewer than 5')
+    || propsTier.includes('5 to 10');
+  if (propsNum > 10 || !isUnder10Tier) {
     return false;
   }
 
@@ -471,12 +473,13 @@ async function submitAutoProposalForJob(job, options = {}) {
     }
     const propsNum = Number(job.current_proposals_numeric || 0);
     const propsTier = String(job.current_proposals_tier || 'Less than 5').toLowerCase();
-    const isUnder5Tier = /^(less than 5|fewer than 5|<5|< 5)$/i.test(propsTier)
+    const isUnder10Tier = /^(less than 5|fewer than 5|<5|< 5|5 to 10|5-10)$/i.test(propsTier)
       || propsTier.includes('less than 5')
-      || propsTier.includes('fewer than 5');
-    if (propsNum > 5 || !isUnder5Tier) {
-      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_5_proposals', null, `DB tier=${job.current_proposals_tier} (${propsNum})`);
-      return { ok: false, status: 'skipped_over_5_proposals', job_id: job.job_id };
+      || propsTier.includes('fewer than 5')
+      || propsTier.includes('5 to 10');
+    if (propsNum > 10 || !isUnder10Tier) {
+      recordAutoProposalOutcome(job, shareId, shareUrl, chargedAmount, 0, 'skipped_over_10_proposals', null, `DB tier=${job.current_proposals_tier} (${propsNum})`);
+      return { ok: false, status: 'skipped_over_10_proposals', job_id: job.job_id };
     }
     if (job.posted_at) {
       const minsSincePosted = (Date.now() - new Date(job.posted_at).getTime()) / 60000;
@@ -909,7 +912,7 @@ async function runAutoProposerCycle(maxPerCycle = 3) {
         AND is_ghost_job = 0
         AND client_payment_verified = 1
         AND datetime(posted_at) >= datetime('now', '-30 minutes')
-        AND (current_proposals_tier LIKE '%less than 5%' OR current_proposals_tier LIKE '%fewer than 5%' OR current_proposals_numeric <= 5)
+        AND (current_proposals_tier LIKE '%less than 5%' OR current_proposals_tier LIKE '%fewer than 5%' OR current_proposals_tier LIKE '%5 to 10%' OR current_proposals_numeric <= 10)
         AND job_id NOT IN (
           SELECT job_id FROM auto_proposals
           WHERE status IN (${terminalStatusList})
