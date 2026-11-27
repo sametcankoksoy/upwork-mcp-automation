@@ -341,13 +341,22 @@ function answerScreeningQuestion(question, title, shareUrl) {
   return `Check out the quick 35s Loom I recorded specifically for your ${target}`;
 }
 
+const failedVideoRenderCooldown = new Map();
+
 async function ensureVideoGenerated(jobId, strictUnder5 = true) {
   if (!fs.existsSync(videosDir)) {
     fs.mkdirSync(videosDir, { recursive: true });
   }
   const outPath = path.join(videosDir, `${jobId}.mp4`);
   if (fs.existsSync(outPath)) {
+    failedVideoRenderCooldown.delete(jobId);
     return { generatedNow: false, outPath };
+  }
+
+  const cooldownUntil = failedVideoRenderCooldown.get(jobId) || 0;
+  if (cooldownUntil > Date.now()) {
+    const secs = Math.ceil((cooldownUntil - Date.now()) / 1000);
+    throw new Error(`VIDEO_RENDER_COOLDOWN: Recently failed for ${jobId}, waiting ${secs}s before retry`);
   }
 
   if (activeVideoRenders.has(jobId)) {
@@ -363,10 +372,15 @@ async function ensureVideoGenerated(jobId, strictUnder5 = true) {
     }
 
     console.log(`[Auto-Proposer] Rendering custom Loom video for ${jobId} -> ${upworkUrl} (strictUnder5=${strictUnder5})`);
-    await execFileAsync(pythonCmd, args, {
-      maxBuffer: 1024 * 1024 * 20,
-      timeout: 150000
-    });
+    try {
+      await execFileAsync(pythonCmd, args, {
+        maxBuffer: 1024 * 1024 * 20,
+        timeout: 150000
+      });
+    } catch (renderErr) {
+      failedVideoRenderCooldown.set(jobId, Date.now() + 5 * 60 * 1000);
+      throw renderErr;
+    }
 
     // Automatically publish rendered video + thumbnail + metadata to cloud CDN so Render serves it 24/7 even when PC is off
     try {
