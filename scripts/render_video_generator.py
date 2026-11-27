@@ -82,8 +82,28 @@ def generate_proposal_video(url, out_video_path, proxy=None, strict_under_5=Fals
         if "this job is a private listing" in page_src or "job is no longer available" in page_src:
             raise RuntimeError("PRIVATE_OR_CLOSED_JOB")
 
+        page_title = (sb.get_title() or "").lower()
+        body_text = (sb.get_text("body") or "").strip()
+        body_lower = body_text.lower()
+
+        # Strictly refuse to render if Cloudflare/challenge page is shown or actual job text failed to load
+        challenge_markers = (
+            "just a moment",
+            "verify you are human",
+            "checking your browser",
+            "attention required",
+            "cf-turnstile",
+            "challenges.cloudflare.com",
+            "enable javascript and cookies to continue",
+        )
+        if any(m in page_title or m in body_lower or m in page_src for m in challenge_markers):
+            raise RuntimeError("CLOUDFLARE_OR_CHALLENGE_BLOCKED: Refusing to render video over challenge page")
+
+        job_markers = ("posted", "summary", "proposals", "skills and expertise", "about the client", "hourly", "fixed-price", "project type")
+        if len(body_text) < 250 or not any(m in body_lower for m in job_markers):
+            raise RuntimeError(f"JOB_CONTENT_NOT_LOADED: Refusing to render video without visible job text (len={len(body_text)})")
+
         if strict_under_5:
-            body_text = sb.get_text("body") or ""
             m_prop = re.search(r"Proposals[\s:\r\n]+(10 to 15|15 to 20|20 to 50|50\+)", body_text, re.I)
             if m_prop:
                 raise RuntimeError(f"PROPOSALS_OVER_10:{m_prop.group(1)}")
